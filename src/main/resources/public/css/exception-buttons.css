@@ -1,0 +1,87 @@
+#exc-btns {
+    padding: 5px 10px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    #exc-btns {
+        display: none;
+    }
+}
+
+#exc-btns > button {
+    cursor: pointer;
+    padding: 5px;
+    background: #ccc;
+    border: 1px solid #aaa;
+    color: #666;
+    border-radius: 3px;
+    width: 44%;
+    margin: 0 2.5%;
+    outline: none !important;
+}
+
+#exc-btns > button:hover {
+    background: #cfcfcf;
+    border-color: #777;
+    color: #333;
+}
+
+.tooltipped {
+    position: relative
+}
+
+.tooltipped:after {
+    position: absolute;
+    z-index: 1000000;
+    display: none;
+    padding: 8px 12px;
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
+    text-shadow: none;
+    text-transform: none;
+    letter-spacing: normal;
+    pointer-events: none;
+    content: attr(aria-label);
+    background: #000;
+    border-radius: 3px;
+    -webkit-font-smoothing: subpixel-antialiased;
+    width: 120px;
+}
+
+.tooltipped:before {
+    position: absolute;
+    z-index: 1000001;
+    display: none;
+    width: 0;
+    height: 0;
+    color: #000;
+    pointer-events: none;
+    content: "";
+    border: 5px solid transparent;
+}
+
+.tooltipped:hover:before,
+.tooltipped:hover:after,
+.tooltipped:active:before,
+.tooltipped:active:after,
+.tooltipped:focus:before,
+.tooltipped:focus:after {
+    display: inline-block;
+    text-decoration: none
+}
+
+.tooltipped-s:after {
+    top: 100%;
+    right: -100px; /* width is 120px */
+    margin-top: 5px
+}
+
+.tooltipped-s:before {
+    top: auto;
+    right: 20px;
+    bottom: -5px;
+    margin-right: 5px;
+    border-bottom-color: #000;
+}
