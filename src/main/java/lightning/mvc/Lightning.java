@@ -16,6 +16,7 @@ import java.io.Reader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -67,7 +68,14 @@ import spark.template.freemarker.FreeMarkerEngine;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.gson.FieldNamingPolicy;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 
 import freemarker.cache.ClassTemplateLoader;
 import freemarker.cache.FileTemplateLoader;
@@ -347,6 +355,42 @@ public class Lightning {
       }
     }
   }
+
+  @SuppressWarnings("rawtypes")
+  public static GsonBuilder newGson() {
+    return new GsonBuilder()
+    .setPrettyPrinting()
+    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+    .disableHtmlEscaping()
+    .serializeNulls()
+    // Serialize ENUMs to their ordinal.
+    .registerTypeHierarchyAdapter(Enum.class, new JsonSerializer<Enum>() {
+      @Override
+      public JsonElement serialize(Enum item, Type type, JsonSerializationContext ctx) {
+        return ctx.serialize(item.ordinal());
+      }
+    })
+    // Deserialize ENUMs from their ordinal.
+    .registerTypeHierarchyAdapter(Enum.class, new JsonDeserializer<Enum>() {
+      @Override
+      public Enum deserialize(JsonElement item, Type type, JsonDeserializationContext ctx)
+          throws JsonParseException {
+        if (!(type instanceof Class)) {
+          throw new JsonParseException("Unable to tranlate enum " + type.getTypeName());
+        }
+        
+        Class enumType = (Class) type;
+        Object[] values = enumType.getEnumConstants();
+        int index = item.getAsInt();
+        if (index >= 0 && index < values.length) {
+          logger.debug("Values: {} Ordinal: {}", values, index);
+          return (Enum) values[index];
+        } else {
+          throw new JsonParseException("Unable to tranlate enum " + type.getTypeName());
+        }
+      }
+    });
+  }
   
   public static ProxyController newContext(Request req, Response res) {
     return new ProxyController(req, res, dbp, config, templateEngine);
@@ -362,6 +406,7 @@ public class Lightning {
     
     final boolean requireAuth = method.getAnnotation(RequireAuth.class) != null;
     final boolean makeJson = method.getAnnotation(Json.class) != null;
+    String jsonPrefix = makeJson ? method.getAnnotation(Json.class).prefix() : "";
     final boolean requireXsrf = method.getAnnotation(RequireXsrfToken.class) != null;
     final String xsrfTokenName = requireXsrf ? method.getAnnotation(RequireXsrfToken.class).inputName() : null;
     final boolean producesTemplate = method.getAnnotation(Template.class) != null;
@@ -480,7 +525,11 @@ public class Lightning {
         if (makeJson) {
           response.status(200);
           response.type("application/json; charset=UTF-8");
-          return new GsonBuilder().setPrettyPrinting().create().toJson(value);
+          
+          String json = newGson()
+              .create()
+              .toJson(value);
+          return jsonPrefix + json;
         }
         
         if (producesTemplate && !(value instanceof ModelAndView)) {

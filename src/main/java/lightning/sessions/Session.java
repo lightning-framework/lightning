@@ -402,6 +402,21 @@ public final class Session {
   }
   
   /**
+   * Sets a new XSRF token and returns it.
+   * @return
+   * @throws Exception
+   */
+  public String newXSRFToken() throws Exception {
+    lazyLoad();
+
+    data.put(XSRF_KEY, lightning.crypt.Hashing.generateToken(XSRF_BYTES, (x) -> false));
+    changedKeys.add(XSRF_KEY);
+    isDirty = true;
+    
+    return (String) data.get(XSRF_KEY);
+  }
+  
+  /**
    * Loads all data attached to this session.
    * @throws SessionDriverException On Failure.
    */

@@ -124,6 +124,8 @@ public final class NamedPreparedStatement implements AutoCloseable {
         this.setTimestamp(column, (Timestamp) value);
       } else if (value instanceof Boolean) {
         this.setInt(column, ((Boolean) value).booleanValue() ? 1 : 0); // SQL has no native booleans.
+      } else if (value instanceof SQLNull) {
+        this.setNull(column, ((SQLNull) value).getSqlType());
       } else {
         this.setObject(column, value);
       }
@@ -266,6 +268,10 @@ public final class NamedPreparedStatement implements AutoCloseable {
     for(int i = 0; i < indexes.length; i++) {
       statement.setNull(indexes[i], sqlType);
     }
+  }
+  
+  public void setNull(String name, SQLNull type) throws SQLException {
+    setNull(name, type.getSqlType());
   }
 
   /**

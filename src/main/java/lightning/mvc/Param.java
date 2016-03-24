@@ -47,6 +47,14 @@ public class Param {
     }
   }
   
+  public Object or(Object other) {
+    return isPresent() ? value.get() : other;
+  }
+  
+  public boolean exists() {
+    return isPresent();
+  }
+  
   public String getKey() {
     return key;
   }
@@ -317,11 +325,32 @@ public class Param {
   
   private void require(boolean condition, String type) {
     if (!condition) {
-      throw new BadRequestException("Invalid parameter value for '" + key + "', expected " + type + ".");
+      String sv = value.isPresent() ? value.get() : "EMPTY";
+      throw new BadRequestException("Invalid parameter value for '" + key + "', expected " + type + " but got " + sv + ".");
     }
   }
     
   public static Param wrap(String key, @Nullable String value) {
     return new Param(key, Optional.fromNullable(value));
+  }
+
+  public Object stringOr(Object other) {
+    return stringOption().isPresent() ? stringOption().get() : other;
+  }
+  
+  public Object intOr(Object other) {
+    return intOption().isPresent() ? intOption().get() : other;
+  }
+  
+  public Object longOr(Object other) {
+    return longOption().isPresent() ? longOption().get() : other;
+  }
+  
+  public Object doubleOr(Object other) {
+    return doubleOption().isPresent() ? doubleOption().get() : other;
+  }
+  
+  public Object floatOr(Object other) {
+    return floatOption().isPresent() ? floatOption().get() : other;
   }
 }

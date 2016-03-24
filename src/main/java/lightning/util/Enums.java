@@ -59,6 +59,16 @@ public class Enums {
     }
   }
   
+  public static <T> Optional<T> getValue(Class<T> type, int value) {
+    T[] constants = type.getEnumConstants();
+    
+    if (value >= 0 && value < constants.length) {
+      return Optional.of(constants[value]);
+    } else {
+      return Optional.absent();
+    }
+  }
+  
   /** 
    * Parses a string listing enum values into a set of native enum values.
    * @param type The enum type.

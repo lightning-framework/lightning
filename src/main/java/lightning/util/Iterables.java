@@ -191,4 +191,14 @@ public class Iterables {
     
     throw new IllegalArgumentException("Provided iterable was empty.");
   }
+  
+  public static <T> int length(Iterable<T> collection) {
+    int i = 0;
+    
+    for (@SuppressWarnings("unused") T item : collection) {
+      i += 1;
+    }
+    
+    return i;
+  }
 }
