@@ -203,26 +203,28 @@ public class Lightning {
 
         logger.debug("DebugMode: No route match was found for {} {}", method, req.raw().getPathInfo());
         if (match == null) {
-          // Try to load from static files.
-          File base = new File("./src/main/java/" + config.server.staticFilesPath);
-          File f = new File(base, req.splat()[0]);
-          logger.debug("DebugMode: Trying for static file: " + f.getPath());
-          if(f.exists() && f.canRead() && !f.isDirectory()) {
-            if (!FilenameUtils.directoryContains(base.getCanonicalPath(), f.getCanonicalPath())) {
-              throw new BadRequestException();
+          if (req.splat().length > 0) {
+            // Try to load from static files.
+            File base = new File("./src/main/java/" + config.server.staticFilesPath);
+            File f = new File(base, req.splat()[0]);
+            logger.debug("DebugMode: Trying for static file: " + f.getPath());
+            if(f.exists() && f.canRead() && !f.isDirectory()) {
+              if (!FilenameUtils.directoryContains(base.getCanonicalPath(), f.getCanonicalPath())) {
+                throw new BadRequestException();
+              }
+              
+              res.status(200);
+              res.header("Cache-Control", "public, max-age=0, must-revalidate");
+              res.header("Content-Type", Mimes.forExtension(FilenameUtils.getExtension(f.getName())));
+              res.header("Content-Disposition", "inline; filename=" + f.getName());
+              res.header("Content-Length", Long.toString(f.length()));    
+              try (FileInputStream stream = new FileInputStream(f)) {
+                IOUtils.copy(stream, res.raw().getOutputStream());
+              }
+              return null;
             }
-            
-            res.status(200);
-            res.header("Cache-Control", "public, max-age=0, must-revalidate");
-            res.header("Content-Type", Mimes.forExtension(FilenameUtils.getExtension(f.getName())));
-            res.header("Content-Disposition", "inline; filename=" + f.getName());
-            res.header("Content-Length", Long.toString(f.length()));    
-            try (FileInputStream stream = new FileInputStream(f)) {
-              IOUtils.copy(stream, res.raw().getOutputStream());
-            }
-            return null;
           }
-          
+            
           // Otherwise, not found.
           throw new NotFoundException();
         }
@@ -352,6 +354,7 @@ public class Lightning {
   
   private static void initRoute(Method method, Route route) {
     if (!controllerClasses.contains(method.getDeclaringClass())) {
+      logger.error("Method {} could not be installed as a route because containing class is not declared @Controller.", method);
       return;
     }
     
