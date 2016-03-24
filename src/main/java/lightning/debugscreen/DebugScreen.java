@@ -127,6 +127,7 @@ public class DebugScreen implements ExceptionHandler {
      */
     protected void installTables(LinkedHashMap<String, Map<String, ? extends Object>> tables, Request request, Controller context) {
         tables.put("Headers", setToLinkedHashMap(request.headers(), h -> h, request::headers));
+        tables.get("Headers").remove("Cookie");
         tables.put("Request", getRequestInfo(request));
         tables.put("Route Parameters", request.params());
         tables.put("Query Parameters", setToLinkedHashMap(request.queryParams(), p -> p, request::queryParams));

@@ -1,26 +1,32 @@
 # Lightning
 
-An experimental light-weight web framework for Java that expands on the Spark framework. The philosophy behind it is simple: to maximize developer productivity by making application development as convenient as possible.
+An experimental light-weight web framework for Java that expands on the Spark framework.
+
+The primary goal of this framework is to provide the convenience of PHP-style save-and-refresh development while enabling developers to leverage the type-safety and speed of Java.
+
+The secondary goal of this framework is to make learning web development simple for beginners by having expressive yet simple APIs and powerful error reporting.
+
+This framework was written for use in a course I taught at Rice University.
 
 # Features
 
   - Built-in distributed sessions
-  - Built-in auth, users, groups, and permissions
+  - Built-in authentication and user management (groups and permissions in-progress)
   - Built-in templating with Freemarker
-  - Built-in SQL support
+  - Built-in MySQL support (JOOQ coming soon)
   - Built-in email support
   - Built-in SSL support
   - Built-in support for CAS authentication
   - Built-in support for websockets
   - Built-in support for HTTP multipart
-  - Built-in validator for forms
+  - Built-in validator for POST/GET parameters
   - Built-in security features
     - Passwords are encrypted with BCrypt
     - Cookies are signed and verified with HMAC
-    - Only hashes stored in the database, period
+    - Only hashes stored in the database
   - Powerful debug mode
-    - Develop without ever restarting the server
-    - Detailed in-browser stack traces on errors
+    - **Develop without ever restarting the server** (PHP-style save and refresh)
+    - **Detailed in-browser stack traces on errors**
   - Intelligent annotation-based routing and filters
   - Powerful type-safe HTTP abstractions
 
@@ -146,4 +152,11 @@ public final class TinyUrlController {
   }
 }
 ```
+
+# Error Page
+
+In debug mode, whenever a request handler throws an Error or Exception you will see a detailed stack trace in your browser (in addition to the console):
+
+![Debug Page](https://cloud.githubusercontent.com/assets/3498024/14005744/3fa323ba-f134-11e5-9f72-00da49a46ab7.png "Debug Page")
+
 

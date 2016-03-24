@@ -59,6 +59,11 @@ public class MVC2DemoApp {
       return "Welcome, " + user().getUserName();
     }
     
+    @Route(path="/errordemo", methods={HTTPMethod.GET})
+    public Object errorProducingHandler() throws Exception {
+      throw new Exception("Something went horribly wrong!");
+    }
+    
     @Initializer
     public void hello() {
       
@@ -70,26 +75,28 @@ public class MVC2DemoApp {
     
     Config config = Config.newBuilder()
         .setEnableDebugMode(true) // Don't enable in production (use Flags).
-        .setAutoReloadPrefixes(ImmutableList.of("edu.rice.mschurr.spark.demos.MVC2DemoApp"))
+        .setAutoReloadPrefixes(ImmutableList.of(
+            "lightning.examples.MVC2DemoApp"
+        ))
         .setScanPrefixes(ImmutableList.of(
-            "edu.rice.mschurr.spark.demos.MVC2DemoApp",
-            "edu.rice.mschurr.spark.controllers.mvc2.cas"
+            "lightning.examples.MVC2DemoApp",
+            "lightning.examples.cas"
         ))
         .server.setPort(80)
         .server.setHmacKey("Kas8FJsa01kfF")
-        .server.setStaticFilesPath("edu/rice/mschurr/spark")
-        .server.setTemplateFilesPath("edu/rice/mschurr/spark")
+        .server.setStaticFilesPath("lightning/examples")
+        .server.setTemplateFilesPath("lightning/examples")
         .db.setHost("localhost")
         .db.setPort(3306)
         .db.setUsername("httpd")
         .db.setPassword("httpd")
-        .db.setName("phylodb")
+        .db.setName("exampledb")
         .mail.setAddress("donotreply@riceapps.org")
         .mail.setHost("smtp.riceapps.org")
         .mail.setPort(465)
         .mail.setUseSSL(true)
         .mail.setUsername("donotreply@riceapps.org")
-        .mail.setPassword("todo")
+        .mail.setPassword("")
         .build();
     
     Lightning.launch(config);
