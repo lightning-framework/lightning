@@ -64,6 +64,11 @@ public class MVC2DemoApp {
       throw new Exception("Something went horribly wrong!");
     }
     
+    @Route(path="/assetdemo", methods={HTTPMethod.GET})
+    public String assetHandler() throws Exception {
+      return "<img src=\"smile.png\" alt=\"FAILED\" />";
+    }
+    
     @Initializer
     public void hello() {
       

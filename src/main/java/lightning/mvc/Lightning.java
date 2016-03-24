@@ -10,6 +10,7 @@ import static spark.Spark.threadPool;
 import static spark.Spark.webSocketIdleTimeoutMillis;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.InvocationTargetException;
@@ -43,7 +44,10 @@ import lightning.sessions.drivers.MySQLSessionDriver;
 import lightning.users.Users;
 import lightning.users.drivers.MySQLUserDriver;
 import lightning.util.Enums;
+import lightning.util.Mimes;
 
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
 import org.reflections.scanners.SubTypesScanner;
@@ -172,14 +176,14 @@ public class Lightning {
       Spark.webSocket(path, ws);
       routes.put(new RouteTarget(HTTPMethod.GET, path), null);
     }
-    
-    // Find all controllers.    
-    rescanAnnotations();
-    
+
     if (!config.enableDebugMode) {
       // Serve static files from Jetty (cached) for production.
       staticFileLocation(config.server.staticFilesPath);
     }
+    
+    // Find all controllers.    
+    rescanAnnotations();
     
     if (config.enableDebugMode) {
       spark.Route debugHandler = (req, res) -> {
@@ -196,9 +200,30 @@ public class Lightning {
             method, 
             req.raw().getPathInfo(), 
             Optional.fromNullable(req.headers("Accept")).or("*/*"));
-        
+
+        logger.debug("DebugMode: No route match was found for {} {}", method, req.raw().getPathInfo());
         if (match == null) {
-          logger.debug("DebugMode: No route match was found for {} {}", method, req.raw().getPathInfo());
+          // Try to load from static files.
+          File base = new File("./src/main/java/" + config.server.staticFilesPath);
+          File f = new File(base, req.splat()[0]);
+          logger.debug("DebugMode: Trying for static file: " + f.getPath());
+          if(f.exists() && f.canRead() && !f.isDirectory()) {
+            if (!FilenameUtils.directoryContains(base.getCanonicalPath(), f.getCanonicalPath())) {
+              throw new BadRequestException();
+            }
+            
+            res.status(200);
+            res.header("Cache-Control", "public, max-age=0, must-revalidate");
+            res.header("Content-Type", Mimes.forExtension(FilenameUtils.getExtension(f.getName())));
+            res.header("Content-Disposition", "inline; filename=" + f.getName());
+            res.header("Content-Length", Long.toString(f.length()));    
+            try (FileInputStream stream = new FileInputStream(f)) {
+              IOUtils.copy(stream, res.raw().getOutputStream());
+            }
+            return null;
+          }
+          
+          // Otherwise, not found.
           throw new NotFoundException();
         }
         
@@ -229,25 +254,7 @@ public class Lightning {
     
     Exceptions.installExceptionHandlers(config, privateTemplateEngine);
     
-    // Install static file handling.
-    if (config.enableDebugMode) {
-      // Serve static files from a controller for instant reloads after each request.
-      /*get("/static/*", () -> {
-        File f = new File(base, "static/" + request.splat()[0]);
-        notFoundIf(!f.exists() || !f.canRead() || f.isDirectory());
-        badRequestIf(!FilenameUtils.directoryContains(base.getCanonicalPath(), f.getCanonicalPath()));
-        
-        response.status(200);
-        response.header("Cache-Control", "public, max-age=0, must-revalidate");
-        response.header("Content-Type", Mimes.forExtension(FilenameUtils.getExtension(f.getName())));
-        response.header("Content-Disposition", "inline; filename=" + f.getName());
-        response.header("Content-Length", Long.toString(f.length()));    
-        try (FileInputStream stream = new FileInputStream(f)) {
-          IOUtils.copy(stream, response.raw().getOutputStream());
-        }
-        return null;
-      });*/
-      
+    if (config.enableDebugMode) {      
       // Schedule templates to automatically reload after each request.
       before((request, response) -> { userConfig.clearTemplateCache(); });
       after((request, response) -> { userConfig.clearTemplateCache(); });

@@ -11,11 +11,7 @@
   </appender>
 
   <!-- Logger for our packages. -->
-  <logger name="edu.rice" level="DEBUG" />
-  <logger name="org.riceapps" level="DEBUG" />
-
-  <!-- http://www.jooq.org/doc/3.7/manual/sql-execution/logging/ -->
-  <logger name="org.jooq" level="DEBUG" />
+  <logger name="lightning" level="DEBUG" />
 
   <!-- By default, the level of the root level is set to DEBUG -->
   <root level="WARN">
