@@ -271,7 +271,7 @@ public class Context {
     return context().render(model, viewName);
   }
   
-  public static final void sendFile(File file) {
-    context().sendFile(file);
+  public static final Object sendFile(File file) throws Exception {
+    return context().sendFile(file);
   }
 }

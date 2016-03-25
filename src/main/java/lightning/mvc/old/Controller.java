@@ -3,16 +3,21 @@ package lightning.mvc.old;
 import static spark.Spark.halt;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.Part;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
 
 import lightning.auth.Auth;
 import lightning.auth.AuthException;
@@ -37,6 +42,8 @@ import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
 import lightning.users.User;
 import lightning.users.Users.UsersException;
+import lightning.util.Mimes;
+import lightning.util.Time;
 import spark.ModelAndView;
 import spark.Request;
 import spark.Response;
@@ -44,6 +51,7 @@ import spark.Spark;
 import spark.template.freemarker.FreeMarkerEngine;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.gson.GsonBuilder;
 
 /**
@@ -672,13 +680,65 @@ public abstract class Controller implements AutoCloseable {
     return templateEngine.render(modelAndView(model, viewName));
   }
   
+  private static final Set<String> accessControlTypes = ImmutableSet.of("ttf", "eot", "otf", "woff", "svg");
+  
   /**
    * Writes the contents of a file into the HTTP response, setting headers appropriately.
    * Utilizes cache headers and compression.
    * @param file A file.
    */
-  public void sendFile(File file) {
-    // TODO(mschurr): Implement.
-    throw new NotImplementedException();
+  public Object sendFile(File file) throws Exception {
+    if (!file.exists() || !file.canRead()) {
+      throw new IOException("File does not exist or is not readable.");
+    }
+    
+    if (file.isDirectory()) {
+      throw new IOException("File must not be a directory.");
+    }
+    
+    String etag = Long.toString(file.lastModified());
+    response.header("Cache-Control", "public, max-age=3600, must-revalidate");
+    response.header("Etag", etag);
+    
+    String extension = FilenameUtils.getExtension(file.getName()).toLowerCase();
+    
+    if (accessControlTypes.contains(extension)) {
+      // Firefox requires this header to be set for fonts.
+      response.header("Access-Control-Allow-Origin", "*");
+    }
+    
+    response.header("Last-Modified", Time.formatForHttp(file.lastModified() / 1000));
+    //response.header("Date", Time.formatForHttp(Time.now())); Jetty does this.
+    response.header("Expires", Time.formatForHttp(Time.now() + 3600));
+    
+    boolean cached = false;
+    
+    if (etag.equals(request.headers("If-None-Match"))) {
+      cached = true;
+    }
+    
+    if (request.headers("If-Modified-Since") != null) {
+      long time = Time.parseFromHttp(request.headers("If-Modified-Since"));
+      
+      if (time >= file.lastModified() / 1000) {
+        cached = true;
+      }
+    }
+    
+    if (cached) {
+      response.status(304);
+      response.body("");
+      return null;
+    }
+    
+    response.status(200);
+    response.header("Content-Type", Mimes.forExtension(extension));
+    response.header("Content-Disposition", "inline; filename=" + file.getName());
+    response.header("Content-Length", Long.toString(file.length()));    
+    try (FileInputStream stream = new FileInputStream(file)) {
+      IOUtils.copy(stream, response.raw().getOutputStream());
+    }
+    
+    return null;    
   }
 }

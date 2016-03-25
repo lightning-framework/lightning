@@ -1,8 +1,10 @@
 package lightning.util;
 
-import java.sql.Date;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.util.Date;
+import java.util.Locale;
 import java.util.TimeZone;
 
 /**
@@ -51,6 +53,17 @@ public class Time {
     SimpleDateFormat sdf = new SimpleDateFormat("MM-dd-yyyy hh:mm:ss a z");
     sdf.setTimeZone(TimeZone.getTimeZone("US/Central"));
     return sdf.format(toDate(timestamp));
+  }
+  
+  public static String formatForHttp(long timestamp) {
+    SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
+    sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
+    return sdf.format(new Date(timestamp * 1000));
+  }
+  
+  public static long parseFromHttp(String timestamp) throws ParseException {
+    SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz");
+    return Time.fromDate(format.parse(timestamp));
   }
   
   /**

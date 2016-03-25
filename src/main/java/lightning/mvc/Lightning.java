@@ -195,6 +195,29 @@ public class Lightning {
     
     if (config.enableDebugMode) {
       spark.Route debugHandler = (req, res) -> {
+        // Try static files first (for speed).
+        if (req.splat().length > 0) {
+          // Try to load from static files.
+          File base = new File("./src/main/java/" + config.server.staticFilesPath);
+          File f = new File(base, req.splat()[0]);
+          logger.debug("DebugMode: Trying for static file: " + f.getPath());
+          if(f.exists() && f.canRead() && !f.isDirectory()) {
+            if (!FilenameUtils.directoryContains(base.getCanonicalPath(), f.getCanonicalPath())) {
+              throw new BadRequestException();
+            }
+            
+            res.status(200);
+            res.header("Cache-Control", "public, max-age=0, must-revalidate");
+            res.header("Content-Type", Mimes.forExtension(FilenameUtils.getExtension(f.getName())));
+            res.header("Content-Disposition", "inline; filename=" + f.getName());
+            res.header("Content-Length", Long.toString(f.length()));    
+            try (FileInputStream stream = new FileInputStream(f)) {
+              IOUtils.copy(stream, res.raw().getOutputStream());
+            }
+            return null;
+          }
+        }
+        
         // Remove all routes.
         matcher.clearRoutes();
         
@@ -203,37 +226,16 @@ public class Lightning {
         rescanAnnotationsForDebug();
         
         // Resolve the route.
-        spark.route.HttpMethod method = Enums.getValue(spark.route.HttpMethod.class, req.requestMethod()).get();
+        spark.route.HttpMethod method = Enums.getValue(spark.route.HttpMethod.class, req.raw().getMethod().toLowerCase()).get();
+        String accepts = Optional.fromNullable(req.raw().getHeader("Accept")).or("*/*");
         RouteMatch match = matcher.findTargetForRequestedRoute(
             method, 
             req.raw().getPathInfo(), 
-            Optional.fromNullable(req.headers("Accept")).or("*/*"));
+            accepts);
 
-        logger.debug("DebugMode: No route match was found for {} {}", method, req.raw().getPathInfo());
         if (match == null) {
-          if (req.splat().length > 0) {
-            // Try to load from static files.
-            File base = new File("./src/main/java/" + config.server.staticFilesPath);
-            File f = new File(base, req.splat()[0]);
-            logger.debug("DebugMode: Trying for static file: " + f.getPath());
-            if(f.exists() && f.canRead() && !f.isDirectory()) {
-              if (!FilenameUtils.directoryContains(base.getCanonicalPath(), f.getCanonicalPath())) {
-                throw new BadRequestException();
-              }
-              
-              res.status(200);
-              res.header("Cache-Control", "public, max-age=0, must-revalidate");
-              res.header("Content-Type", Mimes.forExtension(FilenameUtils.getExtension(f.getName())));
-              res.header("Content-Disposition", "inline; filename=" + f.getName());
-              res.header("Content-Length", Long.toString(f.length()));    
-              try (FileInputStream stream = new FileInputStream(f)) {
-                IOUtils.copy(stream, res.raw().getOutputStream());
-              }
-              return null;
-            }
-          }
-            
           // Otherwise, not found.
+          logger.debug("DebugMode: No route match was found for {} {} {}", method, req.raw().getPathInfo(), accepts);
           throw new NotFoundException();
         }
         
@@ -356,11 +358,15 @@ public class Lightning {
     }
   }
 
-  @SuppressWarnings("rawtypes")
   public static GsonBuilder newGson() {
+    return newGson(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  }
+
+  @SuppressWarnings("rawtypes")
+  public static GsonBuilder newGson(FieldNamingPolicy namePolicy) {
     return new GsonBuilder()
     .setPrettyPrinting()
-    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+    .setFieldNamingPolicy(namePolicy)
     .disableHtmlEscaping()
     .serializeNulls()
     // Serialize ENUMs to their ordinal.
@@ -407,12 +413,14 @@ public class Lightning {
     final boolean requireAuth = method.getAnnotation(RequireAuth.class) != null;
     final boolean makeJson = method.getAnnotation(Json.class) != null;
     String jsonPrefix = makeJson ? method.getAnnotation(Json.class).prefix() : "";
+    final FieldNamingPolicy jsonNamePolicy = makeJson ? method.getAnnotation(Json.class).names() : FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES;
     final boolean requireXsrf = method.getAnnotation(RequireXsrfToken.class) != null;
     final String xsrfTokenName = requireXsrf ? method.getAnnotation(RequireXsrfToken.class).inputName() : null;
     final boolean producesTemplate = method.getAnnotation(Template.class) != null;
     final String templateName = producesTemplate ? method.getAnnotation(Template.class).value() : null;
     final boolean requireMultipart = method.getAnnotation(Multipart.class) != null;
     final String accepts = method.getAnnotation(Accepts.class) != null ? method.getAnnotation(Accepts.class).value() : "*/*";
+    
     
     spark.Route action = (request, response) -> {
       Object value = null;
@@ -526,7 +534,7 @@ public class Lightning {
           response.status(200);
           response.type("application/json; charset=UTF-8");
           
-          String json = newGson()
+          String json = newGson(jsonNamePolicy)
               .create()
               .toJson(value);
           return jsonPrefix + json;
@@ -543,7 +551,7 @@ public class Lightning {
     };
     
     for (HTTPMethod httpMethod : route.methods()) {
-      for (String path : ImmutableList.of(route.path(), route.path() + "/")) {
+      for (String path : ImmutableList.of(route.path())) {
         RouteTarget target = new RouteTarget(httpMethod, path);
         
         if (routes.containsKey(target)) {
@@ -551,9 +559,9 @@ public class Lightning {
         }
         
         routes.put(target, null);
-
+        
         if (config.enableDebugMode) {
-          matcher.parseValidateAddRoute(httpMethod.toString().toUpperCase() + " '" + path +"'", accepts, action);
+          matcher.parseValidateAddRoute(httpMethod.name().toLowerCase() + " '" + path +"'", accepts, action);
         } else if (producesTemplate) {
           httpMethod.installRoute(path, accepts, (req, res) -> {
             return (ModelAndView) action.handle(req, res);

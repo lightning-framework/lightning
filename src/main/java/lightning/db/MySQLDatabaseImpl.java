@@ -11,9 +11,6 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Encapsulates a connection to a MySQL database.
  * This object is not thread-safe; ideally should have one connection per thread.
@@ -22,7 +19,7 @@ import org.slf4j.LoggerFactory;
  * @see http://zetcode.com/db/mysqljava/
  */
 public class MySQLDatabaseImpl implements MySQLDatabase {
-  private final static Logger logger = LoggerFactory.getLogger(MySQLDatabase.class);
+  //private final static Logger logger = LoggerFactory.getLogger(MySQLDatabase.class);
   private final String hostName;
   private final int port;
   private final String userName;
@@ -129,10 +126,10 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
   public <T> T transaction(Transaction<T> transaction) throws Exception {
     try {
       transactionLock.lock();
-      logger.debug("Transaction Starts");
+      //logger.debug("Transaction Starts");
       
       if (transactions.isEmpty()) {
-        logger.debug("SET TRANSACTION = 1;");
+        //logger.debug("SET TRANSACTION = 1;");
         connection.setAutoCommit(false);
       }
       
@@ -143,25 +140,25 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
       transactions.pop();
       
       if (transactions.isEmpty()) {
-        logger.debug("COMMIT, SET TRANSACTION = 0;");
+        //logger.debug("COMMIT, SET TRANSACTION = 0;");
         connection.commit();
         connection.setAutoCommit(true);
         transactionLock.unlock();
       }
       
-      logger.debug("Transaction Ends (Normal)");
+      //logger.debug("Transaction Ends (Normal)");
       return result;
     } catch (Exception e) {
       transactions.pop();
       
       if (transactions.isEmpty()) {
-        logger.debug("ROLLBACK, SET TRANSACTION = 0;");
+        //logger.debug("ROLLBACK, SET TRANSACTION = 0;");
         connection.rollback();
         connection.setAutoCommit(true);
         transactionLock.unlock();
       }
       
-      logger.debug("Transaction Ends (Exception)");
+      //logger.debug("Transaction Ends (Exception)");
       
       throw e;
     }

@@ -51,10 +51,10 @@ public class LoginController {
       // Re-use the existing user record (if present), otherwise create a new user.
       // Note: We're just using a fixed constant password here, because the password will never be used
       // for anything since all authentication happens through CAS anyways but the native API requires it.
-      Optional<User> userOpt = Optional.fromNullable(Users.getByName(casUser.username + DOMAIN));
+      Optional<User> userOpt = Optional.fromNullable(Users.getByName(casUser.username));
       User user = userOpt.isPresent() ? 
           userOpt.get() : 
-          Users.create(casUser.username + DOMAIN, casUser.username + DOMAIN, PASSWORD);
+          Users.create(casUser.username, casUser.username + DOMAIN, PASSWORD);
       
       // Log the user into the native user account that we created based on their CAS account.
       // Use attempt(...) to subject to security measures including throttling.
