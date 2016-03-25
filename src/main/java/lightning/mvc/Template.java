@@ -14,5 +14,5 @@ import java.lang.annotation.Target;
  * view model for the template with the given name.
  */
 public @interface Template {
-  String value();
+  String value() default "";
 }
