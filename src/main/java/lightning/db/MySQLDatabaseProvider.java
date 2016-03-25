@@ -69,7 +69,7 @@ public final class MySQLDatabaseProvider {
     source.setUser(user);
     source.setPassword(password);
     source.setMinPoolSize(5);
-    source.setMaxPoolSize(40);
+    source.setMaxPoolSize(100);
     source.setAcquireIncrement(5);
     source.setMaxStatements(500); // To be cached.
     source.setAcquireRetryAttempts(3);
