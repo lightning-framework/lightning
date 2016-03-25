@@ -6,7 +6,7 @@ import lightning.mail.Mail;
 
 import com.google.common.collect.ImmutableList;
 
-public final class Config {  
+public final class OldConfig {  
   /**
    * Whether or not to enable debug mode.
    * In debug mode, you will be shown stack traces in browser and assets/templates
@@ -32,7 +32,7 @@ public final class Config {
   public final MailConfig mail;
   public final DBConfig db;
   
-  private Config(boolean enableDebugMode, ImmutableList<String> autoReloadPrefixes, ImmutableList<String> scanPrefixes, SSLConfig ssl, 
+  private OldConfig(boolean enableDebugMode, ImmutableList<String> autoReloadPrefixes, ImmutableList<String> scanPrefixes, SSLConfig ssl, 
       ServerConfig server, MailConfig mail, DBConfig db) {
     this.enableDebugMode = enableDebugMode;
     this.autoReloadPrefixes = autoReloadPrefixes;
@@ -68,32 +68,32 @@ public final class Config {
     }
     
     public static final class Builder {
-      private final Config.Builder parent;
+      private final OldConfig.Builder parent;
       private String keyStoreFile = null;
       private String keyStorePassword = null;
       private String trustStoreFile = null;
       private String trustStorePassword = null;
       
-      private Builder(Config.Builder parent) {
+      private Builder(OldConfig.Builder parent) {
         this.parent = parent;
       }
       
-      public Config.Builder setKeyStoreFile(String keyStoreFile) {
+      public OldConfig.Builder setKeyStoreFile(String keyStoreFile) {
         this.keyStoreFile = keyStoreFile;
         return parent;
       }
       
-      public Config.Builder setKeyStorePassword(String keyStorePassword) {
+      public OldConfig.Builder setKeyStorePassword(String keyStorePassword) {
         this.keyStorePassword = keyStorePassword;
         return parent;
       }
       
-      public Config.Builder setTrustStoreFile(String trustStoreFile) {
+      public OldConfig.Builder setTrustStoreFile(String trustStoreFile) {
         this.trustStoreFile = trustStoreFile;
         return parent;
       }
       
-      public Config.Builder setTrustStorePassword(String trustStorePassword) {
+      public OldConfig.Builder setTrustStorePassword(String trustStorePassword) {
         this.trustStorePassword = trustStorePassword;
         return parent;
       }
@@ -128,7 +128,7 @@ public final class Config {
     }
     
     public static final class Builder {
-      private final Config.Builder parent;
+      private final OldConfig.Builder parent;
       private String hmacKey;
       private int port = 8080;
       private int threads = 40;
@@ -137,41 +137,41 @@ public final class Config {
       private String templateFilesPath;
       private boolean trustLoadBalancerHeaders;
       
-      private Builder(Config.Builder parent) {
+      private Builder(OldConfig.Builder parent) {
         this.parent = parent;
       }
       
-      public Config.Builder setHmacKey(String hmacKey) {
+      public OldConfig.Builder setHmacKey(String hmacKey) {
         this.hmacKey = hmacKey;
         return parent;
       }
       
-      public Config.Builder setPort(int port) {
+      public OldConfig.Builder setPort(int port) {
         this.port = port;
         return parent;
       }
       
-      public Config.Builder setThreads(int threads) {
+      public OldConfig.Builder setThreads(int threads) {
         this.threads = threads;
         return parent;
       }
       
-      public Config.Builder setTimeoutMs(int timeoutMs) {
+      public OldConfig.Builder setTimeoutMs(int timeoutMs) {
         this.timeoutMs = timeoutMs;
         return parent;
       }
       
-      public Config.Builder setStaticFilesPath(String staticFilesPath) {
+      public OldConfig.Builder setStaticFilesPath(String staticFilesPath) {
         this.staticFilesPath = staticFilesPath;
         return parent;
       }
       
-      public Config.Builder setTemplateFilesPath(String templateFilesPath) {
+      public OldConfig.Builder setTemplateFilesPath(String templateFilesPath) {
         this.templateFilesPath = templateFilesPath;
         return parent;
       }
       
-      public Config.Builder setTrustLoadBalancerHeaders(boolean trustLoadBalancerHeaders) {
+      public OldConfig.Builder setTrustLoadBalancerHeaders(boolean trustLoadBalancerHeaders) {
         this.trustLoadBalancerHeaders = trustLoadBalancerHeaders;
         return parent;
       }
@@ -238,7 +238,7 @@ public final class Config {
     }
     
     public static final class Builder {
-      private final Config.Builder parent;
+      private final OldConfig.Builder parent;
       private boolean useSSL = true;
       private String address;
       private String username;
@@ -246,36 +246,36 @@ public final class Config {
       private String host;
       private int port = 465;
       
-      private Builder(Config.Builder parent) {
+      private Builder(OldConfig.Builder parent) {
         this.parent = parent;
       }
       
-      public Config.Builder setUseSSL(boolean useSSL) {
+      public OldConfig.Builder setUseSSL(boolean useSSL) {
         this.useSSL = useSSL;
         return parent;
       }
       
-      public Config.Builder setAddress(String address) {
+      public OldConfig.Builder setAddress(String address) {
         this.address = address;
         return parent;
       }
       
-      public Config.Builder setUsername(String username) {
+      public OldConfig.Builder setUsername(String username) {
         this.username = username;
         return parent;
       }
       
-      public Config.Builder setPassword(String password) {
+      public OldConfig.Builder setPassword(String password) {
         this.password = password;
         return parent;
       }
       
-      public Config.Builder setHost(String host) {
+      public OldConfig.Builder setHost(String host) {
         this.host = host;
         return parent;
       }
       
-      public Config.Builder setPort(int port) {
+      public OldConfig.Builder setPort(int port) {
         this.port = port;
         return parent;
       }
@@ -309,38 +309,38 @@ public final class Config {
     }
     
     public static final class Builder {
-      private final Config.Builder parent;
+      private final OldConfig.Builder parent;
       private String host = null;
       private int port = 3306;
       private String username = "root";
       private String password = null;
       private String name = null;
       
-      private Builder(Config.Builder parent) {
+      private Builder(OldConfig.Builder parent) {
         this.parent = parent;
       }
       
-      public Config.Builder setHost(String host) {
+      public OldConfig.Builder setHost(String host) {
         this.host = host;
         return parent;
       }
       
-      public Config.Builder setPort(int port) {
+      public OldConfig.Builder setPort(int port) {
         this.port = port;
         return parent;
       }
       
-      public Config.Builder setUsername(String username) {
+      public OldConfig.Builder setUsername(String username) {
         this.username = username;
         return parent;
       }
       
-      public Config.Builder setPassword(String password) {
+      public OldConfig.Builder setPassword(String password) {
         this.password = password;
         return parent;
       }
       
-      public Config.Builder setName(String name) {
+      public OldConfig.Builder setName(String name) {
         this.name = name;
         return parent;
       }
@@ -377,8 +377,8 @@ public final class Config {
       return this;
     }
     
-    public Config build() {
-      return new Config(enableDebugMode, autoReloadPrefixes, scanPrefixes, ssl.build(), server.build(), mail.build(), db.build());
+    public OldConfig build() {
+      return new OldConfig(enableDebugMode, autoReloadPrefixes, scanPrefixes, ssl.build(), server.build(), mail.build(), db.build());
     }
   }
   

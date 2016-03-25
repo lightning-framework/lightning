@@ -697,19 +697,7 @@ public abstract class Controller implements AutoCloseable {
     }
     
     String etag = Long.toString(file.lastModified());
-    response.header("Cache-Control", "public, max-age=3600, must-revalidate");
-    response.header("Etag", etag);
-    
     String extension = FilenameUtils.getExtension(file.getName()).toLowerCase();
-    
-    if (accessControlTypes.contains(extension)) {
-      // Firefox requires this header to be set for fonts.
-      response.header("Access-Control-Allow-Origin", "*");
-    }
-    
-    response.header("Last-Modified", Time.formatForHttp(file.lastModified() / 1000));
-    //response.header("Date", Time.formatForHttp(Time.now())); Jetty does this.
-    response.header("Expires", Time.formatForHttp(Time.now() + 3600));
     
     boolean cached = false;
     
@@ -726,15 +714,25 @@ public abstract class Controller implements AutoCloseable {
     }
     
     if (cached) {
-      response.status(304);
-      response.body("");
+      response.raw().setStatus(304);
+      response.raw().getOutputStream().close(); // #JustJettyThings
       return null;
     }
     
-    response.status(200);
+    response.header("Cache-Control", "public, max-age=3600, must-revalidate");
+    response.header("Etag", etag);
+    if (accessControlTypes.contains(extension)) {
+      // Firefox requires this header to be set for fonts.
+      response.header("Access-Control-Allow-Origin", "*");
+    }
+    response.header("Last-Modified", Time.formatForHttp(file.lastModified() / 1000));
+    //response.header("Date", Time.formatForHttp(Time.now())); Jetty does this.
+    response.header("Expires", Time.formatForHttp(Time.now() + 3600));
     response.header("Content-Type", Mimes.forExtension(extension));
     response.header("Content-Disposition", "inline; filename=" + file.getName());
     response.header("Content-Length", Long.toString(file.length()));    
+    
+    response.status(200);
     try (FileInputStream stream = new FileInputStream(file)) {
       IOUtils.copy(stream, response.raw().getOutputStream());
     }

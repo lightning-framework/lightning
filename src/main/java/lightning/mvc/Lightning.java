@@ -67,7 +67,6 @@ import spark.routematch.RouteMatch;
 import spark.template.freemarker.FreeMarkerEngine;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
@@ -101,8 +100,9 @@ public class Lightning {
   private static final String TEMPLATE_SUFFIX = "</#escape>";
   
   @SuppressWarnings("deprecation")
-  public static void launch(Config cfg) throws Exception {
-    config = cfg;
+  public static void launch(Config config) throws Exception {
+    Lightning.config = config;
+    logger.info("Config: {}", config);
     logger.info("Working Directory: " + (new java.io.File(".").getCanonicalPath()));
     
     // Configure spark.
@@ -156,6 +156,8 @@ public class Lightning {
     File templateFolder = (new File("./src/main/java/" + config.server.templateFilesPath)).exists() ?
         new File("./src/main/java/" + config.server.templateFilesPath) :
         new File(config.server.templateFilesPath);
+    templateFolder = templateFolder.exists() ? templateFolder : 
+      new File("./src/main/resources/" + config.server.templateFilesPath);
         
     userConfig.setTemplateLoader(new FileTemplateLoader(templateFolder) {
       @Override
@@ -198,9 +200,16 @@ public class Lightning {
         // Try static files first (for speed).
         if (req.splat().length > 0) {
           // Try to load from static files.
-          File base = new File("./src/main/java/" + config.server.staticFilesPath);
+          File base = new File(config.server.staticFilesPath);
+          if (!base.exists()) {
+            base = new File("./src/main/java/" + config.server.staticFilesPath);
+          }
+          if(!base.exists()) {
+            base = new File("./src/main/resources/" + config.server.staticFilesPath);
+          }
+          
           File f = new File(base, req.splat()[0]);
-          logger.debug("DebugMode: Trying for static file: " + f.getPath());
+          //logger.debug("DebugMode: Trying for static file: " + f.getPath());
           if(f.exists() && f.canRead() && !f.isDirectory()) {
             if (!FilenameUtils.directoryContains(base.getCanonicalPath(), f.getCanonicalPath())) {
               throw new BadRequestException();
@@ -551,7 +560,14 @@ public class Lightning {
     };
     
     for (HTTPMethod httpMethod : route.methods()) {
-      for (String path : ImmutableList.of(route.path())) {
+      List<String> paths = new ArrayList<>();
+      paths.add(route.path());
+      
+      if (!route.path().endsWith("/")) {
+        paths.add(route.path() + "/");
+      }
+      
+      for (String path : paths) {
         RouteTarget target = new RouteTarget(httpMethod, path);
         
         if (routes.containsKey(target)) {

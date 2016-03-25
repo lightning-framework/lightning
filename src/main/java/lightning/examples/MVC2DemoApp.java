@@ -1,5 +1,8 @@
 package lightning.examples;
 
+import java.io.FileInputStream;
+
+import spark.utils.IOUtils;
 import lightning.config.Config;
 import lightning.mvc.Controller;
 import lightning.mvc.HTTPMethod;
@@ -77,33 +80,7 @@ public class MVC2DemoApp {
   
   public static void main(String[] args) throws Exception {
     Flags.parse(args);
-    
-    Config config = Config.newBuilder()
-        .setEnableDebugMode(true) // Don't enable in production (use Flags).
-        .setAutoReloadPrefixes(ImmutableList.of(
-            "lightning.examples.MVC2DemoApp"
-        ))
-        .setScanPrefixes(ImmutableList.of(
-            "lightning.examples.MVC2DemoApp",
-            "lightning.examples.cas"
-        ))
-        .server.setPort(80)
-        .server.setHmacKey("Kas8FJsa01kfF")
-        .server.setStaticFilesPath("lightning/examples")
-        .server.setTemplateFilesPath("lightning/examples")
-        .db.setHost("localhost")
-        .db.setPort(3306)
-        .db.setUsername("httpd")
-        .db.setPassword("httpd")
-        .db.setName("exampledb")
-        .mail.setAddress("donotreply@riceapps.org")
-        .mail.setHost("smtp.riceapps.org")
-        .mail.setPort(465)
-        .mail.setUseSSL(true)
-        .mail.setUsername("donotreply@riceapps.org")
-        .mail.setPassword("")
-        .build();
-    
+    Config config = Lightning.newGson().create().fromJson(IOUtils.toString(new FileInputStream(Flags.getFile("config"))), Config.class);
     Lightning.launch(config);
   }
 }
