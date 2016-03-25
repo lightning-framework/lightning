@@ -3,12 +3,12 @@ package lightning.examples;
 import java.io.FileInputStream;
 
 import spark.utils.IOUtils;
+import lightning.Lightning;
 import lightning.config.Config;
 import lightning.mvc.Controller;
 import lightning.mvc.HTTPMethod;
 import lightning.mvc.Initializer;
 import lightning.mvc.Json;
-import lightning.mvc.Lightning;
 import lightning.mvc.QParam;
 import lightning.mvc.RParam;
 import lightning.mvc.RequireAuth;
@@ -19,7 +19,7 @@ import lightning.util.Flags;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import static lightning.mvc.Context.*;
+import static lightning.Context.*;
 
 public class MVC2DemoApp {  
   @Controller

@@ -1,12 +1,12 @@
 package lightning.examples.cas;
 
-import static lightning.mvc.Context.auth;
-import static lightning.mvc.Context.redirect;
-import static lightning.mvc.Context.redirectIfLoggedIn;
-import static lightning.mvc.Context.redirectIfNotLoggedIn;
-import static lightning.mvc.Context.request;
-import static lightning.mvc.Context.response;
-import static lightning.mvc.Context.url;
+import static lightning.Context.auth;
+import static lightning.Context.redirect;
+import static lightning.Context.redirectIfLoggedIn;
+import static lightning.Context.redirectIfNotLoggedIn;
+import static lightning.Context.request;
+import static lightning.Context.response;
+import static lightning.Context.url;
 import lightning.mvc.Controller;
 import lightning.mvc.HTTPMethod;
 import lightning.mvc.Initializer;

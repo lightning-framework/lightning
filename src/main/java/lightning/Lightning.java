@@ -1,4 +1,4 @@
-package lightning.mvc;
+package lightning;
 
 import static spark.Spark.after;
 import static spark.Spark.before;
@@ -40,6 +40,24 @@ import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
 import lightning.io.WrappingReader;
 import lightning.mail.Mail;
+import lightning.mvc.Accepts;
+import lightning.mvc.Controller;
+import lightning.mvc.HTTPMethod;
+import lightning.mvc.Initializer;
+import lightning.mvc.Json;
+import lightning.mvc.Multipart;
+import lightning.mvc.Param;
+import lightning.mvc.ProxyController;
+import lightning.mvc.QParam;
+import lightning.mvc.RParam;
+import lightning.mvc.RequireAuth;
+import lightning.mvc.RequireXsrfToken;
+import lightning.mvc.Route;
+import lightning.mvc.RouteAction;
+import lightning.mvc.RouteTarget;
+import lightning.mvc.Routes;
+import lightning.mvc.Template;
+import lightning.mvc.WebSocketController;
 import lightning.sessions.Session;
 import lightning.sessions.drivers.MySQLSessionDriver;
 import lightning.users.Users;
@@ -143,7 +161,7 @@ public class Lightning {
     // Configure template loaders.
     FreeMarkerEngine privateTemplateEngine = new FreeMarkerEngine();
     Configuration privateConfig = new Configuration();
-    privateConfig.setTemplateLoader(new ClassTemplateLoader(Lightning.class, "../templates") {
+    privateConfig.setTemplateLoader(new ClassTemplateLoader(Lightning.class, "templates/") {
       @Override
       public Reader getReader(Object templateSource, String encoding) throws IOException {
         return new WrappingReader(super.getReader(templateSource, encoding), TEMPLATE_PREFIX, TEMPLATE_SUFFIX);

@@ -12,8 +12,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import lightning.Lightning;
 import lightning.auth.AuthException;
-import lightning.mvc.Lightning;
 import lightning.mvc.old.Controller;
 import lightning.sessions.Session.SessionException;
 import lightning.util.Iterables;

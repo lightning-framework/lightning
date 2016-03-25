@@ -1,4 +1,4 @@
-package lightning.mvc;
+package lightning;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,6 +21,11 @@ import lightning.http.MethodNotAllowedException;
 import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
+import lightning.mvc.Param;
+import lightning.mvc.ParamTester;
+import lightning.mvc.ProxyController;
+import lightning.mvc.URLGenerator;
+import lightning.mvc.Validator;
 import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
