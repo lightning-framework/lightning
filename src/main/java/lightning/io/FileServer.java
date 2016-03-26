@@ -16,6 +16,7 @@ import javax.servlet.UnavailableException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import lightning.http.NotFoundException;
 import lightning.util.Mimes;
 
 import org.apache.commons.io.FilenameUtils;
@@ -266,6 +267,36 @@ public class FileServer implements ResourceFactory {
   }
 
   /* ------------------------------------------------------------ */
+  
+  // NOTE: Doesn't use resource cache or memory mapping, but still supports full spec.
+  public void sendResource(HttpServletRequest request, HttpServletResponse response, Resource resource) throws IOException {
+    if (resource == null || !resource.exists()) {
+      throw new NotFoundException();
+    }
+    
+    HttpContent content = null;
+    boolean close_content = true;
+    Enumeration<String> reqRanges = null;
+    
+    try {
+      reqRanges = request.getHeaders(HttpHeader.RANGE.asString());
+      if (!hasDefinedRange(reqRanges))
+        reqRanges = null;
+      
+      content =
+          new ResourceHttpContent(resource,
+              Mimes.forPath(resource.toString()), response.getBufferSize());
+      
+      if (passConditionalHeaders(request, response, resource, content)) {
+        close_content = sendData(request, response, false, resource, content, reqRanges);
+      }
+    } finally {
+      if (close_content  && content != null) {
+        content.release();
+      }
+    }
+  }
+  
   @SuppressWarnings("resource")
   public void handle(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {

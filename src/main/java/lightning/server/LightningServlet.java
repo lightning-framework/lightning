@@ -97,7 +97,7 @@ public class LightningServlet extends HttpServlet {
     HandlerContext ctx = null;
     
     try {      
-      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig);
+      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer);
       Context.setContext(ctx);
       
       if (config.enableDebugMode) {

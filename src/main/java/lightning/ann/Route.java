@@ -35,6 +35,8 @@ import lightning.enums.HTTPMethod;
  * Routes will be automatically installed based on the 
  * presence of these annotations.
  * 
+ * Routes take precedence over static files.
+ * 
  * Routes must be instance methods and declared public.
  */
 public @interface Route {

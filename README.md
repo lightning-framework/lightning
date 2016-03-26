@@ -28,6 +28,7 @@ This framework was written for use in a course I taught at Rice University.
     - **Detailed in-browser stack traces on errors**
   - Intelligent annotation-based routing and filters
   - Powerful type-safe HTTP abstractions
+  - Async request handling
   
 # Coming Soon
 

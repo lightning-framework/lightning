@@ -1,7 +1,6 @@
 package lightning.mvc;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.sql.SQLException;
@@ -9,14 +8,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.Part;
-
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 
 import lightning.auth.Auth;
 import lightning.auth.AuthException;
@@ -35,20 +30,16 @@ import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
 import lightning.http.Request;
 import lightning.http.Response;
-import lightning.mvc.Param;
-import lightning.mvc.ParamTester;
-import lightning.mvc.URLGenerator;
-import lightning.mvc.Validator;
+import lightning.io.FileServer;
 import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
 import lightning.users.User;
 import lightning.users.Users.UsersException;
-import lightning.util.Mimes;
-import lightning.util.Time;
+
+import org.eclipse.jetty.util.resource.Resource;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.gson.GsonBuilder;
 
 import freemarker.template.Configuration;
@@ -70,13 +61,14 @@ public class HandlerContext implements AutoCloseable {
   public final Session session;
   public final Auth auth;
   public final MySQLDatabase db;
+  private final FileServer fs;
   private boolean isAsync;
   private final MySQLDatabaseProxy dbProxy;
   
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
 
-  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, Configuration te) {
+  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, Configuration te, FileServer fs) {
     this.request = rq;
     this.response = re;
     this.config = c;
@@ -89,6 +81,7 @@ public class HandlerContext implements AutoCloseable {
     this.dbProxy = new MySQLDatabaseProxy(dbp);
     this.db = dbProxy;
     this.isAsync = false;
+    this.fs = fs;
   }
   
   public void goAsync() {
@@ -675,63 +668,24 @@ public class HandlerContext implements AutoCloseable {
     return stringWriter.toString();
   }
   
-  private static final Set<String> accessControlTypes = ImmutableSet.of("ttf", "eot", "otf", "woff", "svg");
+  //private static final Set<String> accessControlTypes = ImmutableSet.of("ttf", "eot", "otf", "woff", "svg");
   
   /**
    * Writes the contents of a file into the HTTP response, setting headers appropriately.
-   * Utilizes cache headers and compression.
+   * IMPORTANT: When a handler calls sendFile(), that handler essentially acts as if it exposes
+   *            the given file as if it were a static file. Thus, the entire HTTP specification 
+   *            is supported (partials, caching, etc) as if it were a static file being served.
+   *            Takes advantage of async IO for speed.
+   *            File name may be exposed to user.
    * @param file A file.
    */
   public Object sendFile(File file) throws Exception {
-    // TODO: should try to use fileserver for full support of the HTTP protocol
-    if (!file.exists() || !file.canRead()) {
-      throw new IOException("File does not exist or is not readable.");
+    if (request.raw().isAsyncSupported()) {
+      goAsync();
+      this.close();
     }
     
-    if (file.isDirectory()) {
-      throw new IOException("File must not be a directory.");
-    }
-    
-    String etag = Long.toString(file.lastModified());
-    String extension = FilenameUtils.getExtension(file.getName()).toLowerCase();
-    
-    boolean cached = false;
-    
-    if (etag.equals(request.headers("If-None-Match"))) {
-      cached = true;
-    }
-    
-    if (request.headers("If-Modified-Since") != null) {
-      long time = Time.parseFromHttp(request.headers("If-Modified-Since"));
-      
-      if (time >= file.lastModified() / 1000) {
-        cached = true;
-      }
-    }
-    
-    if (cached) {
-      response.raw().setStatus(304);
-      return null;
-    }
-    
-    response.header("Cache-Control", "public, max-age=3600, must-revalidate");
-    response.header("Etag", etag);
-    if (accessControlTypes.contains(extension)) {
-      // Firefox requires this header to be set for fonts.
-      response.header("Access-Control-Allow-Origin", "*");
-    }
-    response.header("Last-Modified", Time.formatForHttp(file.lastModified() / 1000));
-    //response.header("Date", Time.formatForHttp(Time.now())); Jetty does this.
-    response.header("Expires", Time.formatForHttp(Time.now() + 3600));
-    response.header("Content-Type", Mimes.forExtension(extension));
-    response.header("Content-Disposition", "inline; filename=" + file.getName());
-    response.header("Content-Length", Long.toString(file.length()));    
-    
-    response.status(200);
-    try (FileInputStream stream = new FileInputStream(file)) {
-      IOUtils.copy(stream, response.raw().getOutputStream());
-    }
-    
-    return null;    
+    fs.sendResource(request.raw(), response.raw(), Resource.newResource(file));
+    return null;
   }
 }
