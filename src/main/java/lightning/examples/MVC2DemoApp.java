@@ -70,6 +70,11 @@ public class MVC2DemoApp {
       return "<img src=\"smile.png\" alt=\"FAILED\" />";
     }
     
+    @Route(path="/dynamicadd", methods={HTTPMethod.GET})
+    public String dynamicAdd() throws Exception {
+      return "TEST";
+    }
+    
     @Initializer
     public void hello() {
       
@@ -79,6 +84,7 @@ public class MVC2DemoApp {
   public static void main(String[] args) throws Exception {
     Config config = new Config();
     config.scanPrefixes = ImmutableList.of("lightning.examples.MVC2DemoApp");
+    config.autoReloadPrefixes = ImmutableList.of("lightning.examples.MVC2DemoApp");
     config.server.hmacKey = "ABCDEF";
     config.server.templateFilesPath = "./";
     config.server.staticFilesPath = "./";

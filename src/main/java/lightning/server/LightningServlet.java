@@ -22,8 +22,6 @@ import lightning.ann.RequireXsrfToken;
 import lightning.ann.Route;
 import lightning.ann.Routes;
 import lightning.ann.Template;
-import lightning.classloaders.ExceptingClassLoader;
-import lightning.classloaders.ExceptingClassLoader.PrefixClassLoaderExceptor;
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.debugscreen.DebugScreen;
@@ -77,7 +75,6 @@ public class LightningServlet extends HttpServlet {
   private Configuration internalTemplateConfig;
   private ExceptionMapper exceptionHandlers;
   private Scanner scanner;
-  private ClassLoader classLoader;
   //private ResourceCache staticFileCache;
   private ResourceFactory staticFileResourceFactory;
   private ScanResult scanResult;
@@ -137,7 +134,8 @@ public class LightningServlet extends HttpServlet {
           }
           
           // Instantiate the controller.
-          Object controller = m.getDeclaringClass().newInstance();
+          Class<?> clazz = m.getDeclaringClass();          
+          Object controller = clazz.newInstance();
           
           // Run initializers.
           if (scanResult.initializers.containsKey(m.getDeclaringClass())) {
@@ -259,10 +257,7 @@ public class LightningServlet extends HttpServlet {
           new File("./src/main/resources/" + config.server.templateFilesPath)
       ), f -> f.exists()), new File(config.server.templateFilesPath)));
       this.exceptionHandlers = new ExceptionMapper();
-      this.classLoader = config.enableDebugMode 
-          ? new ExceptingClassLoader(new PrefixClassLoaderExceptor(config.autoReloadPrefixes), "target/classes")
-          : LightningServlet.class.getClassLoader();
-      this.scanner = new Scanner(classLoader, config.scanPrefixes);
+      this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes);
       this.staticFileResourceFactory = Resource.newClassPathResource(config.server.staticFilesPath);
       this.exceptionViewProducer = new DefaultExceptionViewProducer();
       this.staticFileServer = new FileServer(this.staticFileResourceFactory);

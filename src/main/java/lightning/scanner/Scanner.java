@@ -14,6 +14,8 @@ import lightning.ann.Initializer;
 import lightning.ann.Route;
 import lightning.ann.Routes;
 import lightning.ann.WebSocketFactory;
+import lightning.classloaders.ExceptingClassLoader;
+import lightning.classloaders.ExceptingClassLoader.PrefixClassLoaderExceptor;
 
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -29,17 +31,17 @@ import com.google.common.collect.Iterables;
  * Responsible for scanning the class path for annotations needed by the framework.
  */
 public class Scanner {
-  private final ClassLoader classLoader;
-  private final List<String> prefixes;
+  private final List<String> reloadPrefixes;
+  private final List<String> scanPrefixes;
   private static final Logger logger = LoggerFactory.getLogger(Scanner.class);
   
   /**
    * @param classLoader The class loader to use (default one in most cases)
    * @param scanPrefixes List of package prefixes to scan within (e.g. ["lightning.controllers"])
    */
-  public Scanner(ClassLoader classLoader, List<String> scanPrefixes) {
-    this.classLoader = classLoader;
-    this.prefixes = scanPrefixes;
+  public Scanner(List<String> reloadPrefixes, List<String> scanPrefixes) {
+    this.reloadPrefixes = reloadPrefixes;
+    this.scanPrefixes = scanPrefixes;
   }
   
   private static void putMethod(Map<Class<?>, Set<Method>> map, Method method) {
@@ -58,8 +60,9 @@ public class Scanner {
     Map<Class<?>, Set<Method>> exceptionHandlers = new HashMap<>();
     Map<Class<?>, Set<Method>> routes = new HashMap<>();
     Map<Class<?>, Set<Method>> websocketFactories = new HashMap<>();
+    ClassLoader classLoader = new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), "target/classes");
     
-    for (Reflections scanner : reflections()) {      
+    for (Reflections scanner : reflections(classLoader)) {      
       for (Method m : scanner.getMethodsAnnotatedWith(Initializer.class)) {
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
             !Modifier.isStatic(m.getModifiers()) &&
@@ -120,11 +123,11 @@ public class Scanner {
     return new ScanResult(controllers, initializers, exceptionHandlers, routes, websocketFactories);
   }
   
-  private Reflections[] reflections() {
-    Reflections[] result = new Reflections[prefixes.size()];
+  private Reflections[] reflections(ClassLoader classLoader) {
+    Reflections[] result = new Reflections[scanPrefixes.size()];
     
     int i = 0;
-    for (String searchPath : prefixes) {
+    for (String searchPath : scanPrefixes) {
       ConfigurationBuilder config = ConfigurationBuilder.build(
           searchPath, classLoader, 
           new SubTypesScanner(), 
