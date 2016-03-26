@@ -10,8 +10,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 /**
- * Use to indicate that the target of a route returns a
- * view model for the template with the given name.
+ * Used to indicate that a route handler returns a value
+ * that should be placed in a template.
+ * 
+ * If value is ommitted, the handler should return a ModelAndView.
+ * 
+ * If value is provided, the value should be the name of the template
+ * and the route handler should return ONLY the view model.
  */
 public @interface Template {
   String value() default "";

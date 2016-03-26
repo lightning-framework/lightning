@@ -9,7 +9,5 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-/**
- * NOT YET IMPLEMENTED!
- */
+@Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface Compress {}

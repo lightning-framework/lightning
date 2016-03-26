@@ -214,7 +214,7 @@ public class LightningServlet extends HttpServlet {
         Method handler = exceptionHandlers.getHandler(e);
         
         if (handler != null) {
-          handler.invoke(null, e);
+          handler.invoke(null, ctx, e);
           return;
         }
         
@@ -282,6 +282,7 @@ public class LightningServlet extends HttpServlet {
     for (Class<?> clazz : scanResult.exceptionHandlers.keySet()) {
       for (Method method : scanResult.exceptionHandlers.get(clazz)) {
         ExceptionHandler annotation = method.getAnnotation(ExceptionHandler.class);
+        logger.debug("Added Exception Handler: {} -> {}", annotation.value(), method);
         exceptionHandlers.map(annotation.value(), method);
       }
     }

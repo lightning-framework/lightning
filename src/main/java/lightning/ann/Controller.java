@@ -12,5 +12,8 @@ import java.lang.annotation.Target;
 /**
  * All classes which serve as a controller in the
  * application must be annotated with @Controller.
+ * 
+ * A new instance of each controller is allocated to
+ * handle each incoming request.
  */
 public @interface Controller {}

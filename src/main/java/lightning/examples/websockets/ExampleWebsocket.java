@@ -1,5 +1,9 @@
 package lightning.examples.websockets;
 
+import lightning.ann.WebSocketFactory;
+import lightning.config.Config;
+import lightning.db.MySQLDatabaseProvider;
+
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
 import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
@@ -21,6 +25,11 @@ public class ExampleWebsocket {
   
   public ExampleWebsocket() {
     logger.debug("Websocket Created.");
+  }
+  
+  @WebSocketFactory(path = "/mywebsocket")
+  public static ExampleWebsocket produce(Config config, MySQLDatabaseProvider db) {
+    return new ExampleWebsocket();
   }
   
   @OnWebSocketConnect

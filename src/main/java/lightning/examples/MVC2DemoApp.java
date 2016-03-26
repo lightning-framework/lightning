@@ -4,8 +4,12 @@ import static lightning.server.Context.redirect;
 import static lightning.server.Context.redirectIfLoggedIn;
 import static lightning.server.Context.url;
 import static lightning.server.Context.user;
+
+import java.io.IOException;
+
 import lightning.Lightning;
 import lightning.ann.Controller;
+import lightning.ann.ExceptionHandler;
 import lightning.ann.Initializer;
 import lightning.ann.Json;
 import lightning.ann.QParam;
@@ -15,6 +19,8 @@ import lightning.ann.Route;
 import lightning.ann.Template;
 import lightning.config.Config;
 import lightning.enums.HTTPMethod;
+import lightning.http.BadRequestException;
+import lightning.mvc.HandlerContext;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -32,6 +38,11 @@ public class MVC2DemoApp {
     public Object handleLogin() throws Exception {
       redirectIfLoggedIn(url().to("/"));
       return ImmutableMap.of(); // Empty view model.
+    }
+    
+    @ExceptionHandler(BadRequestException.class)
+    public static void handleException(HandlerContext ctx, BadRequestException e) throws IOException {
+      ctx.response.raw().getWriter().write("custom ex handler");
     }
     
     @Route(path="/loginx", methods={HTTPMethod.POST})

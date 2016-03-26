@@ -11,9 +11,7 @@ import lightning.enums.CacheType;
 @Documented
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-/**
- * NOT YET IMPLEMENTED!
- */
+@Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface Cacheable {
   CacheType type() default CacheType.PUBLIC;
   long expireMs() default 60000;

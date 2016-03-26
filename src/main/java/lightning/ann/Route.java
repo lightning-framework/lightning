@@ -18,12 +18,29 @@ import lightning.enums.HTTPMethod;
  * should handle traffic on the given path for the given
  * methods.
  * 
- * The path may contain parameters or wildcards as is
- * consistent with the format accepted by Spark.get().
+ * The path may contain parameters or wild cards.
  * 
- * Routes will be automatically installed for you.
+ * Example Paths:
+ *  /
+ *  /my/path/
+ *  /u/:username
+ *  /static/*
+ *  
+ * Wildcards and parameters contained in the request will
+ * be exposed on the Request in the handler.
+ *  request.getWildcards()
+ *  request.getWildcardPath()
+ *  request.routeParam("name")
+ * 
+ * Routes will be automatically installed based on the 
+ * presence of these annotations.
+ * 
+ * Routes must be instance methods and declared public.
  */
 public @interface Route {
+  // The path to match (see above for details).
   String path();
+  
+  // The HTTP methods accepted.
   HTTPMethod[] methods() default {HTTPMethod.GET};
 }

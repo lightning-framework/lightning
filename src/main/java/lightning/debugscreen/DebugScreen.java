@@ -26,6 +26,9 @@ import com.google.common.collect.ImmutableMap;
 import freemarker.template.Configuration;
 import freemarker.template.Version;
 
+/**
+ * Displays a stack trace in-browser to users.
+ */
 public class DebugScreen {
     protected final Configuration templateConfig;
     protected final SourceLocator[] sourceLocators;

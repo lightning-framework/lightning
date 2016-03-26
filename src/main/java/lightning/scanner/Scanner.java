@@ -29,6 +29,7 @@ import com.google.common.collect.Iterables;
 
 /**
  * Responsible for scanning the class path for annotations needed by the framework.
+ * TODO: Can we speed this up to make debug mode faster?
  */
 public class Scanner {
   private final List<String> reloadPrefixes;
@@ -82,7 +83,7 @@ public class Scanner {
         if (Modifier.isStatic(m.getModifiers()) &&
             Modifier.isPublic(m.getModifiers()) &&
             !Modifier.isAbstract(m.getModifiers()) &&
-            m.getParameterCount() == 1) {
+            m.getParameterCount() == 2) {
           putMethod(exceptionHandlers, m);
         } else {
           logger.error(

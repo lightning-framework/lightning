@@ -60,7 +60,7 @@ public class LightningServer {
     connector.setIdleTimeout(config.server.connectionIdleTimeoutMs);
     connector.setSoLingerTime(-1);
     connector.setHost(config.server.host);
-    connector.setPort(config.server.port);
+    connector.setPort(config.ssl.isEnabled() ? config.ssl.port : config.server.port);
     server.addConnector(connector);    
     
     for(Connector y : server.getConnectors()) {

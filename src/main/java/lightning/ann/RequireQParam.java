@@ -13,6 +13,7 @@ import lightning.enums.FilterType;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Repeatable(RequireQParams.class)
+@Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface RequireQParam {
   String param();
   FilterType[] filters();

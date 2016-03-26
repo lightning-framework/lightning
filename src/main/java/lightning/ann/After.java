@@ -13,9 +13,7 @@ import lightning.fn.Filter;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Repeatable(Afters.class)
-/**
- * NOT YET IMPLEMENTED
- */
+@Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface After {
   Class<? extends Filter> filter();
 }

@@ -13,7 +13,15 @@ import java.lang.annotation.Target;
 @Repeatable(ExceptionHandlers.class)
 /**
  * Indicates that a given method handles Exceptions of the given type.
- * Exception handlers respect the class hierarchy.
+ * User-defined exception handlers will take precedence over framework defined handlers.
+ * 
+ * When matching exception handlers, the framework respects the class hierarchy.
+ * Thus, to have a catch-all handler, you could declare a handler for Throwable.class. 
+ * 
+ * To have custom HTTP error pages, add exception handlers for the exceptions in lightning.http.
+ *  
+ * A correct function signature for an @ExceptionHandler might look like:
+ *  public static void handleMyException(HandlerContext ctx, Exception e) throws Exception;
  */
 public @interface ExceptionHandler {
   Class<? extends Throwable> value();

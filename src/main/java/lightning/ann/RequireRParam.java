@@ -13,6 +13,7 @@ import lightning.enums.FilterType;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Repeatable(RequireRParams.class)
+@Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface RequireRParam {
   String name();
   FilterType[] filters();

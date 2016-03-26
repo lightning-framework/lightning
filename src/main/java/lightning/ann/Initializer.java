@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 /**
- * Controller classes (annotated with Controller) will have any methods
- * annotated with Initializer invoked before receiving any traffic.
+ * Controller classes (annotated with @Controller) will have any methods
+ * annotated with @Initializer invoked before receiving any traffic.
  */
 public @interface Initializer {}

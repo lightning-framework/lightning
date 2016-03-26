@@ -15,10 +15,14 @@ import com.google.gson.FieldNamingPolicy;
  * Indicates that a routing target returns JSON.
  * 
  * The value returned from the target will be 
- * automatically JSONified and appropriate
- * headers will be set.
+ * automatically JSONified (via GSON) and 
+ * appropriate headers will be set.
  */
 public @interface Json {
+  // An optional prefix that will be prepended to the JSON.
+  // Use to set an XSSI prefix e.g. ')]}\n
   String prefix() default "";
+  
+  // An optional naming policy to use for GSON:
   FieldNamingPolicy names() default FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES;
 }

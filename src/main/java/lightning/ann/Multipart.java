@@ -13,5 +13,8 @@ import java.lang.annotation.Target;
  * Use to indicate that a given routing target
  * accepts HTTP multipart input (typically for
  * file uploads).
+ * 
+ * Will initialize multipart handling on the
+ * request automatically.
  */
 public @interface Multipart {}
