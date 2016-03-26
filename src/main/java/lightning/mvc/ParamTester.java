@@ -13,6 +13,10 @@ public class ParamTester {
     return new ParamTester(Param.wrap(key, value));
   }
   
+  public static ParamTester create(Param param) {
+    return new ParamTester(param);
+  }
+  
   private final Param value;
   
   private ParamTester(Param value) {

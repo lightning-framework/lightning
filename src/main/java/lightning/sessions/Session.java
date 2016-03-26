@@ -11,10 +11,10 @@ import java.util.TreeSet;
 
 import lightning.crypt.SecureCookieManager;
 import lightning.crypt.SecureCookieManager.InsecureCookieException;
+import lightning.http.Request;
+import lightning.http.Response;
 import lightning.util.Iterables;
 import lightning.util.Time;
-import spark.Request;
-import spark.Response;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableMap;

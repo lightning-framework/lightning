@@ -1,10 +1,9 @@
 package lightning.debugscreen;
 
-import static spark.Spark.exception;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,19 +11,12 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import lightning.Lightning;
-import lightning.auth.AuthException;
-import lightning.mvc.old.Controller;
-import lightning.sessions.Session.SessionException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import lightning.util.Iterables;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
-
-import spark.ExceptionHandler;
-import spark.Request;
-import spark.Response;
-import spark.Spark;
-import spark.template.freemarker.FreeMarkerEngine;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -34,8 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import freemarker.template.Configuration;
 import freemarker.template.Version;
 
-public class DebugScreen implements ExceptionHandler {
-    protected final FreeMarkerEngine templateEngine;
+public class DebugScreen {
     protected final Configuration templateConfig;
     protected final SourceLocator[] sourceLocators;
 
@@ -47,37 +38,13 @@ public class DebugScreen implements ExceptionHandler {
     }
 
     public DebugScreen(SourceLocator... sourceLocators) {
-        templateEngine = new FreeMarkerEngine();
         templateConfig = new Configuration(new Version(2, 3, 23));
         templateConfig.setClassForTemplateLoading(getClass(), "/");
-        templateEngine.setConfiguration(templateConfig);
         this.sourceLocators = sourceLocators;
     }
-
-    /**
-     * Enables the debug screen to catch any exception (Exception.class)
-     * using the default source locators (src/main/java and src/test/java)
-     */
-    public static void enableDebugScreen() {
-        exception(Exception.class, new DebugScreen());
-    }
-
-    /**
-     * Enables the debug screen to catch any exception (Exception.class)
-     * using user defined source locators
-     * @param sourceLocators locators to use to find source files
-     */
-    public static void enableDebugScreen(SourceLocator... sourceLocators) {
-        exception(Exception.class, new DebugScreen(sourceLocators));
-    }
-
-    @Override
-    public final void handle(Exception exception, Request request, Response response) {
-        handleThrowable(exception, request, response);
-    }
     
-    public final void handleThrowable(Throwable throwable, Request request, Response response) {
-        response.status(500); // Internal Server Error
+    public final void handle(Throwable throwable, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        response.setStatus(500); // Internal Server Error
         
         // Find the original causing throwable; this will contain the most relevant information to 
         // display to the user. 
@@ -97,14 +64,13 @@ public class DebugScreen implements ExceptionHandler {
             model.put("type", throwable.getClass().getCanonicalName());
   
             LinkedHashMap<String, Map<String, ? extends Object>> tables = new LinkedHashMap<>();
-            installTables(tables, request, Lightning.newContext(request, response));
+            installTables(tables, request, response);
             model.put("tables", tables);
-  
-            response.body(templateEngine.render(Spark.modelAndView(model, "debugscreen.ftl")));
+            templateConfig.getTemplate("debugscreen.ftl").process(model, response.getWriter());
         } catch (Exception e) {
             // In case we encounter any exceptions trying to render the error page itself,
             // have this simple fallback.
-            response.body(
+            response.getWriter().println(
                     "<html>"
                             + "  <head>"
                             + "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -125,16 +91,18 @@ public class DebugScreen implements ExceptionHandler {
      *
      * @param tables the map containing the tables to display on the debug screen
      */
-    protected void installTables(LinkedHashMap<String, Map<String, ? extends Object>> tables, Request request, Controller context) {
-        tables.put("Headers", setToLinkedHashMap(request.headers(), h -> h, request::headers));
-        tables.get("Headers").remove("Cookie");
+    protected void installTables(LinkedHashMap<String, Map<String, ? extends Object>> tables, HttpServletRequest request, HttpServletResponse response) {
+        // TODO: Add more tables here.
         tables.put("Request", getRequestInfo(request));
+        tables.put("Environment", getEnvironmentInfo());
+        /*tables.put("Headers", setToLinkedHashMap(request.headers(), h -> h, request::headers));
+        tables.get("Headers").remove("Cookie");
         tables.put("Route Parameters", request.params());
         tables.put("Query Parameters", setToLinkedHashMap(request.queryParams(), p -> p, request::queryParams));
         //tables.put("Session Attributes", setToLinkedHashMap(request.session().attributes(), a -> a, request.session()::attribute));
         tables.put("Request Attributes", setToLinkedHashMap(request.attributes(), a -> a, request::attribute));
         //tables.put("Cookies (Raw)", request.cookies());
-        tables.put("Environment", getEnvironmentInfo());
+        
         
         tables.put("Cookies", context.cookies.asMap());
         
@@ -144,9 +112,10 @@ public class DebugScreen implements ExceptionHandler {
         } catch (SessionException | AuthException e) {
           tables.put("Session", ImmutableMap.of());
           tables.put("Auth", ImmutableMap.of());
-        }
+        }*/
     }
 
+    @SuppressWarnings("unused")
     private LinkedHashMap<String, String> setToLinkedHashMap(Set<String> set,
                                                              Function<String, String> keyMapper,
                                                              Function<String, String> valueMapper) {
@@ -159,13 +128,13 @@ public class DebugScreen implements ExceptionHandler {
         return environment;
     }
 
-    private LinkedHashMap<String, Object> getRequestInfo(Request request) {
+    private LinkedHashMap<String, Object> getRequestInfo(HttpServletRequest request) {
         LinkedHashMap<String, Object> req = new LinkedHashMap<>();
-        req.put("URL", Optional.fromNullable(request.url()).or("-"));
-        req.put("Scheme", Optional.fromNullable(request.scheme()).or("-"));
-        req.put("Method", Optional.fromNullable(request.requestMethod()).or("-"));
-        req.put("Protocol", Optional.fromNullable(request.protocol()).or("-"));
-        req.put("Remote IP", Optional.fromNullable(request.ip()).or("-"));
+        //req.put("URL", Optional.fromNullable(request.url()).or("-"));
+        //req.put("Scheme", Optional.fromNullable(request.scheme()).or("-"));
+        //req.put("Method", Optional.fromNullable(request.requestMethod()).or("-"));
+        //req.put("Protocol", Optional.fromNullable(request.protocol()).or("-"));
+        //req.put("Remote IP", Optional.fromNullable(request.ip()).or("-"));
         //req.put("Path Info", Optional.fromNullable(request.pathInfo()).or("-"));
         //req.put("Query String", Optional.fromNullable(request.queryString()).or("-"));
         //req.put("Host", Optional.fromNullable(request.host()).or("-"));

@@ -9,8 +9,6 @@ import java.util.regex.Pattern;
 import javax.servlet.ServletException;
 import javax.servlet.http.Part;
 
-import lightning.mvc.old.Controller;
-
 import com.google.common.base.Optional;
 
 /**
@@ -21,10 +19,10 @@ import com.google.common.base.Optional;
  *   v.check("field").isEmail();
  */
 public class Validator {
-  private final Controller controller;
+  private final HandlerContext controller;
   private final Map<String, String> errors;
   
-  public Validator(Controller controller) {
+  public Validator(HandlerContext controller) {
     this.controller = controller;
     errors = new HashMap<>();
   }
@@ -63,7 +61,7 @@ public class Validator {
     return errors.isEmpty();
   }
   
-  public static Validator create(Controller controller) {
+  public static Validator create(HandlerContext controller) {
     return new Validator(controller);
   }
   
@@ -76,7 +74,7 @@ public class Validator {
     private final Param field;
     
     public FieldValidator(String field) {
-      this.field = Param.wrap(field, controller.request.queryParams(field));
+      this.field = controller.request.queryParams(field);
     }
     
     public FieldValidator addError(String message) {

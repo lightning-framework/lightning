@@ -1,5 +1,7 @@
 package lightning.mvc;
 
+import lightning.enums.HTTPMethod;
+
 /**
  * Used to indicate a route exists on a given path with a given method.
  */

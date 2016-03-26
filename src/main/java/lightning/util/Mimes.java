@@ -1,5 +1,7 @@
 package lightning.util;
 
+import org.apache.commons.io.FilenameUtils;
+
 import com.google.common.collect.ImmutableMap;
 
 /**
@@ -52,5 +54,9 @@ public class Mimes {
    */
   public static String forExtension(String extension) {
     return EXT_TO_MIME.getOrDefault(extension.toLowerCase(), DEFAULT_MIME);
+  }
+  
+  public static String forPath(String path) {
+    return forExtension(FilenameUtils.getExtension(path));
   }
 }

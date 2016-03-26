@@ -11,8 +11,8 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.Cookie;
 
-import spark.Request;
-import spark.Response;
+import lightning.http.Request;
+import lightning.http.Response;
 
 /**
  * Provides functionality for reading and writing secure HTTP cookies in the Spark Java web framework.
@@ -178,7 +178,7 @@ public class SecureCookieManager {
    * @throws InsecureCookieException On failure to find and validate the cookie.
    */
   public String get(String name) throws InsecureCookieException {
-    String value = request.cookie(name);
+    String value = request.unencryptedCookie(name);
     
     // Ensure the cookie was set.
     if (value == null) {
@@ -209,7 +209,7 @@ public class SecureCookieManager {
   public Map<String, String> asMap() {
     Map<String, String> cookies = new HashMap<>();
     
-    for (String cookie : request.cookies().keySet()) {
+    for (String cookie : request.unencryptedCookies().keySet()) {
       try {
         cookies.put(cookie, get(cookie));
       } catch (InsecureCookieException e) {

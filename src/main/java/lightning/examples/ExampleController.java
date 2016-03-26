@@ -1,11 +1,11 @@
 package lightning.examples;
 
-import lightning.mvc.Controller;
-import lightning.mvc.HTTPMethod;
-import lightning.mvc.Initializer;
-import lightning.mvc.Json;
-import lightning.mvc.QParam;
-import lightning.mvc.Route;
+import lightning.ann.Controller;
+import lightning.ann.Initializer;
+import lightning.ann.Json;
+import lightning.ann.QParam;
+import lightning.ann.Route;
+import lightning.enums.HTTPMethod;
 
 import com.google.common.collect.ImmutableList;
 

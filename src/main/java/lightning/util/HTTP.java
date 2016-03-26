@@ -5,7 +5,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.Map;
 
-import spark.utils.IOUtils;
+import org.apache.commons.io.IOUtils;
 
 /**
  * Provides quick macros for fetching data over HTTP.

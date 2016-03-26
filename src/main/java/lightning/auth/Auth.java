@@ -12,8 +12,6 @@ import lightning.users.User;
 import lightning.users.Users;
 import lightning.users.Users.UsersException;
 import lightning.util.Time;
-import spark.Request;
-import spark.Response;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
@@ -149,17 +147,6 @@ public final class Auth {
     }
     
     return new Auth(session, sharedDriver);
-  }
-  
-  /**
-   * Returns a new instance of Auth for the given (request, response) pair.
-   * Prefer using forSession if you also need a separate reference to Session.
-   * @param request
-   * @param response
-   * @return
-   */
-  public static Auth forRequest(Request request, Response response) {
-    return new Auth(Session.forRequest(request, response), sharedDriver);
   }
   
   /**

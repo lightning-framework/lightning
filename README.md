@@ -1,6 +1,6 @@
 # Lightning
 
-An experimental light-weight web framework for Java that expands on the Spark framework.
+An experimental light-weight web framework for Java built on Jetty.
 
 The primary goal of this framework is to provide the convenience of PHP-style save-and-refresh development while enabling developers to leverage the type-safety and speed of Java.
 
@@ -17,7 +17,6 @@ This framework was written for use in a course I taught at Rice University.
   - Built-in email support
   - Built-in SSL support
   - Built-in support for CAS authentication
-  - Built-in support for websockets
   - Built-in support for HTTP multipart
   - Built-in validator for POST/GET parameters
   - Built-in security features
@@ -29,13 +28,17 @@ This framework was written for use in a course I taught at Rice University.
     - **Detailed in-browser stack traces on errors**
   - Intelligent annotation-based routing and filters
   - Powerful type-safe HTTP abstractions
+  
+# Coming Soon
+
+- Built-in support for websockets
 
 # Code Sample
 
 ```java
-import lightning.mvc.*;
-import static lightning.mvc.Context.*;
-import static lightning.mvc.HTTPMethod.*;
+import lightning.ann.*;
+import static lightning.server.Context.*;
+import static lightning.enums.HTTPMethod.*;
 
 // ... other imports omitted ...
 

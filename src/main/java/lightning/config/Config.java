@@ -1,6 +1,7 @@
 package lightning.config;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
@@ -36,6 +37,7 @@ public class Config {
     public @Nullable String keyStorePassword;   // Required to enable SSL.
     public @Nullable String trustStoreFile;     // Optional.
     public @Nullable String trustStorePassword; // Optional.
+    public boolean redirectInsecureRequests = true;
     
     public boolean isEnabled() {
       return keyStorePassword != null && keyStoreFile != null;
@@ -45,18 +47,28 @@ public class Config {
   public static final class ServerConfig {
     @Override
     public String toString() {
-      return "ServerConfig [hmacKey=" + hmacKey + ", port=" + port + ", threads=" + threads
-          + ", timeoutMs=" + timeoutMs + ", staticFilesPath=" + staticFilesPath
+      return "ServerConfig [hmacKey=" + hmacKey + ", port=" + port + ", minThreads=" + minThreads
+          + ", maxThreads=" + maxThreads + ", threadTimeoutMs=" + threadTimeoutMs
+          + ", websocketTimeoutMs=" + websocketTimeoutMs + ", staticFilesPath=" + staticFilesPath
           + ", templateFilesPath=" + templateFilesPath + ", trustLoadBalancerHeaders="
           + trustLoadBalancerHeaders + "]";
     }
     public String hmacKey; // Should be long, random, and unique.
     public int port = 80;
-    public int threads = 250;
-    public int timeoutMs = 10000; // For websockets.
+    public int minThreads = 40;
+    public int maxThreads = 250;
+    public int threadTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60);
+    public int websocketTimeoutMs = (int) TimeUnit.SECONDS.toMillis(3); // For websockets.
+    public int maxPostBytes = 2000000; // In bytes
+    public int maxQueryParams = 100; // In number of params.
+    public int connectionIdleTimeoutMs = (int) TimeUnit.MINUTES.toMillis(3);
     public String staticFilesPath; // Relative to src/main/java in your eclipse project folder.
     public String templateFilesPath; // Relative to src/main/java in your eclipse project folder.
+    public String host = "localhost";
     public boolean trustLoadBalancerHeaders = false;
+    public int maxCachedStaticFileSizeBytes = 1024 * 50; // 50KB
+    public int maxStaticFileCacheSizeBytes = 1024 * 1024 * 30; // 30MB
+    public int maxCachedStaticFiles = 500;
   }
   
   public static final class MailConfig implements Mail.MailConfig {

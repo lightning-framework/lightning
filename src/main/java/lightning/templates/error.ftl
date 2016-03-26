@@ -1,3 +1,5 @@
+<#ftl strip_whitespace=true>
+<#escape x as x?html>
 <!doctype html>
 <html lang="en">
   <head>
@@ -112,3 +114,4 @@
   </div>
   </body>
 </html>
+</#escape>

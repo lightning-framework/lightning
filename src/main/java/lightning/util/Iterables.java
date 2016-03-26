@@ -192,6 +192,14 @@ public class Iterables {
     throw new IllegalArgumentException("Provided iterable was empty.");
   }
   
+  public static <T> T firstOr(Iterable<T> collection, T defaultValue) {
+    for (T item : collection) {
+      return item;
+    }
+    
+    return defaultValue;
+  }
+  
   public static <T> int length(Iterable<T> collection) {
     int i = 0;
     

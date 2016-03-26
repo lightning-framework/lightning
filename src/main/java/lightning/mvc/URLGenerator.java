@@ -4,13 +4,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map;
 
+import lightning.http.Request;
 import lightning.util.Iterables;
 
 import org.apache.commons.lang3.StringUtils;
 
 import com.google.common.base.Joiner;
-
-import spark.Request;
 
 // TODO(mschurr): It'd be cool if we could do reverse routing (e.g. generate URL for a class).
 public class URLGenerator {

@@ -1,25 +1,23 @@
 package lightning.examples;
 
-import java.io.FileInputStream;
-
-import spark.utils.IOUtils;
+import static lightning.server.Context.redirect;
+import static lightning.server.Context.redirectIfLoggedIn;
+import static lightning.server.Context.url;
+import static lightning.server.Context.user;
 import lightning.Lightning;
+import lightning.ann.Controller;
+import lightning.ann.Initializer;
+import lightning.ann.Json;
+import lightning.ann.QParam;
+import lightning.ann.RParam;
+import lightning.ann.RequireAuth;
+import lightning.ann.Route;
+import lightning.ann.Template;
 import lightning.config.Config;
-import lightning.mvc.Controller;
-import lightning.mvc.HTTPMethod;
-import lightning.mvc.Initializer;
-import lightning.mvc.Json;
-import lightning.mvc.QParam;
-import lightning.mvc.RParam;
-import lightning.mvc.RequireAuth;
-import lightning.mvc.Route;
-import lightning.mvc.Template;
-import lightning.util.Flags;
+import lightning.enums.HTTPMethod;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-
-import static lightning.Context.*;
 
 public class MVC2DemoApp {  
   @Controller
@@ -79,8 +77,12 @@ public class MVC2DemoApp {
   }
   
   public static void main(String[] args) throws Exception {
-    Flags.parse(args);
-    Config config = Lightning.newGson().create().fromJson(IOUtils.toString(new FileInputStream(Flags.getFile("config"))), Config.class);
+    Config config = new Config();
+    config.scanPrefixes = ImmutableList.of("lightning.examples.MVC2DemoApp");
+    config.server.hmacKey = "ABCDEF";
+    config.server.templateFilesPath = "./";
+    config.server.staticFilesPath = "./";
+    config.enableDebugMode = true;
     Lightning.launch(config);
   }
 }

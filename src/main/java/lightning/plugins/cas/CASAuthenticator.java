@@ -5,15 +5,14 @@ import java.net.URLEncoder;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lightning.http.Request;
+import lightning.http.Response;
 import lightning.mvc.Param;
 import lightning.mvc.URLGenerator;
 import lightning.util.HTTP;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import spark.Request;
-import spark.Response;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
@@ -118,7 +117,7 @@ public final class CASAuthenticator {
   }
   
   private Param queryParam(Request request, String name) {
-    return Param.wrap(name, request.queryParams(name));
+    return request.queryParams(name);
   }
   
   public Optional<CASUser> startAuthentication(Request request, Response response, String destinationUrl) throws Exception {
