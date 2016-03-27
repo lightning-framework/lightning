@@ -2,6 +2,7 @@ package lightning.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URI;
@@ -242,7 +243,13 @@ public class LightningHandler extends AbstractHandler {
           }
   
           // Invoke the controller.
-          Object output = m.invoke(controller, args);
+          Object output = null;
+          try {
+            output = m.invoke(controller, args);
+          } catch (InvocationTargetException e) {
+            if (e.getCause() != null)
+              throw e.getCause();
+          }
           
           // Perform post-processing.
           if (output == null) {} // Assume the handler returned void or null because it did its work.
