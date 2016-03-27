@@ -66,6 +66,10 @@ public class Response {
    * Sets an HTTP cookie.
    * Be aware that all clients may not support cookies, or may not have them enabled.
    * Cookie will be signed with a cryptographic hash (HMAC) to guarantee integrity.
+   * Secure only will automatically be set if SSL is enabled in your config.
+   * 
+   * Want to set unsigned cookies? -> Use the HttpServletResponse API directly.
+   * 
    * @param name
    * @param value
    * @param path
@@ -77,23 +81,14 @@ public class Response {
   }
   
   /**
-   * Sets an HTTP cookie.
-   * Be aware that all clients may not support cookies, or may not have them enabled.
-   * Cookie will be signed with a cryptographic hash (HMAC) to guarantee integrity.
-   * @param name
-   * @param value
+   * See above.
    */
   public void setCookie(String name, String value) {
     cookies.set(name, value);
   }
   
   /**
-   * Sets an HTTP cookie.
-   * Be aware that all clients may not support cookies, or may not have them enabled.
-   * Cookie will be signed with a cryptographic hash (HMAC) to guarantee integrity.
-   * @param name
-   * @param value
-   * @param maxAgeSec
+   * See above.
    */
   public void setCookie(String name, String value, int maxAgeSec) {
     setCookie(name, value, "/", maxAgeSec, true);
