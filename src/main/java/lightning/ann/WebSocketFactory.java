@@ -15,10 +15,10 @@ import java.lang.annotation.Target;
  * 
  * An example method signature might be:
  *   public static ExampleWebsocket produce(Config config, MySQLDatabaseProvider db) throws Exception {
- *     return new ExampleWebsocekt(config, db);
+ *     return new ExampleWebsocket(config, db);
  *   }
  * 
- * The class of the returned object must be annotated with @Websocket
+ * The class of the returned object must be annotated with @WebSocket
  * and must contain methods annotated with:
  *   @OnWebSocketConnect 
  *   @OnWebSocketClose 

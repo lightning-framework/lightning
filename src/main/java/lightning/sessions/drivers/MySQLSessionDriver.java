@@ -24,6 +24,7 @@ import org.eclipse.jetty.util.ClassLoadingObjectInputStream;
 
 /**
  * A session driver implementation that uses a MySQL database.
+ * TODO: Implement automatic cleanup of old sessions.
  */
 public class MySQLSessionDriver implements SessionStorageDriver {
   private final MySQLDatabaseProvider provider;
