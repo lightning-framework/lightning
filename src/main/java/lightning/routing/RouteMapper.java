@@ -315,6 +315,8 @@ public class RouteMapper<T> {
    * @throws RouteFormatException
    */
   public void compile() throws RouteFormatException {
+    routes.clear();
+    
     for (HTTPMethod method : pending.keySet()) {
       RouteTreeNodeBuilder<RouteRequest, Match<T>> root = new RouteTreeNodeBuilder<>();
       
