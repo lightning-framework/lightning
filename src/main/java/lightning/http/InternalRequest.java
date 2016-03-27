@@ -5,13 +5,15 @@ import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
+import lightning.crypt.SecureCookieManager;
+
 public class InternalRequest extends Request {
-  public InternalRequest(HttpServletRequest request) {
-    super(request);
+  public InternalRequest(HttpServletRequest request, boolean trustLoadBalancerHeaders) {
+    super(request, trustLoadBalancerHeaders);
   }
 
-  public static InternalRequest makeRequest(HttpServletRequest request) {
-    return new InternalRequest(request);
+  public static InternalRequest makeRequest(HttpServletRequest request, boolean trustLoadBalancerHeaders) {
+    return new InternalRequest(request, trustLoadBalancerHeaders);
   }
   
   public void setWildcards(List<String> wildcards) {
@@ -20,5 +22,9 @@ public class InternalRequest extends Request {
   
   public void setParams(Map<String, String> params) {
     this.parameters = params;
+  }
+  
+  public void setCookieManager(SecureCookieManager manager) {
+    this.cookies = manager;
   }
 }

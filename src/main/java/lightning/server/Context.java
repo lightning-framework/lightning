@@ -15,6 +15,7 @@ import lightning.auth.AuthException;
 import lightning.config.Config;
 import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabase;
+import lightning.enums.HTTPMethod;
 import lightning.groups.Groups.GroupsException;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -39,7 +40,7 @@ import lightning.users.Users.UsersException;
 /**
  * Provides a thread-specific context for incoming requests.
  * Controllers will want to import static Context.* and use these methods.
- * Methods delegate to an instance of Controller; see documentation on Controller.
+ * Methods delegate to an instance of HandlerContext; see the source of HandlerCOntext for documentation.
  */
 public class Context {
   private static final ThreadLocal<HandlerContext> controller = new ThreadLocal<>();
@@ -190,7 +191,7 @@ public class Context {
     context().requireSecure();
   }
 
-  public static final void requireMethod(String method) throws MethodNotAllowedException {
+  public static final void requireMethod(HTTPMethod method) throws MethodNotAllowedException {
     context().requireMethod(method);
   }
 

@@ -111,9 +111,8 @@ public class Config {
     // Host on which to listen.
     public String host = "0.0.0.0";
     
-    // Whether or not to trust load balancer headers (X-Forwarded-From, X-Forwarded-For, X-Forwarded-Proto).
+    // Whether or not to trust load balancer headers (X-Forwarded-For, X-Forwarded-Proto).
     // Enable only if your app is firewalled behind a load balancer.
-    // TODO: Implement this.
     public boolean trustLoadBalancerHeaders = false;
     
     // Maximum size of a cached static file in bytes.

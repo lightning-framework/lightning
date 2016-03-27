@@ -141,7 +141,7 @@ public class LightningHandler extends AbstractHandler {
   public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest _request,
       HttpServletResponse _response) throws IOException, ServletException {
     baseRequest.setHandled(true);
-    InternalRequest request = InternalRequest.makeRequest(_request);
+    InternalRequest request = InternalRequest.makeRequest(_request, config.server.trustLoadBalancerHeaders);
     InternalResponse response = InternalResponse.makeResponse(_response);
     HandlerContext ctx = null;    
     
@@ -172,6 +172,8 @@ public class LightningHandler extends AbstractHandler {
       // Perform routing.
       ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer);
       Context.setContext(ctx);
+      request.setCookieManager(ctx.cookies);
+      response.setCookieManager(ctx.cookies);
       
       if (config.enableDebugMode) {
         rescan();
@@ -230,10 +232,10 @@ public class LightningHandler extends AbstractHandler {
           for (int i = 0; i < params.length; i++) {
             if (params[i].getAnnotation(QParam.class) != null) {
               String name = params[i].getAnnotation(QParam.class).value();
-              args[i] = request.queryParams(name).castTo(params[i].getType());
+              args[i] = request.queryParam(name).castTo(params[i].getType());
             } else if(params[i].getAnnotation(RParam.class) != null) {
               String name = params[i].getAnnotation(RParam.class).value();
-              args[i] = request.routeParams(name).castTo(params[i].getType());
+              args[i] = request.routeParam(name).castTo(params[i].getType());
             } else {
               throw new LightningException("Cannot figure out how to inject arguments for route target " + m);
             }

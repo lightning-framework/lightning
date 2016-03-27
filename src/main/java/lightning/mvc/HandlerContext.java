@@ -20,6 +20,7 @@ import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProxy;
+import lightning.enums.HTTPMethod;
 import lightning.groups.Groups.GroupsException;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -413,8 +414,8 @@ public class HandlerContext implements AutoCloseable {
    * @param method An HTTP method (e.g. 'POST').
    * @throws MethodNotAllowedException If the given method does not match that of the request.
    */
-  public final void requireMethod(String method) throws MethodNotAllowedException {
-    if (!request.requestMethod().equals(method.toUpperCase())) {
+  public final void requireMethod(HTTPMethod method) throws MethodNotAllowedException {
+    if (request.method() != method) {
       throw new MethodNotAllowedException();
     }
   }
@@ -451,14 +452,14 @@ public class HandlerContext implements AutoCloseable {
    * @return Whether or not servicing a POST request.
    */
   public final boolean isPOST() {
-    return request.requestMethod().equals("POST");
+    return request.method() == HTTPMethod.POST;
   }
 
   /**
    * @return Whether or not servicing a GET request.
    */
   public final boolean isGET() {
-    return request.requestMethod().equals("GET");
+    return request.method() == HTTPMethod.GET;
   }
 
   /**
@@ -505,7 +506,7 @@ public class HandlerContext implements AutoCloseable {
    * @throws BadRequestException If the parameter is not present.
    */
   public final ParamTester requireQueryParam(String name) throws BadRequestException {
-    return ParamTester.create(request.queryParams(name)).isNotNull();
+    return ParamTester.create(request.queryParam(name)).isNotNull();
   }
 
   /**
@@ -516,7 +517,7 @@ public class HandlerContext implements AutoCloseable {
    * @throws BadRequestException If the parameter is not present.
    */
   public final ParamTester requireParam(String name) throws BadRequestException {
-    return ParamTester.create(request.routeParams(name)).isNotNull();
+    return ParamTester.create(request.routeParam(name)).isNotNull();
   }
 
   /**
@@ -540,7 +541,7 @@ public class HandlerContext implements AutoCloseable {
    * @return A wrapper object with useful functionality for reading the query parameter.
    */
   public final Param queryParam(String name) {
-    return request.queryParams(name);
+    return request.queryParam(name);
   }
 
   /**
@@ -548,7 +549,7 @@ public class HandlerContext implements AutoCloseable {
    * @return A wrapper object with useful functionality for reading the route parameter.
    */
   public final Param routeParam(String name) {
-    return request.routeParams(name);
+    return request.routeParam(name);
   }
 
   /**
@@ -623,7 +624,7 @@ public class HandlerContext implements AutoCloseable {
         continue;
       }
 
-      result.put(s, request.queryParams(s));
+      result.put(s, request.queryParam(s));
     }
 
     return result;

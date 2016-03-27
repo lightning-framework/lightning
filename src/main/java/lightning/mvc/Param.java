@@ -15,6 +15,17 @@ import com.google.common.collect.Iterables;
 
 /**
  * A wrapper for a (key, value) pair in which the value is optional.
+ * 
+ * Used all around the framework for convenience. You will find that
+ * there are many convenience methods (e.g. intValue()). Methods such
+ * as intValue() will either succeed (convert the value to an integer
+ * and return it) or fail. On failure, a BadRequestException will be
+ * thrown. We recommend not catching these and instead letting the
+ * framework capture them and render a bad request page.
+ * 
+ * There are also methods for testing the contained value (e.g. isInteger)
+ * that will not throw exceptions but simply return boolean whether or
+ * not the value meets the constraints.
  */
 public class Param {
   private final String key;

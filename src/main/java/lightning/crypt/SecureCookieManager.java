@@ -147,11 +147,23 @@ public class SecureCookieManager {
    * @param value Cookie value (raw)
    */
   public void set(String name, String value) {
+    set(name, value, "/", LIFETIME_SECONDS, true);
+  }
+  
+  /**
+   * Creates and sets a cookie with the given name and value.
+   * @param name
+   * @param value
+   * @param path
+   * @param maxAgeSec
+   * @param httpOnly
+   */
+  public void set(String name, String value, String path, int maxAgeSec, boolean httpOnly) {
     Cookie cookie = new Cookie(name, value + sign(name + value, sharedSecretKey));
-    cookie.setPath("/");
-    cookie.setMaxAge(LIFETIME_SECONDS);
+    cookie.setPath(path);
+    cookie.setMaxAge(maxAgeSec);
     cookie.setSecure(alwaysSetSecureOnly || request.scheme().equals("https"));
-    cookie.setHttpOnly(true);
+    cookie.setHttpOnly(httpOnly);
     response.raw().addCookie(cookie);
   }
   

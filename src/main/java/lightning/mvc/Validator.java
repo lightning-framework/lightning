@@ -74,7 +74,7 @@ public class Validator {
     private final Param field;
     
     public FieldValidator(String field) {
-      this.field = controller.request.queryParams(field);
+      this.field = controller.request.queryParam(field);
     }
     
     public FieldValidator addError(String message) {

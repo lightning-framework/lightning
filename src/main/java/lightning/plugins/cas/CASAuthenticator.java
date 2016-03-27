@@ -117,7 +117,7 @@ public final class CASAuthenticator {
   }
   
   private Param queryParam(Request request, String name) {
-    return request.queryParams(name);
+    return request.queryParam(name);
   }
   
   public Optional<CASUser> startAuthentication(Request request, Response response, String destinationUrl) throws Exception {
