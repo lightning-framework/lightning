@@ -39,18 +39,14 @@ import lightning.enums.HTTPMethod;
  * 
  * Routes must be instance methods and declared public.
  * 
- * Routes are matched such that priority is given first
- * to more concrete routes. For example, consider the
- * following routes:
- *  /a/*
- *  /a/:user
- *  /a/bob
- *  
- * For these incoming URLs, the following routes will be
- * executed:
- *  /a/hello -> /a/:user
- *  /a/hello/world -> /a/*
- *  /a/bob -> /a/bob
+ * Routing conflicts are strictly disallowed. If any conflicts
+ * are detected, the server will fail to start and print the
+ * conflict OR (in debug mode) the conflict will be displayed
+ * in your console and browser.
+ * 
+ * An example of conflicts:
+ *   /hello/:name
+ *   /hello/*
  *  
  * Concrete path segments take the highest priority, followed
  * by parametric segments, followed by wildcards.

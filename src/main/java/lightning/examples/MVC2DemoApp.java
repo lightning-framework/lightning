@@ -68,7 +68,7 @@ public class MVC2DemoApp {
     
     @Route(path="/", methods={HTTPMethod.GET})
     public Object handleMe() throws Exception {
-      return "Welcome, " + user().getUserName();
+      return "Welcome!";
     }
     
     @Route(path="/errordemo", methods={HTTPMethod.GET})

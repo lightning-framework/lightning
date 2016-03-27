@@ -55,6 +55,10 @@ public class RouteMapper<T> {
     }
   }
   
+  /**
+   * Represents a route match (in the format it will be returned to clients).
+   * @param <T>
+   */
   public static final class Match<T> {
     private final T data;
     private final Map<String, String> params;
@@ -80,12 +84,10 @@ public class RouteMapper<T> {
   }
   
   static final class RouteMatchHandler<T> implements IRouteHandler<RouteRequest, Match<T>> {
-    protected final T data;
     protected final PendingRoute<T> route;
     protected final List<String> routePath;
     
-    public RouteMatchHandler(T data, PendingRoute<T> route) {
-      this.data = data;
+    public RouteMatchHandler(PendingRoute<T> route) {
       this.route = route;
       this.routePath = DefaultPathToPathSegments.parse(route.path);
     }
@@ -93,30 +95,34 @@ public class RouteMapper<T> {
     @Override
     public IRouteHandler<RouteRequest, Match<T>> merge(
         IRouteHandler<RouteRequest, Match<T>> other) {
-      throw new IllegalStateException("Cannot have duplicate handlers for same (path, method).");
+      throw new IllegalStateException("Found duplicate/incompatible routes for path: " + route.method + " " + route.path);
     }
 
     @Override
     public Match<T> call(RouteMatch<RouteRequest> match) {
       List<String> wildcards = match.getWildcardRouteMatchResult();
       Iterator<String> results = match.getRouteMatchResult().getStringMatchesInOrder().iterator();
+      
+      // Build the mapping of parameter names to values for this match.
       Map<String, String> params = new HashMap<>();
       
       for (String segment : routePath) {
-        logger.debug("Checking segment: {}", segment);
         if (segment.startsWith(":")) {
-          logger.debug("Finding param for segment: {}", segment);
           params.put(segment.substring(1), match.getRouteMatchResult().getStringMatch(results.next()));
         }
       }
       
       logger.debug("Found Match: data={} segments={} wildcards={}, params={}", 
-          data, match.getRequest().getPathSegments(), wildcards, params);
+          route.action, match.getRequest().getPathSegments(), wildcards, params);
       
-      return new Match<>(data, params, wildcards);
+      return new Match<>(route.action, params, wildcards);
     }
   }
   
+  /**
+   * Represents the route (in the format that it will be provided by clients).
+   * @param <T>
+   */
   static final class PendingRoute<T> {
     public final HTTPMethod method;
     public final String path;
@@ -140,6 +146,11 @@ public class RouteMapper<T> {
     }
   }
   
+  /**
+   * A builder used to help assemble the routing radix tree.
+   * @param <T_REQ>
+   * @param <T_RES>
+   */
   static final class RouteTreeNodeBuilder<T_REQ extends IRequest, T_RES> {
     private final String pathPrefix = "/";
     private final Pattern validSegmentChars = Pattern.compile("[\\w\\-\\._~]+");
@@ -162,6 +173,10 @@ public class RouteMapper<T> {
     }
     
     public RouteTreeNodeBuilder<T_REQ, T_RES> parametric() {
+      if (wildcardChild != null) {
+        throw new IllegalStateException("Incompatible handler for path.");
+      }
+      
       if (parametricChild == null) {
         parametricChild = new RouteTreeNodeBuilder<T_REQ, T_RES>();
         parametricSegment = new StringSegment(UUID.randomUUID().toString());
@@ -171,6 +186,10 @@ public class RouteMapper<T> {
     }
     
     public RouteTreeNodeBuilder<T_REQ, T_RES> wildcard() {
+      if (parametricChild != null) {
+        throw new IllegalStateException("Incompatible handler for path.");
+      }
+      
       if (wildcardChild == null) {
         wildcardChild = new RouteTreeNodeBuilder<T_REQ, T_RES>();
       }
@@ -223,6 +242,11 @@ public class RouteMapper<T> {
     pending = new EnumMap<>(HTTPMethod.class);
   }
 
+  /**
+   * @param method An HTTP method.
+   * @param path A routing path (e.g. /path/:variable/*).
+   * @param action An object to be returned when this route is matched.
+   */
   public void map(HTTPMethod method, String path, T action) {
     if (!pending.containsKey(method)) {
       pending.put(method, new ArrayList<>());
@@ -231,11 +255,19 @@ public class RouteMapper<T> {
     pending.get(method).add(new PendingRoute<>(method, path, action));
   }
   
+  /**
+   * Clears all existing routes.
+   */
   public void clear() {
     pending.clear();
     routes.clear();
   }
   
+  /**
+   * Attempts to match an HTTP request to a route.
+   * @param request An HTTP request.
+   * @return A routing match (if one exists) or null otherwise.
+   */
   public Match<T> lookup(Request request) {
     if (!routes.containsKey(request.method())) {
       return null; 
@@ -244,23 +276,28 @@ public class RouteMapper<T> {
     return matcher.match(routes.get(request.method()), new RouteRequest(request));
   }
     
-  private void buildTree(PendingRoute<T> route, RouteTreeNodeBuilder<RouteRequest, Match<T>> node, Iterator<String> components, T action) throws RouteFormatException {
+  /**
+   * A recursive helper function for assembling the routing radix tree.
+   * @param route The route being processed.
+   * @param node The current node in the tree.
+   * @param components An iterator over components of the path.
+   * @param action The action to 
+   * @throws RouteFormatException
+   */
+  private void buildTree(PendingRoute<T> route, RouteTreeNodeBuilder<RouteRequest, Match<T>> node, Iterator<String> components) throws RouteFormatException {
     if (!components.hasNext()) {
-      node.handler(new RouteMatchHandler<T>(action, route));
+      node.handler(new RouteMatchHandler<T>(route));
       return;
     }
     
     String component = components.next();
     RouteTreeNodeBuilder<RouteRequest, Match<T>> newChild;
-    
-    // If a wildcard already exists at node, this is a route conflict.
-    // Allow this since priority is given first to concrete components then parametrics.
-    
+        
     if (component.startsWith(":")) {
       newChild = node.parametric();
     } else if (component.equals("*")) {
       if (components.hasNext()) {
-        throw new RouteFormatException("Wildcards may only occur at the end of paths.");
+        throw new RouteFormatException("Invalid route format (wildcards may only appear at the end of paths): " + route.method + " " + route.path);
       }
       
       newChild = node.wildcard();
@@ -268,9 +305,15 @@ public class RouteMapper<T> {
       newChild = node.path(component);
     }
     
-    buildTree(route, newChild, components, action);
+    buildTree(route, newChild, components);
   }
   
+  /**
+   * Compiles the routing radix tree. 
+   * This needs to be called at least once after all routes are added.
+   * Must re-compile the radix tree each time routes are modified.
+   * @throws RouteFormatException
+   */
   public void compile() throws RouteFormatException {
     for (HTTPMethod method : pending.keySet()) {
       RouteTreeNodeBuilder<RouteRequest, Match<T>> root = new RouteTreeNodeBuilder<>();
@@ -280,11 +323,13 @@ public class RouteMapper<T> {
         List<String> components = DefaultPathToPathSegments.parse(route.path);
         
         try {
-          buildTree(route, root, components.iterator(), route.action);
+          buildTree(route, root, components.iterator());
         } catch (IllegalArgumentException e) {
-          throw new RouteFormatException("Routing path " + method + " " + route.path + " contains illegal characters.", e);
+          routes.clear();
+          throw new RouteFormatException("Routing path " + method + " " + route.path + " contains illegal characters.");
         } catch (IllegalStateException e) {
-          throw new RouteFormatException("Duplicate routing path " + method + " " + route.path + ".", e);
+          routes.clear();
+          throw new RouteFormatException("Duplicate/incompatible routing path " + method + " " + route.path + ".");
         }
       }
 

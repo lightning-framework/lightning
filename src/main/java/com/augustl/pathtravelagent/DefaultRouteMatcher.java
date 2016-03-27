@@ -14,8 +14,7 @@ public class DefaultRouteMatcher<T_REQ extends IRequest, T_RES> {
         RouteTreeNode<T_REQ, T_RES> targetNode = rootNode;
         RouteMatchResult routeMatchResult = new RouteMatchResult();
 
-        int i;
-        for (i = 0; i < pathSegments.size(); i++) {
+        for (int i = 0; i < pathSegments.size(); i++) {
             String pathSegment = pathSegments.get(i);
 
             if (targetNode.containsPathSegmentChildNodes(pathSegment)) {
