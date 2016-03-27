@@ -249,6 +249,7 @@ public class LightningHandler extends AbstractHandler {
           } catch (InvocationTargetException e) {
             if (e.getCause() != null)
               throw e.getCause();
+            throw e;
           }
           
           // Perform post-processing.
