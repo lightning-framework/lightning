@@ -30,6 +30,9 @@ import com.augustl.pathtravelagent.segment.StringSegment;
  * Performs route mapping and matching using a variant of a radix tree.
  * Matching time is always proportional to the number of path segments in the request regardless of how many routes are present.
  * 
+ * To use, add all of the routes you wish to have and then call compile().
+ * Compile assembles the radix tree to be used for route matching (very fast).
+ * Compilation is only necessary once (after all routes have been added). 
  * @param <T>
  */
 public class RouteMapper<T> {  

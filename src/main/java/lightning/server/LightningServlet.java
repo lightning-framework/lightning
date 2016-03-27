@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.net.URI;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -120,9 +121,26 @@ public class LightningServlet extends AbstractHandler {
     baseRequest.setHandled(true);
     InternalRequest request = InternalRequest.makeRequest(_request);
     InternalResponse response = InternalResponse.makeResponse(_response);
-    HandlerContext ctx = null;
+    HandlerContext ctx = null;    
     
     try {      
+      // Redirect insecure requests.
+      if (config.ssl.isEnabled() && 
+          config.ssl.redirectInsecureRequests &&
+          !_request.getScheme().toLowerCase().equals("https")) {
+          URI oldUri = new URI(_request.getRequestURL().toString());
+          URI newUri = new URI("https",
+                             oldUri.getUserInfo(),
+                             oldUri.getHost(),
+                             config.ssl.port,
+                             oldUri.getPath(),
+                             oldUri.getQuery(),
+                             null);
+
+          _response.sendRedirect(newUri.toString());
+          return;
+      }
+      
       ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer);
       Context.setContext(ctx);
       
