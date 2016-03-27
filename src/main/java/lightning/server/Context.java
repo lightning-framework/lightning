@@ -9,7 +9,6 @@ import java.util.Map;
 
 import javax.servlet.ServletException;
 
-import freemarker.template.Configuration;
 import lightning.auth.Auth;
 import lightning.auth.AuthException;
 import lightning.config.Config;
@@ -37,10 +36,14 @@ import lightning.sessions.Session.SessionException;
 import lightning.users.User;
 import lightning.users.Users.UsersException;
 
+import com.google.gson.FieldNamingPolicy;
+
+import freemarker.template.Configuration;
+
 /**
  * Provides a thread-specific context for incoming requests.
  * Controllers will want to import static Context.* and use these methods.
- * Methods delegate to an instance of HandlerContext; see the source of HandlerCOntext for documentation.
+ * Methods delegate to an instance of HandlerContext; see the source of HandlerContext for documentation.
  */
 public class Context {
   private static final ThreadLocal<HandlerContext> controller = new ThreadLocal<>();
@@ -58,9 +61,16 @@ public class Context {
   }
   
   /**
-   * @return A fixed snapshot of the context that can be used asynchronously; use if you are going to go async in your handlers.
-   * If you go async, you must be sure to close the context when you finish by calling close().
-   * Be wary: some methods may not work as they do in synchronous mode when you are being asynchronous.
+   * Returns a fixed snapshot of the context that can be used asynchronously.
+   * Does not make the underlying request asynchronous; you must do this on your own.
+   * 
+   * IF YOU GO ASYNCHRONOUS, BE AWARE:
+   *   - You MUST close the HandlerContext by invoking close() to avoid leaking resources.
+   *   - Methods on HandlerContext were designed with the assumption the request is being handled synchronously.
+   *     Some of them may not work correctly while going asynchronous.
+   *   - Static methods on Context are no longer safe to use in your async handlers; use the instance returned
+   *     by this function instead.
+   * @return
    */
   public static final HandlerContext goAsync() {
     context().goAsync();
@@ -275,10 +285,6 @@ public class Context {
     return context().queryParams();
   }
   
-  public static final String jsonify(Object object) {
-    return context().jsonify(object);
-  }
-  
   public static final ModelAndView modelAndView(String viewName, Object viewModel) {
     return context().modelAndView(viewName, viewModel);
   }
@@ -289,5 +295,37 @@ public class Context {
   
   public static final void sendFile(File file) throws Exception {
     context().sendFile(file);
+  }
+  
+  public final void sendJson(Object object) throws IOException {
+    context().sendJson(object);
+  }
+  
+  public final void sendJson(Object object, FieldNamingPolicy policy) throws IOException {
+    context().sendJson(object, policy);
+  }
+  
+  public final void sendJson(Object object, String prefix) throws IOException {
+    context().sendJson(object, prefix);
+  }
+  
+  public final void sendJson(Object object, String prefix, FieldNamingPolicy policy) throws IOException {
+    context().sendJson(object, prefix, policy);
+  }
+  
+  public final String toJson(Object object) {
+    return context().toJson(object);
+  }
+  
+  public final String toJson(Object object, FieldNamingPolicy policy) {
+    return context().toJson(object, policy);
+  }
+  
+  public final <T> T parseJson(String json, Class<T> clazz) {
+    return context().parseJson(json, clazz);
+  }
+  
+  public final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
+    return context().parseJson(json, clazz, policy);
   }
 }

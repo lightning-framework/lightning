@@ -21,6 +21,7 @@ import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProxy;
 import lightning.enums.HTTPMethod;
+import lightning.enums.HTTPStatus;
 import lightning.groups.Groups.GroupsException;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -32,6 +33,7 @@ import lightning.http.NotImplementedException;
 import lightning.http.Request;
 import lightning.http.Response;
 import lightning.io.FileServer;
+import lightning.json.JsonFactory;
 import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
@@ -41,7 +43,7 @@ import lightning.users.Users.UsersException;
 import org.eclipse.jetty.util.resource.Resource;
 
 import com.google.common.collect.ImmutableList;
-import com.google.gson.GsonBuilder;
+import com.google.gson.FieldNamingPolicy;
 
 import freemarker.template.Configuration;
 
@@ -636,17 +638,44 @@ public class HandlerContext implements AutoCloseable {
   public final Map<String, Param> queryParams() {
     return queryParamsExcepting(ImmutableList.of());
   }
-
-  /**
-   * Returns a JSON-encoded object and sets the appropriate response headers for JSON.
-   * NOTE: Prefer using the @Json annotation for speed.
-   * @param object To convert to JSON.
-   * @return The jsonified object (as a string).
-   */
-  public final String jsonify(Object object) {
-    response.status(200);
+  
+  public final void sendJson(Object object) throws IOException {
+    sendJson(object, null, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  }
+  
+  public final void sendJson(Object object, FieldNamingPolicy policy) throws IOException {
+    sendJson(object, null, policy);
+  }
+  
+  public final void sendJson(Object object, String prefix) throws IOException {
+    sendJson(object, null, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  }
+  
+  public final void sendJson(Object object, String prefix, FieldNamingPolicy policy) throws IOException {
+    response.status(HTTPStatus.OK);
     response.type("application/json; charset=UTF-8");
-    return new GsonBuilder().create().toJson(object);
+    
+    if (prefix != null && prefix.length() > 0) {
+      response.raw().getWriter().print(prefix);
+    }
+    
+    JsonFactory.newJsonParser(policy).toJson(object, response.raw().getWriter());
+  }
+  
+  public final String toJson(Object object) {
+    return toJson(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  }
+  
+  public final String toJson(Object object, FieldNamingPolicy policy) {
+    return JsonFactory.newJsonParser(policy).toJson(object);
+  }
+  
+  public final <T> T parseJson(String json, Class<T> clazz) {
+    return parseJson(json, clazz, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  }
+  
+  public final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
+    return JsonFactory.newJsonParser(policy).fromJson(json, clazz);
   }
   
   /**
@@ -654,7 +683,7 @@ public class HandlerContext implements AutoCloseable {
    * @param viewName
    * @return
    */
-  public ModelAndView modelAndView(String viewName, Object viewModel) {
+  public final ModelAndView modelAndView(String viewName, Object viewModel) {
     return new ModelAndView(viewName, viewModel);
   }
   
@@ -663,7 +692,7 @@ public class HandlerContext implements AutoCloseable {
    * @param viewName
    * @return
    */
-  public String renderToString(String viewName, Object viewModel) throws Exception {
+  public final String renderToString(String viewName, Object viewModel) throws Exception {
     StringWriter stringWriter = new StringWriter();
     templateEngine.getTemplate(viewName).process(viewModel, stringWriter);
     return stringWriter.toString();
@@ -674,7 +703,7 @@ public class HandlerContext implements AutoCloseable {
    * @return
    * @throws Exception
    */
-  public String renderToString(ModelAndView modelAndView) throws Exception {
+  public final String renderToString(ModelAndView modelAndView) throws Exception {
     return renderToString(modelAndView.viewName, modelAndView.viewModel);
   }
   
