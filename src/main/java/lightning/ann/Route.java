@@ -50,6 +50,16 @@ import lightning.enums.HTTPMethod;
  *  
  * Concrete path segments take the highest priority, followed
  * by parametric segments, followed by wildcards.
+ * 
+ * Route handlers may return...
+ *   void
+ *   null (equivalent to returning void)
+ *   String: to output it
+ *   ModelAndView: to render it
+ *   File: to pass it through
+ *   Any other Object:
+ *      To be converted to JSON and written out if @Json is present
+ *      To be used as a view model to render a template if @Template is present
  */
 public @interface Route {
   // The path to match (see above for details).

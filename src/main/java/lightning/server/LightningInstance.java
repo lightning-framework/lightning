@@ -37,6 +37,7 @@ public class LightningInstance {
   }
   
   public static void start(Config cfg) throws Exception {
+    // TODO(mschurr): Try to move away from global state.
     config = cfg;
     Log.setLog(null);    
     SecureCookieManager.setSecretKey(config.server.hmacKey);

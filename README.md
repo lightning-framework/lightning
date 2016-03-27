@@ -14,7 +14,7 @@ This framework was written for use in a course I taught at Rice University.
   - Built-in authentication and user management (groups and permissions in-progress)
   - Built-in templating with Freemarker
   - Built-in MySQL support (JOOQ coming soon)
-  - Built-in email support (via Mail)
+  - Built-in email support
   - Built-in SSL support (w/ option to redirect insecure requests)
   - Built-in support for CAS authentication
   - Built-in support for HTTP multipart request processing and file uploads
