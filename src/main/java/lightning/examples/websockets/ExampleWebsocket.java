@@ -1,5 +1,7 @@
 package lightning.examples.websockets;
 
+import java.io.IOException;
+
 import lightning.ann.WebSocketFactory;
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
@@ -33,8 +35,9 @@ public class ExampleWebsocket {
   }
   
   @OnWebSocketConnect
-  public void connected(final Session session) {
+  public void connected(final Session session) throws IOException {
     logger.debug("Connected: {}", session.getRemoteAddress().toString());
+    session.getRemote().sendString("HELLO!");
   }
 
   @OnWebSocketClose
@@ -43,8 +46,9 @@ public class ExampleWebsocket {
   }
 
   @OnWebSocketMessage
-  public void message(final Session session, String message) {
+  public void message(final Session session, String message) throws IOException {
     logger.debug("Received: {} -> {}", session.getRemoteAddress().toString(), message);
+    session.getRemote().sendString("THANKS!");
   }
   
   @OnWebSocketError

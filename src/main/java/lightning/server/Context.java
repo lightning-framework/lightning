@@ -278,15 +278,15 @@ public class Context {
     return context().jsonify(object);
   }
   
-  public static final ModelAndView modelAndView(Object model, String viewName) {
-    return context().modelAndView(model, viewName);
+  public static final ModelAndView modelAndView(String viewName, Object viewModel) {
+    return context().modelAndView(viewName, viewModel);
   }
   
-  public static final String renderToString(Object model, String viewName) throws Exception {
-    return context().renderToString(model, viewName);
+  public static final String renderToString(String viewName, Object viewModel) throws Exception {
+    return context().renderToString(viewName, viewModel);
   }
   
-  public static final Object sendFile(File file) throws Exception {
-    return context().sendFile(file);
+  public static final void sendFile(File file) throws Exception {
+    context().sendFile(file);
   }
 }

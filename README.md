@@ -29,10 +29,7 @@ This framework was written for use in a course I taught at Rice University.
   - Intelligent annotation-based routing and filters
   - Powerful type-safe HTTP abstractions
   - Async request handling
-  
-# Coming Soon
-
-- Built-in support for websockets
+  - Built-in support for websockets
 
 # Code Sample
 

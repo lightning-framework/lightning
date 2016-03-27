@@ -5,9 +5,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 
-import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -22,6 +20,7 @@ import lightning.ann.RequireXsrfToken;
 import lightning.ann.Route;
 import lightning.ann.Routes;
 import lightning.ann.Template;
+import lightning.ann.WebSocketFactory;
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.debugscreen.DebugScreen;
@@ -53,6 +52,7 @@ import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
 import lightning.util.Iterables;
 
+import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
@@ -64,8 +64,7 @@ import com.google.common.collect.ImmutableSet;
 import freemarker.template.Configuration;
 import freemarker.template.Version;
 
-@SuppressWarnings("serial")
-public class LightningServlet extends HttpServlet {
+public class LightningServlet extends AbstractHandler {
   private static final Version FREEMARKER_VERSION = new Version(2, 3, 20);
   private static final Logger logger = LoggerFactory.getLogger(LightningServlet.class);
   
@@ -83,15 +82,42 @@ public class LightningServlet extends HttpServlet {
   private FileServer staticFileServer;
   private RouteMapper<Method> routeMapper;
   
+  public LightningServlet(Config config, MySQLDatabaseProvider dbp) throws Exception {
+    this.config = config;
+    this.dbp = dbp;
+    this.debugScreen = new DebugScreen();
+    this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
+    this.internalTemplateConfig.setClassForTemplateLoading(Lightning.class, "templates");
+    this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
+    this.userTemplateConfig.setDirectoryForTemplateLoading(Iterables.firstOr(Iterables.filter(ImmutableList.of(
+        new File("./src/main/java/" + config.server.templateFilesPath),
+        new File("./src/main/resources/" + config.server.templateFilesPath)
+    ), f -> f.exists()), new File(config.server.templateFilesPath)));
+    this.exceptionHandlers = new ExceptionMapper();
+    this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes);
+    this.staticFileResourceFactory = Resource.newClassPathResource(config.server.staticFilesPath);
+    this.exceptionViewProducer = new DefaultExceptionViewProducer();
+    this.staticFileServer = new FileServer(this.staticFileResourceFactory);
+    this.staticFileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
+    this.staticFileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
+    this.staticFileServer.setMaxCacheSize(config.server.maxStaticFileCacheSizeBytes);
+    this.staticFileServer.setEnableHttpCaching(!config.enableDebugMode);
+    this.staticFileServer.init();
+    this.routeMapper = new RouteMapper<>();
+    rescan();
+  }
+  
   @SuppressWarnings("unchecked")
   private ImmutableSet<Class<? extends Throwable>> ignoredExceptions = ImmutableSet.<Class<? extends Throwable>>of(
       NotFoundException.class, BadRequestException.class, NotAuthorizedException.class,
       AccessViolationException.class, InternalServerErrorException.class, MethodNotAllowedException.class,
       NotImplementedException.class);
-      
+
+
   @Override
-  protected void service(HttpServletRequest _request, HttpServletResponse _response) 
-      throws ServletException, IOException {
+  public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest _request,
+      HttpServletResponse _response) throws IOException, ServletException {
+    baseRequest.setHandled(true);
     InternalRequest request = InternalRequest.makeRequest(_request);
     InternalResponse response = InternalResponse.makeResponse(_response);
     HandlerContext ctx = null;
@@ -118,6 +144,12 @@ public class LightningServlet extends HttpServlet {
         try {
           // TODO: Not sure how bad the performance is going to be with reflection here.
           Method m = match.getData();
+          
+          if (m == null) {
+            logger.debug("WebSocket Handler Detected, skip");
+            baseRequest.setHandled(false);
+            return;
+          }
           
           // Perform pre-processing.          
           if (m.getAnnotation(Multipart.class) != null) {
@@ -230,48 +262,10 @@ public class LightningServlet extends HttpServlet {
         logger.warn("Exception closing context:", e);
       }
       Context.clearContext();
-    }
+    } 
   }
   
   // FINISHED
-  
-  @Override
-  public void destroy() {
-    super.destroy();
-    staticFileServer.destroy();
-  }
-
-  @Override
-  public void init(ServletConfig servletConfig) throws ServletException {
-    super.init(servletConfig);
-    
-    try {
-      config = (Config) servletConfig.getServletContext().getAttribute("lightning_cfg");
-      this.dbp = (MySQLDatabaseProvider) servletConfig.getServletContext().getAttribute("lightning_dbp");
-      this.debugScreen = new DebugScreen();
-      this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
-      this.internalTemplateConfig.setClassForTemplateLoading(Lightning.class, "templates");
-      this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
-      this.userTemplateConfig.setDirectoryForTemplateLoading(Iterables.firstOr(Iterables.filter(ImmutableList.of(
-          new File("./src/main/java/" + config.server.templateFilesPath),
-          new File("./src/main/resources/" + config.server.templateFilesPath)
-      ), f -> f.exists()), new File(config.server.templateFilesPath)));
-      this.exceptionHandlers = new ExceptionMapper();
-      this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes);
-      this.staticFileResourceFactory = Resource.newClassPathResource(config.server.staticFilesPath);
-      this.exceptionViewProducer = new DefaultExceptionViewProducer();
-      this.staticFileServer = new FileServer(this.staticFileResourceFactory);
-      this.staticFileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
-      this.staticFileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
-      this.staticFileServer.setMaxCacheSize(config.server.maxStaticFileCacheSizeBytes);
-      this.staticFileServer.setEnableHttpCaching(!config.enableDebugMode);
-      this.staticFileServer.init();
-      this.routeMapper = new RouteMapper<>();
-      rescan();
-    } catch (Exception e) {
-      throw new ServletException(e);
-    }
-  }
   
   protected void rescan() throws Exception {
     scanResult = scanner.scan();
@@ -306,6 +300,14 @@ public class LightningServlet extends HttpServlet {
             }
           }
         }
+      }
+    }
+    
+    // Map websockets to a null handler.
+    for (Class<?> clazz : scanResult.websocketFactories.keySet()) {
+      for (Method m : scanResult.websocketFactories.get(clazz)) {
+        WebSocketFactory info = m.getAnnotation(WebSocketFactory.class);
+        routeMapper.map(HTTPMethod.GET, info.path(), null);
       }
     }
     

@@ -48,7 +48,6 @@ import freemarker.template.Configuration;
  * A controller is a class that is used to process a single HTTP request and should be sub-classed.
  * Each controller lives only on a single thread to service a single request. Instances are 
  * allocated to service a single request and destroyed after a response to that request is sent.
- * TODO(mschurr): It'd be really swell if we could somehow integrate with Spark's before and after filters.
  */
 public class HandlerContext implements AutoCloseable {
   public final Request request;
@@ -639,6 +638,7 @@ public class HandlerContext implements AutoCloseable {
 
   /**
    * Returns a JSON-encoded object and sets the appropriate response headers for JSON.
+   * NOTE: Prefer using the @Json annotation for speed.
    * @param object To convert to JSON.
    * @return The jsonified object (as a string).
    */
@@ -653,7 +653,7 @@ public class HandlerContext implements AutoCloseable {
    * @param viewName
    * @return
    */
-  public ModelAndView modelAndView(Object viewModel, String viewName) {
+  public ModelAndView modelAndView(String viewName, Object viewModel) {
     return new ModelAndView(viewName, viewModel);
   }
   
@@ -662,13 +662,37 @@ public class HandlerContext implements AutoCloseable {
    * @param viewName
    * @return
    */
-  public String renderToString(Object model, String viewName) throws Exception {
+  public String renderToString(String viewName, Object viewModel) throws Exception {
     StringWriter stringWriter = new StringWriter();
-    templateEngine.getTemplate(viewName).process(model, stringWriter);
+    templateEngine.getTemplate(viewName).process(viewModel, stringWriter);
     return stringWriter.toString();
   }
   
-  //private static final Set<String> accessControlTypes = ImmutableSet.of("ttf", "eot", "otf", "woff", "svg");
+  /**
+   * @param modelAndView
+   * @return
+   * @throws Exception
+   */
+  public String renderToString(ModelAndView modelAndView) throws Exception {
+    return renderToString(modelAndView.viewName, modelAndView.viewModel);
+  }
+  
+  /**
+   * @param viewName
+   * @param model
+   * @throws Exception
+   */
+  public void render(String viewName, Object viewModel) throws Exception {
+    templateEngine.getTemplate(viewName).process(viewModel, response.raw().getWriter());
+  }
+  
+  /**
+   * @param modelAndView
+   * @throws Exception
+   */
+  public void render(ModelAndView modelAndView) throws Exception {
+    templateEngine.getTemplate(modelAndView.viewName).process(modelAndView.viewModel, response.raw().getWriter());
+  }
   
   /**
    * Writes the contents of a file into the HTTP response, setting headers appropriately.
@@ -679,13 +703,13 @@ public class HandlerContext implements AutoCloseable {
    *            File name may be exposed to user.
    * @param file A file.
    */
-  public Object sendFile(File file) throws Exception {
+  public void sendFile(File file) throws Exception {
     if (request.raw().isAsyncSupported()) {
       goAsync();
       this.close();
     }
     
     fs.sendResource(request.raw(), response.raw(), Resource.newResource(file));
-    return null;
+    return;
   }
 }

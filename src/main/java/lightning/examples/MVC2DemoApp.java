@@ -94,7 +94,10 @@ public class MVC2DemoApp {
   
   public static void main(String[] args) throws Exception {
     Config config = new Config();
-    config.scanPrefixes = ImmutableList.of("lightning.examples.MVC2DemoApp");
+    config.scanPrefixes = ImmutableList.of(
+        "lightning.examples.MVC2DemoApp",
+        "lightning.examples.websockets"
+      );
     config.autoReloadPrefixes = ImmutableList.of("lightning.examples.MVC2DemoApp");
     config.server.hmacKey = "ABCDEF";
     config.server.templateFilesPath = "./";

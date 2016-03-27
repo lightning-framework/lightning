@@ -91,7 +91,7 @@ public class Config {
     public int threadTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60);
     
     // Jetty websocket timeout.
-    public int websocketTimeoutMs = (int) TimeUnit.SECONDS.toMillis(3); // For websockets.
+    public int websocketTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60); // For websockets.
     
     // Maximum incoming request size (in bytes).
     public int maxPostBytes = 2000000; // In bytes
