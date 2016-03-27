@@ -12,7 +12,6 @@ import java.util.List;
 import javax.servlet.AsyncContext;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
-import javax.servlet.UnavailableException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -129,7 +128,6 @@ public class FileServer implements ResourceFactory {
   private int maxCacheSize = 1024 * 1024 * 30;
   private int maxCachedFiles = 500;
   private int maxCachedFileSize = 1024 * 1024 * 1;
-  private boolean enableHttpCaching = true;
 
   private ResourceCache _cache;
 
@@ -139,8 +137,21 @@ public class FileServer implements ResourceFactory {
   private List<String> _gzipEquivalentFileExtensions;
   private ResourceFactory factory;
   
-  public FileServer(ResourceFactory factory) {
+  public FileServer(ResourceFactory factory) throws Exception {
     this.factory = factory;
+    
+    _cache = new ResourceCache(null, this, new MimeTypes(), _useFileMappedBuffer, _etags, _gzip);
+
+    if (maxCacheSize >= 0)
+      _cache.setMaxCacheSize(maxCacheSize);
+    if (maxCachedFileSize >= -1)
+      _cache.setMaxCachedFileSize(maxCachedFileSize);
+    if (maxCachedFiles >= -1)
+      _cache.setMaxCachedFiles(maxCachedFiles);      
+
+    _gzipEquivalentFileExtensions = new ArrayList<String>();
+    _gzipEquivalentFileExtensions.add(".svgz");
+    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=0, must-revalidate");
   }
   
   public void setMaxCacheSize(int value) {
@@ -155,37 +166,16 @@ public class FileServer implements ResourceFactory {
     this.maxCachedFileSize = value;
   }
   
-  public void setEnableHttpCaching(boolean value) {
-    this.enableHttpCaching = value;
-  }
-
-  /* ------------------------------------------------------------ */
-  public void init() throws UnavailableException {
-    try {
-      _cache = new ResourceCache(null, this, new MimeTypes(), _useFileMappedBuffer, _etags, _gzip);
-
-      if (maxCacheSize >= 0)
-        _cache.setMaxCacheSize(maxCacheSize);
-      if (maxCachedFileSize >= -1)
-        _cache.setMaxCachedFileSize(maxCachedFileSize);
-      if (maxCachedFiles >= -1)
-        _cache.setMaxCachedFiles(maxCachedFiles);      
-    } catch (Exception e) {
-      logger.warn("", e);
-      throw new UnavailableException(e.toString());
-    }
-
-    _gzipEquivalentFileExtensions = new ArrayList<String>();
-    _gzipEquivalentFileExtensions.add(".svgz");
-    
-    if (!this.enableHttpCaching) {
-      _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=0, must-revalidate");
-    }
-    
-  }
-  
   public void disableAsync() {
     this.disableAsync = true; // Enables closing the IO stream on completion.
+  }
+  
+  public void disableCaching() {
+    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=0, must-revalidate");
+    _etags = false;
+    _cache.flushCache();
+    _cache = null;
+    _useFileMappedBuffer = false;
   }
 
 

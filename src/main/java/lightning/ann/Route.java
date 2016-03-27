@@ -35,9 +35,25 @@ import lightning.enums.HTTPMethod;
  * Routes will be automatically installed based on the 
  * presence of these annotations.
  * 
- * Routes take precedence over static files.
+ * Static files take precedence over routes.
  * 
  * Routes must be instance methods and declared public.
+ * 
+ * Routes are matched such that priority is given first
+ * to more concrete routes. For example, consider the
+ * following routes:
+ *  /a/*
+ *  /a/:user
+ *  /a/bob
+ *  
+ * For these incoming URLs, the following routes will be
+ * executed:
+ *  /a/hello -> /a/:user
+ *  /a/hello/world -> /a/*
+ *  /a/bob -> /a/bob
+ *  
+ * Concrete path segments take the highest priority, followed
+ * by parametric segments, followed by wildcards.
  */
 public @interface Route {
   // The path to match (see above for details).

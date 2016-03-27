@@ -253,6 +253,9 @@ public class RouteMapper<T> {
     String component = components.next();
     RouteTreeNodeBuilder<RouteRequest, Match<T>> newChild;
     
+    // If a wildcard already exists at node, this is a route conflict.
+    // Allow this since priority is given first to concrete components then parametrics.
+    
     if (component.startsWith(":")) {
       newChild = node.parametric();
     } else if (component.equals("*")) {

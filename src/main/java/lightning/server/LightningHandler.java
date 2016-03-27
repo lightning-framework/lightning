@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URI;
+import java.util.ArrayList;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -55,6 +56,7 @@ import lightning.util.Iterables;
 
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.util.resource.ResourceCollection;
 import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,9 +67,9 @@ import com.google.common.collect.ImmutableSet;
 import freemarker.template.Configuration;
 import freemarker.template.Version;
 
-public class LightningServlet extends AbstractHandler {
+public class LightningHandler extends AbstractHandler {
   private static final Version FREEMARKER_VERSION = new Version(2, 3, 20);
-  private static final Logger logger = LoggerFactory.getLogger(LightningServlet.class);
+  private static final Logger logger = LoggerFactory.getLogger(LightningHandler.class);
   
   private Config config;
   private MySQLDatabaseProvider dbp;
@@ -75,7 +77,6 @@ public class LightningServlet extends AbstractHandler {
   private Configuration internalTemplateConfig;
   private ExceptionMapper exceptionHandlers;
   private Scanner scanner;
-  //private ResourceCache staticFileCache;
   private ResourceFactory staticFileResourceFactory;
   private ScanResult scanResult;
   private DebugScreen debugScreen;
@@ -83,7 +84,7 @@ public class LightningServlet extends AbstractHandler {
   private FileServer staticFileServer;
   private RouteMapper<Method> routeMapper;
   
-  public LightningServlet(Config config, MySQLDatabaseProvider dbp) throws Exception {
+  public LightningHandler(Config config, MySQLDatabaseProvider dbp) throws Exception {
     this.config = config;
     this.dbp = dbp;
     this.debugScreen = new DebugScreen();
@@ -96,16 +97,37 @@ public class LightningServlet extends AbstractHandler {
     ), f -> f.exists()), new File(config.server.templateFilesPath)));
     this.exceptionHandlers = new ExceptionMapper();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes);
-    this.staticFileResourceFactory = Resource.newClassPathResource(config.server.staticFilesPath);
+    this.staticFileResourceFactory = config.enableDebugMode
+        ? new ResourceCollection(getResourcePaths())
+        : Resource.newClassPathResource(config.server.staticFilesPath);
     this.exceptionViewProducer = new DefaultExceptionViewProducer();
     this.staticFileServer = new FileServer(this.staticFileResourceFactory);
     this.staticFileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
     this.staticFileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
     this.staticFileServer.setMaxCacheSize(config.server.maxStaticFileCacheSizeBytes);
-    this.staticFileServer.setEnableHttpCaching(!config.enableDebugMode);
-    this.staticFileServer.init();
+    if (config.enableDebugMode) {
+      this.staticFileServer.disableCaching();
+    }
     this.routeMapper = new RouteMapper<>();
     rescan();
+  }
+  
+  private Resource[] getResourcePaths() {
+    File[] files = new File[] {
+        new File("./src/main/resources", config.server.staticFilesPath),
+        new File("./src/main/java", config.server.staticFilesPath),
+        new File(config.server.staticFilesPath)
+    };
+    
+    ArrayList<Resource> resources = new ArrayList<>();
+    
+    for (File f : files) {
+      if (f.exists() && f.isDirectory() && f.canRead()) {
+        resources.add(Resource.newResource(f));
+      }
+    }
+    
+    return resources.toArray(new Resource[resources.size()]);
   }
   
   @SuppressWarnings("unchecked")
@@ -141,6 +163,13 @@ public class LightningServlet extends AbstractHandler {
           return;
       }
       
+      // Try to pass through a static file (if any).
+      if (staticFileServer.couldConsume(_request)) {
+        staticFileServer.handle(_request, _response);
+        return;
+      }
+      
+      // Perform routing.
       ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer);
       Context.setContext(ctx);
       
@@ -247,12 +276,6 @@ public class LightningServlet extends AbstractHandler {
         return;
       }
       
-      // Try to pass through a static file (if any).
-      if (staticFileServer.couldConsume(_request)) {
-        staticFileServer.handle(_request, _response);
-        return;
-      }
-      
       // Trigger a 404 page.
       throw new NotFoundException();
     } catch (Throwable e) {
@@ -275,7 +298,9 @@ public class LightningServlet extends AbstractHandler {
       }
     } finally {
       try {
-        ctx.closeIfNotAsync();
+        if (ctx != null) {
+          ctx.closeIfNotAsync();
+        }
       } catch (Exception e) {
         logger.warn("Exception closing context:", e);
       }
@@ -285,7 +310,7 @@ public class LightningServlet extends AbstractHandler {
   
   // FINISHED
   
-  protected void rescan() throws Exception {
+  protected synchronized void rescan() throws Exception {
     scanResult = scanner.scan();
     logger.debug("Scanned Annotations: {}", scanResult);
     

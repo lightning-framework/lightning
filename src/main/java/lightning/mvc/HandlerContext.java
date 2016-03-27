@@ -701,6 +701,9 @@ public class HandlerContext implements AutoCloseable {
    *            is supported (partials, caching, etc) as if it were a static file being served.
    *            Takes advantage of async IO for speed.
    *            File name may be exposed to user.
+   *            Will be sent with Cache-Control: public.
+   *            TODO: Add an option to have cache-control private.
+   *            TODO: Can this method cache the file contents using resource cache + mmap-ing?
    * @param file A file.
    */
   public void sendFile(File file) throws Exception {

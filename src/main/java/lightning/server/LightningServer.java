@@ -79,16 +79,7 @@ public class LightningServer {
           }
       }
     }
-    
-    /*ServletContextHandler httpHandler = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
-    httpHandler.setResourceBase("/");
-    httpHandler.setMaxFormContentSize(config.server.maxPostBytes);
-    httpHandler.setMaxFormKeys(config.server.maxQueryParams);
-    httpHandler.setAttribute("lightning_cfg", config);
-    httpHandler.setAttribute("lightning_dbp", dbp);
-    ServletHolder ssh = new ServletHolder("lightning", LightningServlet.class);
-    httpHandler.addServlet(ssh, "/*");*/
-    
+        
     ServletContextHandler websocketHandler = new ServletContextHandler(null, "/", false, false);
     WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
     websocketFilter.getFactory().getPolicy().setIdleTimeout(config.server.websocketTimeoutMs);
@@ -113,54 +104,9 @@ public class LightningServer {
         websocketFilter.addMapping(new ServletPathSpec(info.path()), creator);
       }
     }
-     
-    if (config.ssl.isEnabled() && config.ssl.redirectInsecureRequests) {
-      // TODO: Add the HTTP -> HTTPS redirector
-      /*FilterHolder fh = new FilterHolder(new Filter() {
-        @Override
-        public void destroy() {}
-  
-        @Override
-        public void doFilter(ServletRequest _req, ServletResponse _res, FilterChain chain)
-            throws IOException, ServletException {
-          try {
-            HttpServletRequest req = (HttpServletRequest) _req;
-            HttpServletResponse res = (HttpServletResponse) _res;
-            
-            if (!req.getScheme().toLowerCase().equals("https")) {
-              URI oldUri = new URI(req.getRequestURL().toString());
-              URI newUri = new URI("https",
-                                 oldUri.getUserInfo(),
-                                 oldUri.getHost(),
-                                 config.ssl.port,
-                                 oldUri.getPath(),
-                                 oldUri.getQuery(),
-                                 null);
-  
-              res.sendRedirect(newUri.toString());
-            } else {
-              chain.doFilter(_req, _res);
-            }
-          } catch (URISyntaxException e) {
-            throw new ServletException(e);
-          }
-        }
-  
-        @Override
-        public void init(FilterConfig cfg) throws ServletException {}
-      });
-      httpHandler.addFilter(fh, "/*", EnumSet.of(DispatcherType.REQUEST));*/
-    }
-    
-    /*httpHandler.setErrorHandler(new ErrorHandler() {
-      @Override
-      protected void handleErrorPage(HttpServletRequest request, Writer writer, int code, String message) throws IOException {
-        writer.write(String.format("%d %s", code, message));
-      }
-    });*/
     
     HandlerCollection handlers = new HandlerCollection();
-    handlers.addHandler(new LightningServlet(config, dbp));
+    handlers.addHandler(new LightningHandler(config, dbp));
     handlers.addHandler(websocketHandler);
     server.setHandler(handlers);
   }
