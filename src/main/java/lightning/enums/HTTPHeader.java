@@ -21,7 +21,8 @@ public enum HTTPHeader {
   ETAG("Etag"),
   EXPIRES("Expires"),
   SERVER("Server"),
-  UPGRADE_INSECURE_REQUESTS("Upgrade-Insecure-Requests");
+  UPGRADE_INSECURE_REQUESTS("Upgrade-Insecure-Requests"),
+  LAST_MODIFIED("Last-Modified");
   
   private final String headerName;
   

@@ -126,6 +126,8 @@ public final class NamedPreparedStatement implements AutoCloseable {
         this.setInt(column, ((Boolean) value).booleanValue() ? 1 : 0); // SQL has no native booleans.
       } else if (value instanceof SQLNull) {
         this.setNull(column, ((SQLNull) value).getSqlType());
+      } else if (value instanceof InputStream) {
+        this.setBinaryStream(column, (InputStream) value);
       } else {
         this.setObject(column, value);
       }
@@ -325,6 +327,13 @@ public final class NamedPreparedStatement implements AutoCloseable {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
       statement.setBinaryStream(indexes[i], stream, length);
+    }
+  }
+  
+  public void setBinaryStream(String name, InputStream stream) throws SQLException {
+    int[] indexes = getIndexes(name);
+    for(int i = 0; i < indexes.length; i++) {
+      statement.setBinaryStream(indexes[i], stream);
     }
   }
 

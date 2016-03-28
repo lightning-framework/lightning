@@ -11,4 +11,13 @@ public enum HTTPScheme {
       default: return false;
     }
   }
+  
+  @Override
+  public String toString() {
+    switch (this) {
+      case HTTP: return "http";
+      case HTTPS: return "https";
+      default: return "http";
+    }
+  }
 }

@@ -125,4 +125,8 @@ public class Response {
   public ServletOutputStream getOutputStream() throws IOException {
     return response.getOutputStream();
   }
+
+  public ServletOutputStream outputStream() throws IOException {
+    return response.getOutputStream();
+  }
 }
