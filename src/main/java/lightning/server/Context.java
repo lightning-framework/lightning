@@ -221,8 +221,8 @@ public class Context {
     return context().isGET();
   }
 
-  public static final Object redirect(String path) {
-    return context().redirect(path);
+  public static final void redirect(String path) {
+    context().redirect(path);
   }
 
   public static final void redirectIfLoggedIn(String path) throws SessionException, AuthException {
@@ -293,6 +293,18 @@ public class Context {
     return context().renderToString(viewName, viewModel);
   }
   
+  public static final String renderToString(ModelAndView modelAndView) throws Exception {
+    return context().renderToString(modelAndView);
+  }
+  
+  public void render(String viewName, Object viewModel) throws Exception {
+    context().render(viewName, viewModel);
+  }
+
+  public void render(ModelAndView modelAndView) throws Exception {
+    context().render(modelAndView);
+  }
+  
   public static final void sendFile(File file) throws Exception {
     context().sendFile(file);
   }
@@ -327,5 +339,11 @@ public class Context {
   
   public final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
     return context().parseJson(json, clazz, policy);
+  }
+  
+  
+  
+  public final void halt() {
+    context().halt();
   }
 }

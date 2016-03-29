@@ -47,10 +47,10 @@ public class MVC2DemoApp {
     
     @Route(path="/loginx", methods={HTTPMethod.POST})
     @Template("login.ftl")
-    public Object handleLoginAction() throws Exception {
+    public void handleLoginAction() throws Exception {
       redirectIfLoggedIn(url().to("/"));
       // Do processing.
-      return redirect(url().to("/profile"));
+      redirect(url().to("/profile"));
     }
     
     @Route(path="/profile", methods={HTTPMethod.GET})

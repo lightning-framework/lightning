@@ -469,10 +469,9 @@ public class HandlerContext implements AutoCloseable {
    * @param path To redirect to.
    * @return null (So that you return this in handleRequest and be type safe).
    */
-  public final Object redirect(String path) {
+  public final void redirect(String path) {
     response.redirect(path, 302);
     halt();
-    return null;
   }
 
   /**
@@ -712,7 +711,7 @@ public class HandlerContext implements AutoCloseable {
    * @param model
    * @throws Exception
    */
-  public void render(String viewName, Object viewModel) throws Exception {
+  public final void render(String viewName, Object viewModel) throws Exception {
     templateEngine.getTemplate(viewName).process(viewModel, response.raw().getWriter());
   }
   
@@ -720,7 +719,7 @@ public class HandlerContext implements AutoCloseable {
    * @param modelAndView
    * @throws Exception
    */
-  public void render(ModelAndView modelAndView) throws Exception {
+  public final void render(ModelAndView modelAndView) throws Exception {
     templateEngine.getTemplate(modelAndView.viewName).process(modelAndView.viewModel, response.raw().getWriter());
   }
   
