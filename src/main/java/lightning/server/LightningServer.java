@@ -68,6 +68,8 @@ public class LightningServer {
     connector.setHost(config.server.host);
     connector.setPort(config.ssl.isEnabled() ? config.ssl.port : config.server.port);
     server.addConnector(connector);    
+    
+    // TODO(mschurr): Expose additional Jetty options if needed.
     server.setAttribute("org.eclipse.jetty.server.Request.maxFormContentSize", config.server.maxPostBytes);
     server.setAttribute("org.eclipse.jetty.server.Request.maxFormKeys", config.server.maxQueryParams);
     

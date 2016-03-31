@@ -297,11 +297,11 @@ public class Context {
     return context().renderToString(modelAndView);
   }
   
-  public void render(String viewName, Object viewModel) throws Exception {
+  public static final void render(String viewName, Object viewModel) throws Exception {
     context().render(viewName, viewModel);
   }
 
-  public void render(ModelAndView modelAndView) throws Exception {
+  public static final void render(ModelAndView modelAndView) throws Exception {
     context().render(modelAndView);
   }
   
@@ -309,41 +309,39 @@ public class Context {
     context().sendFile(file);
   }
   
-  public final void sendJson(Object object) throws IOException {
+  public static final void sendJson(Object object) throws IOException {
     context().sendJson(object);
   }
   
-  public final void sendJson(Object object, FieldNamingPolicy policy) throws IOException {
+  public static final void sendJson(Object object, FieldNamingPolicy policy) throws IOException {
     context().sendJson(object, policy);
   }
   
-  public final void sendJson(Object object, String prefix) throws IOException {
+  public static final void sendJson(Object object, String prefix) throws IOException {
     context().sendJson(object, prefix);
   }
   
-  public final void sendJson(Object object, String prefix, FieldNamingPolicy policy) throws IOException {
+  public static final void sendJson(Object object, String prefix, FieldNamingPolicy policy) throws IOException {
     context().sendJson(object, prefix, policy);
   }
   
-  public final String toJson(Object object) {
+  public static final String toJson(Object object) {
     return context().toJson(object);
   }
   
-  public final String toJson(Object object, FieldNamingPolicy policy) {
+  public static final String toJson(Object object, FieldNamingPolicy policy) {
     return context().toJson(object, policy);
   }
   
-  public final <T> T parseJson(String json, Class<T> clazz) {
+  public static final <T> T parseJson(String json, Class<T> clazz) {
     return context().parseJson(json, clazz);
   }
   
-  public final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
+  public static final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
     return context().parseJson(json, clazz, policy);
   }
   
-  
-  
-  public final void halt() {
+  public static final void halt() {
     context().halt();
   }
 }

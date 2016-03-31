@@ -1,11 +1,14 @@
 package lightning.db;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -128,6 +131,14 @@ public final class NamedPreparedStatement implements AutoCloseable {
         this.setNull(column, ((SQLNull) value).getSqlType());
       } else if (value instanceof InputStream) {
         this.setBinaryStream(column, (InputStream) value);
+      } else if (value instanceof Double) {
+        this.setDouble(column, (Double) value);
+      } else if (value instanceof Float) {
+        this.setFloat(column, (Float) value);
+      } else if (value instanceof Date) {
+        this.setDate(column, (Date) value);
+      } else if (value instanceof Time) {
+        this.setTime(column, (Time) value);
       } else {
         this.setObject(column, value);
       }
@@ -288,6 +299,41 @@ public final class NamedPreparedStatement implements AutoCloseable {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
       statement.setInt(indexes[i], value);
+    }
+  }
+  
+  public void setDouble(String name, double value) throws SQLException {
+    int[] indexes = getIndexes(name);
+    for(int i = 0; i < indexes.length; i++) {
+      statement.setDouble(indexes[i], value);
+    }
+  }
+  
+  public void setFloat(String name, float value) throws SQLException {
+    int[] indexes = getIndexes(name);
+    for(int i = 0; i < indexes.length; i++) {
+      statement.setFloat(indexes[i], value);
+    }
+  }
+  
+  public void setBigDecimal(String name, BigDecimal value) throws SQLException {
+    int[] indexes = getIndexes(name);
+    for(int i = 0; i < indexes.length; i++) {
+      statement.setBigDecimal(indexes[i], value);
+    }
+  }
+  
+  public void setTime(String name, Time value) throws SQLException {
+    int[] indexes = getIndexes(name);
+    for(int i = 0; i < indexes.length; i++) {
+      statement.setTime(indexes[i], value);
+    }
+  }
+  
+  public void setDate(String name, Date value) throws SQLException {
+    int[] indexes = getIndexes(name);
+    for(int i = 0; i < indexes.length; i++) {
+      statement.setDate(indexes[i], value);
     }
   }
 

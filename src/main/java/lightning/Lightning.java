@@ -9,6 +9,7 @@ import lightning.config.Config;
 import lightning.json.JsonFactory;
 import lightning.server.LightningInstance;
 
+// TODO(mschurr): Provide a way to stop the server after launching it.
 public final class Lightning {
   /**
    * Starts the application server using the given configuration parameters.
