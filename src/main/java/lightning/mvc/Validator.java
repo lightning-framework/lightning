@@ -256,6 +256,22 @@ public class Validator {
       
       return this;
     }
+    
+    public FieldValidator containsOnly(Iterable<String> values) {
+      if (!field.containsOnly(values)) {
+        addError("You must enter an accepted value.");
+      }
+      
+      return this;
+    }
+    
+    public FieldValidator hasNoDuplicates() {
+      if (!field.hasNoDuplicates()) {
+        addError("You must enter an accepted value.");
+      }
+      
+      return this;
+    }
 
     public FieldValidator isNonEmptyFile() throws IOException, ServletException {
       if (!controller.isMultipart()) {

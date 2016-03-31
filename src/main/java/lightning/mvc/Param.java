@@ -1,7 +1,9 @@
 package lightning.mvc;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
@@ -174,6 +176,32 @@ public class Param {
   
   public boolean isOneOf(Iterable<String> values) {
     return isNotNull() && Iterables.contains(values, value.get());
+  }
+  
+  public boolean containsOnly(Iterable<String> values) {
+    for (String s : this.values) {
+      if (s == null) {
+        return false;
+      }
+      
+      if (!Iterables.contains(values, s)) {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+  
+  public boolean hasNoDuplicates() {
+    Set<String> values = new HashSet<>();
+    
+    for (String s : this.values) {
+      if (s != null) {
+        values.add(s);
+      }
+    }
+    
+    return values.size() == this.values.length;
   }
   
   public boolean isAllUppercase() {
