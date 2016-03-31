@@ -155,8 +155,8 @@ public class Request {
    * @param name A query parameter name.
    * @return
    */
-  public Param queryParam(String name) {
-    return Param.wrap(name, request.getParameter(name));
+  public Param queryParam(String name) {    
+    return Param.wrapList(name, request.getParameterValues(name));
   }
   
   /**

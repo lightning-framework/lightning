@@ -1,5 +1,7 @@
 package lightning.mvc;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
@@ -29,11 +31,13 @@ import com.google.common.collect.Iterables;
  */
 public class Param {
   private final String key;
+  private final String[] values;
   private final Optional<String> value;
   
-  private Param(String key, Optional<String> value) {
+  private Param(String key, String[] values) {
     this.key = key;
-    this.value = value;
+    this.values = values;
+    this.value = values.length == 0 ? Optional.absent() : Optional.fromNullable(values[0]);
   }
   
   public <T> Object castTo(Class<T> type) {
@@ -293,6 +297,18 @@ public class Param {
     }
   }
   
+  public Optional<List<String>> arrayOption() {
+    List<String> v = new ArrayList<>();
+    
+    for (String s : this.values) {
+      if (s != null) {
+        v.add(s);
+      }
+    }
+    
+    return Optional.of(v);
+  }
+  
   public String stringValue() {
     require(value.isPresent(), "string");
     return value.get();
@@ -328,6 +344,12 @@ public class Param {
     return option.get();
   }
   
+  public List<String> arrayValue() {
+    Optional<List<String>> option = arrayOption();
+    require(option.isPresent(), "array");
+    return option.get();
+  }
+  
   public <T> T enumValue(Class<T> type) {
     Optional<T> option = enumOption(type);
     require(option.isPresent(), "enum " + type.getSimpleName());
@@ -342,7 +364,11 @@ public class Param {
   }
     
   public static Param wrap(String key, @Nullable String value) {
-    return new Param(key, Optional.fromNullable(value));
+    return new Param(key, value == null ? new String[0] : new String[]{value});
+  }
+  
+  public static Param wrapList(String key, @Nullable String[] values) {
+    return new Param(key, values == null ? new String[0] : values);
   }
 
   public Object stringOr(Object other) {
