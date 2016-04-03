@@ -18,8 +18,6 @@ import org.slf4j.LoggerFactory;
 /**
  * A web socket is a singleton class which handles incoming requests statelessly through
  * event handlers.
- * TODO(mschurr): Unfortunately, Spark does not provide a way to utilize websockets with
- * constructors. Need to fix this.
  */
 @WebSocket
 public class ExampleWebsocket {

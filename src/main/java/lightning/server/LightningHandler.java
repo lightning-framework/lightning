@@ -227,6 +227,7 @@ public class LightningHandler extends AbstractHandler {
           }
           
           // Build invocation arguments.
+          // TODO: Better dependency injection support - maybe w/ Guice?
           Object[] args = new Object[m.getParameterCount()];
           
           Parameter[] params = m.getParameters();
@@ -297,6 +298,7 @@ public class LightningHandler extends AbstractHandler {
         Method handler = exceptionHandlers.getHandler(e);
         
         if (handler != null) {
+          // TODO: Better dependency injection support - maybe with Guice?
           handler.invoke(null, ctx, e);
           return;
         }

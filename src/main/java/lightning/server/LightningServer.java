@@ -97,6 +97,7 @@ public class LightningServer {
           @Override
           public Object createWebSocket(ServletUpgradeRequest req, ServletUpgradeResponse res) {
             try {
+              // TODO: Better dependency injection support - maybe with Guice?
               return m.invoke(null, config, dbp);
             } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
               return null;

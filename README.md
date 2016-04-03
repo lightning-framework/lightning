@@ -166,4 +166,3 @@ In debug mode, whenever a request handler throws an Error or Exception you will 
 
 ![Debug Page](https://cloud.githubusercontent.com/assets/3498024/14005744/3fa323ba-f134-11e5-9f72-00da49a46ab7.png "Debug Page")
 
-
