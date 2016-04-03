@@ -17,6 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import lightning.http.NotFoundException;
 import lightning.util.Mimes;
+import lightning.util.Time;
 
 import org.apache.commons.io.FilenameUtils;
 import org.eclipse.jetty.http.DateParser;
@@ -50,6 +51,7 @@ import org.slf4j.LoggerFactory;
  * Supports the HTTP protocol fully (caching, partials).
  * Supports fast serving of a directory using file mapped buffer caching.
  * NOTE: This code is an adaptation of Jetty's default servlet code to work with this framework.
+ * NOTE: HTTP caching in chrome doesn't work properly w/ HTTPS self-signed certificates?
  * TODO(mschurr): This is pretty convoluted, should just rewrite it from scratch time allowing.
  */
 public class FileServer implements ResourceFactory {
@@ -57,6 +59,7 @@ public class FileServer implements ResourceFactory {
   private static final PreEncodedHttpField ACCEPT_RANGES = new PreEncodedHttpField(
       HttpHeader.ACCEPT_RANGES, "bytes");
 
+  private boolean caching = true;
   private boolean _acceptRanges = true;
   private boolean _gzip = true;
   private boolean _pathInfoOnly = true;
@@ -69,8 +72,7 @@ public class FileServer implements ResourceFactory {
   private ResourceCache _cache;
 
   private boolean _useFileMappedBuffer = true;
-  private HttpField _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL,
-      "public, max-age=3600, must-revalidate");
+  private HttpField _cacheControl = null;
   private List<String> _gzipEquivalentFileExtensions;
   private ResourceFactory factory;
   
@@ -88,7 +90,7 @@ public class FileServer implements ResourceFactory {
 
     _gzipEquivalentFileExtensions = new ArrayList<String>();
     _gzipEquivalentFileExtensions.add(".svgz");
-    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=0, must-revalidate");
+    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=3600");
   }
   
   public void setMaxCacheSize(int value) {
@@ -113,6 +115,7 @@ public class FileServer implements ResourceFactory {
     _cache.flushCache();
     _cache = null;
     _useFileMappedBuffer = false;
+    caching = false;
   }
 
 
@@ -204,6 +207,8 @@ public class FileServer implements ResourceFactory {
     HttpContent content = null;
     boolean close_content = true;
     Enumeration<String> reqRanges = null;
+    
+    //response.addHeader("Content-Disposition", "inline, filename=" + FilenameUtils.getBaseName(resource.getName()));
     
     try {
       reqRanges = request.getHeaders(HttpHeader.RANGE.asString());
@@ -719,6 +724,12 @@ public class FileServer implements ResourceFactory {
 
       if (_cacheControl != null)
         response.setHeader(_cacheControl.getName(), _cacheControl.getValue());
+    }
+    
+    if (caching) {
+      response.setHeader("Expires", Time.formatForHttp(Time.now() + 3600));
+    } else {
+      response.setHeader("Expires", Time.formatForHttp(Time.now()));
     }
   }
 
