@@ -37,6 +37,8 @@ import lightning.users.User;
 import lightning.users.Users.UsersException;
 
 import com.google.gson.FieldNamingPolicy;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 
 import freemarker.template.Configuration;
 
@@ -339,6 +341,22 @@ public class Context {
   
   public static final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
     return context().parseJson(json, clazz, policy);
+  }
+  
+  public static final <T> T parseJson(Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException {
+    return context().parseJson(clazz);
+  }
+   
+  public static final <T> T parseJson(Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException {
+    return context().parseJson(clazz, policy);
+  }
+   
+  public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
+    return context().parseJsonFromParam(queryParamName, clazz, policy);
+  }
+   
+  public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
+    return context().parseJsonFromParam(queryParamName, clazz);
   }
   
   public static final void halt() {

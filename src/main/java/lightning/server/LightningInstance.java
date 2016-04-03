@@ -51,12 +51,7 @@ public class LightningInstance {
       Mail.configure(config.mail);
     }
     
-    dbp = new MySQLDatabaseProvider(
-        config.db.host, 
-        config.db.port, 
-        config.db.username, 
-        config.db.password, 
-        config.db.name);
+    dbp = new MySQLDatabaseProvider(config);
     
     Session.setDriver(new MySQLSessionDriver(dbp));
     Groups.setDriver(new MySQLGroupDriver(dbp));

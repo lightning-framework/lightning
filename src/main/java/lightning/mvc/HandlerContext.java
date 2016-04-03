@@ -2,6 +2,7 @@ package lightning.mvc;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.sql.SQLException;
 import java.util.Collection;
@@ -44,6 +45,8 @@ import org.eclipse.jetty.util.resource.Resource;
 
 import com.google.common.collect.ImmutableList;
 import com.google.gson.FieldNamingPolicy;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 
 import freemarker.template.Configuration;
 
@@ -675,6 +678,26 @@ public class HandlerContext implements AutoCloseable {
   
   public final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
     return JsonFactory.newJsonParser(policy).fromJson(json, clazz);
+  }
+  
+  public final <T> T parseJson(Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException {
+   return parseJson(clazz, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES); 
+  }
+  
+  public final <T> T parseJson(Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException {
+    return JsonFactory.newJsonParser(policy).fromJson(request.raw().getReader(), clazz);
+  }
+  
+  public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
+    if (isMultipart()) {
+      return JsonFactory.newJsonParser(policy).fromJson(new InputStreamReader(request.raw().getPart(queryParamName).getInputStream()), clazz);
+    } else {
+      return JsonFactory.newJsonParser(policy).fromJson(queryParam(queryParamName).stringValue(), clazz);
+    }
+  }
+  
+  public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
+    return parseJsonFromParam(queryParamName, clazz, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
   
   /**

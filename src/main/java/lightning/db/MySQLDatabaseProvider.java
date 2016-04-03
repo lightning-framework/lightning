@@ -6,6 +6,8 @@ import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
+import lightning.config.Config;
+
 import com.mchange.v2.c3p0.ComboPooledDataSource;
 
 /**
@@ -30,19 +32,11 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
  */
 public final class MySQLDatabaseProvider {
   private DataSource source;
-  private final String hostName;
-  private final String user;
-  private final String password;
-  private final String databaseName;
-  private final int port;
+  private final Config config;
   
-  public MySQLDatabaseProvider(String hostName, int port, String user, String password, String databaseName) throws SQLException, PropertyVetoException {
-    this.hostName = hostName;
-    this.port = port;
-    this.user = user;
-    this.password = password;
-    this.databaseName = databaseName;
+  public MySQLDatabaseProvider(Config config) throws SQLException, PropertyVetoException {
     initializeSource();
+    this.config = config;
   }
   
   /**
@@ -64,45 +58,51 @@ public final class MySQLDatabaseProvider {
   private void initializeSource() throws SQLException, PropertyVetoException {
     // See http://www.mchange.com/projects/c3p0/
     ComboPooledDataSource source = new ComboPooledDataSource();
-    source.setJdbcUrl(String.format("jdbc:mysql://%s:%d/%s", hostName, port, databaseName));
+    String url = String.format("jdbc:mysql://%s:%d/%s", config.db.host, config.db.port, config.db.name);
+    
+    if (config.db.useSSL) {
+      url += "?verifyServerCertificate=true&useSSL=true&requireSSL=true";
+    }
+    
+    source.setJdbcUrl(url);
     source.setDriverClass("com.mysql.jdbc.Driver");
-    source.setUser(user);
-    source.setPassword(password);
-    source.setMinPoolSize(5);
-    source.setMaxPoolSize(100);
-    source.setAcquireIncrement(5);
-    source.setMaxStatements(500); // To be cached.
-    source.setAcquireRetryAttempts(3);
-    source.setAcquireRetryDelay(1000); // milliseconds
-    source.setAutoCommitOnClose(true);
+    source.setUser(config.db.username);
+    source.setPassword(config.db.password);
+    source.setMinPoolSize(config.db.minPoolSize);
+    source.setMaxPoolSize(config.db.maxPoolSize);
+    source.setAcquireIncrement(config.db.acquireIncrement);
+    source.setMaxStatements(config.db.maxStatementsCached); // To be cached.
+    source.setAcquireRetryAttempts(config.db.acquireRetryAttempts);
+    source.setAcquireRetryDelay(config.db.acquireRetryDelayMs); // milliseconds
+    source.setAutoCommitOnClose(config.db.autoCommitOnClose);
     source.setDebugUnreturnedConnectionStackTraces(true);
-    source.setMaxConnectionAge(50000); // seconds
-    source.setMaxIdleTime(50000); // seconds
-    source.setMaxIdleTimeExcessConnections(50000); // seconds
-    source.setUnreturnedConnectionTimeout(50000); // seconds
+    source.setMaxConnectionAge(config.db.maxConnectionAgeS); // seconds
+    source.setMaxIdleTime(config.db.maxIdleTimeS); // seconds
+    source.setMaxIdleTimeExcessConnections(config.db.maxIdleTimeExcessConnectionsS); // seconds
+    source.setUnreturnedConnectionTimeout(config.db.unreturnedConnectionTimeoutS); // seconds
     source.setTestConnectionOnCheckin(false);
     source.setTestConnectionOnCheckout(false); // Note: expensive if true
-    source.setIdleConnectionTestPeriod(600); // seconds
+    source.setIdleConnectionTestPeriod(config.db.idleConnectionTestPeriodS); // seconds
     this.source = source;
   }
   
   public String getHostName() {
-    return hostName;
+    return config.db.host;
   }
   
   public String getPassword() {
-    return password;
+    return config.db.password;
   }
   
   public String getUser() {
-    return user;
+    return config.db.username;
   }
   
   public int getPort() {
-    return port;
+    return config.db.port;
   }
   
   public String getDatabaseName() {
-    return databaseName;
+    return config.db.name;
   }
 }
