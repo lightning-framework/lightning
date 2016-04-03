@@ -46,74 +46,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The default servlet.
- * <p>
- * This servlet, normally mapped to /, provides the handling for static content, OPTION and TRACE
- * methods for the context. The following initParameters are supported, these can be set either on
- * the servlet itself or as ServletContext initParameters with a prefix of
- * org.eclipse.jetty.servlet.Default. :
- * 
- * <pre>
- *  acceptRanges      If true, range requests and responses are
- *                    supported
- * 
- *  dirAllowed        If true, directory listings are returned if no
- *                    welcome file is found. Else 403 Forbidden.
- * 
- *  welcomeServlets   If true, attempt to dispatch to welcome files
- *                    that are servlets, but only after no matching static
- *                    resources could be found. If false, then a welcome
- *                    file must exist on disk. If "exact", then exact
- *                    servlet matches are supported without an existing file.
- *                    Default is true.
- * 
- *                    This must be false if you want directory listings,
- *                    but have index.jsp in your welcome file list.
- * 
- *  redirectWelcome   If true, welcome files are redirected rather than
- *                    forwarded to.
- * 
- *  gzip              If set to true, then static content will be served as
- *                    gzip content encoded if a matching resource is
- *                    found ending with ".gz"
- * 
- *  resourceBase      Set to replace the context resource base
- * 
- *  resourceCache     If set, this is a context attribute name, which the servlet
- *                    will use to look for a shared ResourceCache instance.
- * 
- *  relativeResourceBase
- *                    Set with a pathname relative to the base of the
- *                    servlet context root. Useful for only serving static content out
- *                    of only specific subdirectories.
- * 
- *  pathInfoOnly      If true, only the path info will be applied to the resourceBase
- * 
- *  stylesheet        Set with the location of an optional stylesheet that will be used
- *                    to decorate the directory listing html.
- * 
- *  etags             If True, weak etags will be generated and handled.
- * 
- *  maxCacheSize      The maximum total size of the cache or 0 for no cache.
- *  maxCachedFileSize The maximum size of a file to cache
- *  maxCachedFiles    The maximum number of files to cache
- * 
- *  useFileMappedBuffer
- *                    If set to true, it will use mapped file buffer to serve static content
- *                    when using NIO connector. Setting this value to false means that
- *                    a direct buffer will be used instead of a mapped file buffer.
- *                    This is set to false by default by this class, but may be overridden
- *                    by eg webdefault.xml 
- * 
- *  cacheControl      If set, all static content will have this value set as the cache-control
- *                    header.
- *                    
- * otherGzipFileExtensions
- *                    Other file extensions that signify that a file is gzip compressed. Eg ".svgz"
- *
- *
- * </pre>
- *
+ * Handles serving static files either individually or from a directory.
+ * Supports the HTTP protocol fully (caching, partials).
+ * Supports fast serving of a directory using file mapped buffer caching.
+ * NOTE: This code is an adaptation of Jetty's default servlet code to work with this framework.
+ * TODO(mschurr): This is pretty convoluted, should just rewrite it from scratch time allowing.
  */
 public class FileServer implements ResourceFactory {
   private static final Logger logger = LoggerFactory.getLogger(FileServer.class);
