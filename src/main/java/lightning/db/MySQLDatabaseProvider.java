@@ -35,8 +35,8 @@ public final class MySQLDatabaseProvider {
   private final Config config;
   
   public MySQLDatabaseProvider(Config config) throws SQLException, PropertyVetoException {
-    initializeSource();
     this.config = config;
+    initializeSource();
   }
   
   /**
@@ -55,7 +55,7 @@ public final class MySQLDatabaseProvider {
     return source.getConnection();
   }
 
-  private void initializeSource() throws SQLException, PropertyVetoException {
+  private void initializeSource() throws SQLException, PropertyVetoException {    
     // See http://www.mchange.com/projects/c3p0/
     ComboPooledDataSource source = new ComboPooledDataSource();
     String url = String.format("jdbc:mysql://%s:%d/%s", config.db.host, config.db.port, config.db.name);
