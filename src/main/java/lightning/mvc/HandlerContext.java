@@ -20,6 +20,7 @@ import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProxy;
+import lightning.enums.CacheType;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.groups.Groups.GroupsException;
@@ -738,6 +739,16 @@ public class HandlerContext implements AutoCloseable {
   }
   
   /**
+   * See sendFile(File, CacheType)
+   * CAUTION: File will be sent with Cache-Control PUBLIC.
+   * @param file
+   * @throws Exception
+   */
+  public void sendFile(File file) throws Exception {
+    sendFile(file, CacheType.PUBLIC);
+  }
+  
+  /**
    * Writes the contents of a file into the HTTP response, setting headers appropriately.
    * IMPORTANT: When a handler calls sendFile(), that handler essentially acts as if it exposes
    *            the given file as if it were a static file. Thus, the entire HTTP specification 
@@ -745,11 +756,17 @@ public class HandlerContext implements AutoCloseable {
    *            Takes advantage of async IO for speed.
    *            File name may be exposed to user.
    *            Will be sent with Cache-Control: public.
-   *            TODO: Support for cache-control private to prevent proxy caching.
-   *            TODO: Can this method cache the file contents using resource cache + mmap-ing?
+   *            TODO: Can this method cache the file contents using resource cache + mmap-ing
+   *                  like DefaultServlet does?
+   *            TODO: Can this take advantage of GZIP?
    * @param file A file.
    */
-  public void sendFile(File file) throws Exception {
+  public void sendFile(File file, CacheType cacheType) throws Exception {
+    if (cacheType == CacheType.PRIVATE) {
+      // TODO(mschurr): Implement this.
+      throw new UnsupportedOperationException("Cache type private is not implemented yet.");
+    }
+    
     if (request.raw().isAsyncSupported()) {
       goAsync();
       this.close();

@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
  * Supports fast serving of a directory using file mapped buffer caching.
  * NOTE: This code is an adaptation of Jetty's default servlet code to work with this framework.
  * NOTE: HTTP caching in chrome doesn't work properly w/ HTTPS self-signed certificates?
+ * TODO(mschurr): On-the-fly GZIP support?
  * TODO(mschurr): This is pretty convoluted, should just rewrite it from scratch time allowing.
  */
 public class FileServer implements ResourceFactory {

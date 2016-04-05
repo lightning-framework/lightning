@@ -102,7 +102,17 @@ public class Config {
     // Maximum amount of time allowed before closing an idle HTTP connection.
     public @Optional int connectionIdleTimeoutMs = (int) TimeUnit.MINUTES.toMillis(3);
     
-    // Path from which to serve static files.
+    /**
+     * Path from which to serve static files.
+     * 
+     * Static files will be served directly on their path within this folder (e.g. if style.css exists in here, it will
+     * be accessible on /style.css).
+     * 
+     * Static files will be served optimally (memory caching, http caching) and with full support for the HTTP specification
+     * (including ranges).
+     * 
+     * Static files will be served gzipped if a .gz version exists (e.g. styles.css.gz). 
+     */
     public @Required String staticFilesPath; // Relative to src/main|resources/java in your eclipse project folder.
     
     // Path in which freemarker templates are located.
