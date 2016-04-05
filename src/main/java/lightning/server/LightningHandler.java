@@ -69,6 +69,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import freemarker.template.Configuration;
+import freemarker.template.TemplateExceptionHandler;
 import freemarker.template.Version;
 
 public class LightningHandler extends AbstractHandler {
@@ -94,11 +95,21 @@ public class LightningHandler extends AbstractHandler {
     this.debugScreen = new DebugScreen();
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.internalTemplateConfig.setClassForTemplateLoading(Lightning.class, "templates");
+    this.internalTemplateConfig.setShowErrorTips(config.enableDebugMode);
+    this.internalTemplateConfig.setTemplateExceptionHandler(config.enableDebugMode ?
+        TemplateExceptionHandler.HTML_DEBUG_HANDLER :
+        TemplateExceptionHandler.RETHROW_HANDLER);
+    
     this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.userTemplateConfig.setDirectoryForTemplateLoading(Iterables.firstOr(Iterables.filter(ImmutableList.of(
         new File("./src/main/java/" + config.server.templateFilesPath),
         new File("./src/main/resources/" + config.server.templateFilesPath)
     ), f -> f.exists()), new File(config.server.templateFilesPath)));
+    this.userTemplateConfig.setShowErrorTips(config.enableDebugMode);
+    this.userTemplateConfig.setTemplateExceptionHandler(config.enableDebugMode ?
+        TemplateExceptionHandler.HTML_DEBUG_HANDLER :
+        TemplateExceptionHandler.RETHROW_HANDLER);    
+    
     this.exceptionHandlers = new ExceptionMapper();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes);
     this.staticFileResourceFactory = config.enableDebugMode
