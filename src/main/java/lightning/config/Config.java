@@ -52,11 +52,11 @@ public class Config {
     public @Optional String trustStorePassword; // Optional.
     
     // Whether to redirect HTTP requests to their HTTPS equivalents.
-    // If true, this server will also install an HTTP server (on server.port)
+    // If false, will only install an HTTPs server (on ssl.port).
+    // If true, will also install an HTTP server (on server.port) that redirects insecure requests.
     public @Optional boolean redirectInsecureRequests = true;
     
-    // If SSL is enabled, the server will listen for HTTPS connections on
-    // this port.
+    // If SSL is enabled, the server will listen for HTTPS connections on this port.
     public @Optional int port = 443;
     
     public boolean isEnabled() {
@@ -122,6 +122,7 @@ public class Config {
     public @Optional String host = "0.0.0.0";
     
     // Whether or not to trust load balancer headers (X-Forwarded-For, X-Forwarded-Proto).
+    // Will cause things like request.scheme() and request.method() to utilize the header information.
     // Enable only if your app is firewalled behind a load balancer.
     public @Optional boolean trustLoadBalancerHeaders = false;
     
