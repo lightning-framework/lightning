@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.Part;
 
@@ -429,7 +428,7 @@ public class HandlerContext implements AutoCloseable {
    * @return Whether or not this request is HTTP multi-part.
    */
   public final boolean isMultipart() {
-    return request.raw().getContentType() != null && request.raw().getContentType().startsWith("multipart/form-data");
+    return request.isMultipart();
   }
 
   /**
@@ -443,14 +442,6 @@ public class HandlerContext implements AutoCloseable {
     if (!isMultipart()) {
       throw new BadRequestException("Incorrect request type; expected multipart/form-data.");
     }
-
-    final String SAVE_LOCATION = System.getProperty("java.io.tmpdir");
-    final long MAX_FILE_SIZE = 1024 * 100; // 100MB
-    final long MAX_REQUEST_SIZE = 1024 * 100; // 100MB
-    final int FLUSH_THRESHOLD = 1024 * 10; // 10 MB
-
-    request.raw().setAttribute(org.eclipse.jetty.server.Request.__MULTIPART_CONFIG_ELEMENT,
-        new MultipartConfigElement(SAVE_LOCATION, MAX_FILE_SIZE, MAX_REQUEST_SIZE, FLUSH_THRESHOLD));
   }
 
   /**
@@ -754,7 +745,7 @@ public class HandlerContext implements AutoCloseable {
    *            Takes advantage of async IO for speed.
    *            File name may be exposed to user.
    *            Will be sent with Cache-Control: public.
-   *            TODO: Add an option to have cache-control private.
+   *            TODO: Support for cache-control private to prevent proxy caching.
    *            TODO: Can this method cache the file contents using resource cache + mmap-ing?
    * @param file A file.
    */

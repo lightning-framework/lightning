@@ -123,6 +123,22 @@ public class Config {
     
     // Maximum number of cached static files.
     public @Optional int maxCachedStaticFiles = 500;
+    
+    // Place in which multipart pieces that are flushed to disk will be saved.
+    public @Optional String multipartSaveLocation = System.getProperty("java.io.tmpdir");
+    
+    // Size at which a multipart piece will be flushed to disk.
+    public @Optional int multipartFlushSizeBytes = 1024 * 10; // 10 MB
+    
+    // Maximum size of a multipart piece.
+    public @Optional int multipartPieceLimitBytes = 1024 * 100; // 100 MB
+    
+    // Maximum size of a multipart request.
+    public @Optional int multipartRequestLimitBytes = 1024 * 100; // 100 MB
+    
+    // Whether or not to accept multipart requests.
+    // If false, all multipart requests will be dropped.
+    public @Optional boolean multipartEnabled = true;
   }
   
   public static final class MailConfig implements Mail.MailConfig {

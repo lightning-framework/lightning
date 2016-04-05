@@ -174,7 +174,7 @@ public class RouteMapper<T> {
     
     public RouteTreeNodeBuilder<T_REQ, T_RES> parametric() {
       if (wildcardChild != null) {
-        throw new IllegalStateException("Incompatible handler for path.");
+        //throw new IllegalStateException("Incompatible handler for path.");
       }
       
       if (parametricChild == null) {
@@ -187,7 +187,7 @@ public class RouteMapper<T> {
     
     public RouteTreeNodeBuilder<T_REQ, T_RES> wildcard() {
       if (parametricChild != null) {
-        throw new IllegalStateException("Incompatible handler for path.");
+        //throw new IllegalStateException("Incompatible handler for path.");
       }
       
       if (wildcardChild == null) {

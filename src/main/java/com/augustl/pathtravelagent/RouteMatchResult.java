@@ -25,6 +25,11 @@ public class RouteMatchResult {
         value.addToMatchResult(parametricSegment.getParamName(), this);
         return value.isSuccess();
     }
+    
+    public void removeParametricSegment(IParametricSegment parametricSegment) {
+      this.integerMatches.remove(parametricSegment.getParamName());
+      this.stringMatches.remove(parametricSegment.getParamName());
+    }
 
     public void addToIntegerMatches(String pathSegment, Integer val) {
         this.integerMatches.put(pathSegment, val);

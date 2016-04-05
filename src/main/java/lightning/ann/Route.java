@@ -39,19 +39,33 @@ import lightning.enums.HTTPMethod;
  * 
  * Routes must be instance methods and declared public.
  * 
- * Routing conflicts are strictly disallowed. If any conflicts
- * are detected, the server will fail to start and print the
- * conflict OR (in debug mode) the conflict will be displayed
- * in your console and browser.
+ * Routing conflicts are allowed. Routes are resolved by crawling
+ * the routing radix tree searching for a match with priority given
+ * to exact matches, then parametric matches, then wildcard matches.
  * 
- * An example of conflicts:
- *   /hello/:name
- *   /hello/*
+ * As a simple example, consider the following routes:
+ *   /
+ *   /something
+ *   /*
+ *   /:something
+ *   /u/:something
+ *   /u/*
+ *   /z/:something
  *  
- * Concrete path segments take the highest priority, followed
- * by parametric segments, followed by wildcards.
- * 
- * Route handlers may return...
+ * For the above routes, the given URLs (LHS) will be matched to (RHS):
+ *   / => /
+ *   /something => /something
+ *   /anything => /:something
+ *   /anything/more => /*
+ *   /u => /:something
+ *   /u/h => /u/:something
+ *   /u/h/z => /u/*
+ *   /z/h/u => /*
+ *   
+ * Route matching is tree-based and incredibly fast - O(n) w.r.t. the number
+ * of segments in the path regardless of the number of routes installed.
+ *   
+ * Route handlers may return:
  *   void
  *   null (equivalent to returning void)
  *   String: to output it

@@ -61,7 +61,7 @@ public class DefaultExceptionViewProducer implements ExceptionViewProducer {
     data.put("status_text", statusText.get(clazz));
     data.put("explanation", explanationText.get(clazz));
     
-    if (includeMessage.getOrDefault(clazz, false)) {
+    if (includeMessage.getOrDefault(clazz, false) && e.getMessage() != null) {
       data.put("message", e.getMessage());
     }
     

@@ -78,6 +78,7 @@ public final class MySQLDatabaseProvider {
     source.setDebugUnreturnedConnectionStackTraces(true);
     source.setMaxConnectionAge(config.db.maxConnectionAgeS); // seconds
     source.setMaxIdleTime(config.db.maxIdleTimeS); // seconds
+    source.setInitialPoolSize(config.db.minPoolSize);
     source.setMaxIdleTimeExcessConnections(config.db.maxIdleTimeExcessConnectionsS); // seconds
     source.setUnreturnedConnectionTimeout(config.db.unreturnedConnectionTimeoutS); // seconds
     source.setTestConnectionOnCheckin(false);

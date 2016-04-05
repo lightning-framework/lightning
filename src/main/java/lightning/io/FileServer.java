@@ -90,6 +90,14 @@ public class FileServer implements ResourceFactory {
 
     _gzipEquivalentFileExtensions = new ArrayList<String>();
     _gzipEquivalentFileExtensions.add(".svgz");
+    usePublicCaching();
+  }
+  
+  public void usePrivateCaching() {
+    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "private, max-age=3600");
+  }
+  
+  public void usePublicCaching() {
     _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=3600");
   }
   
@@ -110,7 +118,7 @@ public class FileServer implements ResourceFactory {
   }
   
   public void disableCaching() {
-    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=0, must-revalidate");
+    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "no-cache, no-store, max-age=0, must-revalidate");
     _etags = false;
     _cache.flushCache();
     _cache = null;

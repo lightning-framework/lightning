@@ -8,6 +8,7 @@ import java.lang.reflect.Parameter;
 import java.net.URI;
 import java.util.ArrayList;
 
+import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -56,6 +57,8 @@ import lightning.scanner.Scanner;
 import lightning.util.Iterables;
 
 import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.MultiPartInputStreamParser;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.resource.ResourceCollection;
 import org.eclipse.jetty.util.resource.ResourceFactory;
@@ -106,6 +109,7 @@ public class LightningHandler extends AbstractHandler {
     this.staticFileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
     this.staticFileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
     this.staticFileServer.setMaxCacheSize(config.server.maxStaticFileCacheSizeBytes);
+    this.staticFileServer.usePublicCaching();
     if (config.enableDebugMode) {
       this.staticFileServer.disableCaching();
     }
@@ -145,7 +149,7 @@ public class LightningHandler extends AbstractHandler {
     InternalRequest request = InternalRequest.makeRequest(_request, config.server.trustLoadBalancerHeaders);
     InternalResponse response = InternalResponse.makeResponse(_response);
     HandlerContext ctx = null;    
-    
+        
     try {      
       // Redirect insecure requests.
       if (config.ssl.isEnabled() && 
@@ -165,9 +169,23 @@ public class LightningHandler extends AbstractHandler {
       }
       
       // Try to pass through a static file (if any).
-      if (staticFileServer.couldConsume(_request)) {
+      if (request.method() == HTTPMethod.GET && staticFileServer.couldConsume(_request)) {
         staticFileServer.handle(_request, _response);
         return;
+      }
+      
+      // Enable multi-part support.
+      if (request.isMultipart()) {
+        if (!config.server.multipartEnabled) {
+          throw new BadRequestException("Multipart requests are disallowed.");
+        }
+        
+        request.raw().setAttribute(org.eclipse.jetty.server.Request.__MULTIPART_CONFIG_ELEMENT,
+          new MultipartConfigElement(
+              config.server.multipartSaveLocation, 
+              config.server.multipartPieceLimitBytes, 
+              config.server.multipartRequestLimitBytes, 
+              config.server.multipartPieceLimitBytes));
       }
       
       // Perform routing.
@@ -317,11 +335,21 @@ public class LightningHandler extends AbstractHandler {
         logger.warn("Exception closing context:", e);
       }
       Context.clearContext();
+      
+      if (request.isMultipart() && config.server.multipartEnabled) {
+        MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser) 
+            request.raw().getAttribute(org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
+        if (multipartInputStream != null) {
+          try {
+            multipartInputStream.deleteParts();
+          } catch (MultiException e) {
+            logger.warn("Error cleaning multiparts:", e);
+          }
+        }
+      }
     } 
   }
-  
-  // FINISHED
-  
+    
   protected synchronized void rescan() throws Exception {
     scanResult = scanner.scan();
     logger.debug("Scanned Annotations: {}", scanResult);
