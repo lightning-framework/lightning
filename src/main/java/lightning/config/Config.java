@@ -94,7 +94,7 @@ public class Config {
     public @Optional int websocketTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60); // For websockets.
     
     // Maximum incoming request size (in bytes).
-    public @Optional int maxPostBytes = 2000000; // In bytes
+    public @Optional int maxPostBytes = 1024 * 1024 * 20; // 20 MB
     
     // Maxmimum number of query parameters on an incoming request (in #).
     public @Optional int maxQueryParams = 100; // In number of params.
@@ -139,13 +139,13 @@ public class Config {
     public @Optional String multipartSaveLocation = System.getProperty("java.io.tmpdir");
     
     // Size at which a multipart piece will be flushed to disk.
-    public @Optional int multipartFlushSizeBytes = 1024 * 10; // 10 MB
+    public @Optional int multipartFlushSizeBytes = 1024 * 1024 * 10; // 10 MB
     
     // Maximum size of a multipart piece.
-    public @Optional int multipartPieceLimitBytes = 1024 * 100; // 100 MB
+    public @Optional int multipartPieceLimitBytes = 1024 * 1024 * 100; // 100 MB
     
     // Maximum size of a multipart request.
-    public @Optional int multipartRequestLimitBytes = 1024 * 100; // 100 MB
+    public @Optional int multipartRequestLimitBytes = 1024 * 1024 * 100; // 100 MB
     
     // Whether or not to accept multipart requests.
     // If false, all multipart requests will be dropped.
@@ -247,6 +247,6 @@ public class Config {
     public @Optional int unreturnedConnectionTimeoutS = 50000;
     public @Optional int idleConnectionTestPeriodS = 600;
     public @Optional int maxStatementsCached = 500;
-    public @Optional boolean useSSL = false;
+    public @Optional boolean useSSL = false; // Must have cert for server in your trust store.
   }
 }
