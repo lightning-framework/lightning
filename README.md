@@ -66,6 +66,8 @@ This framework was written for use in a course I taught at Rice University.
 
 2. Write a launcher.
 
+If you do not wish to use JSON-formatted configuration files, you may skip the above step and instead build your own instance of `Config` in code anyway you like and pass it to `Lightning::launch`.
+
 ```java
 class MyApp {
   public static void main(String[] args) {
@@ -96,8 +98,8 @@ class MyController {
   @RequireXsrfToken
   @RequireAuth
   @Json
-  // Inject route parameters in a type-safe manner using @RParam. If the user provides the wrong
-  // type, then a BadRequestException is triggered.
+  // Inject query parameters in a type-safe manner using @QParam. If the user provides the wrong
+  // type, then a BadRequestException is triggered. Thus, messageId is guaranteed to be an integer.
   public Map<String, ?> handleMessagesApi(@QParam("mid") int messageId) throws Exception {
     Map<String, Object> message = new HashMap<>();
 
@@ -118,6 +120,8 @@ class MyController {
 ```
 
 4. Define your websockets (if any).
+
+Websockets are singletons (a single instance is created to service all incoming requests) and utilize the Jetty API. Unfortunately, web sockets currently cannot be automatically reloaded in debug mode (due to some limitations in Jetty) so you'll need to restart the server to see changes to websocket handlers.
 
 ```java
 class MyWebsockets {
@@ -153,12 +157,15 @@ class MyWebsockets {
 class MyExceptionHandlers {
   @ExceptionHandler(NotFoundException.class)
   public static void handleException(HandlerContext ctx, Exception e) throws Exception {
-    // Called when a route handler throws an exception of type NotFoundException.class.
+    // Called when a route handler throws an exception of type NotFoundException.class (or any subclass
+    // thereof unless a more specific exception handler is installed upon that subclass).
     // Use ctx to generate the appropriate error page.
     // If your exception handler throws an exception, the default error page will be shown instead.
   }
 }
 ```
+
+You can override the default error pages (e.g. for 404 not found) by installing an exception handler for the corresponding exception (e.g. `lightning.http.NotFoundException`).
 
 # Error Page
 

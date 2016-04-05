@@ -29,7 +29,7 @@ import com.google.common.collect.Iterables;
 
 /**
  * Responsible for scanning the class path for annotations needed by the framework.
- * TODO: Can we speed this up to make debug mode faster?
+ * TODO: Can we speed this up to make debug mode faster? Not going to be scalable to MASSIVE applications.
  */
 public class Scanner {
   private final List<String> reloadPrefixes;

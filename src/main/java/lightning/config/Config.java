@@ -18,11 +18,13 @@ public class Config {
   }
   
   // Whether or not to enable debug mode.
-  // Recommended for development, DO NOT LEAVE ON IN PRODUCTION!
+  // Recommended for development, **DO NOT LEAVE ON IN PRODUCTION AS IT EXPOSES SYSTEM INTERNALS**!
   // Enables automatic hot swapping (reloading) of handler classes, exception stack traces in
   // the browser, template errors in browser, and disables HTTP caching of static files. 
   // Ensures templates and static files will always be reloaded from disk on each request. 
   // Essentially: quick and easy save and refresh development.
+  // NOTE: Websockets are currently not automatically reloaded due to limitations in Jetty. You'll
+  //       need to restart to server to see changes to websocket handler code.
   public @Optional boolean enableDebugMode = false;
 
   // A list of prefixes on which classes should be automatically reloaded on each incoming
@@ -36,6 +38,9 @@ public class Config {
   public @Required ServerConfig server = new ServerConfig();
   public @Required MailConfig mail = new MailConfig();
   public @Required DBConfig db = new DBConfig();
+  
+  // TODO: Add options for FreeMarker config.
+  // TODO: Add options for Whoops search paths.
   
   public static final class SSLConfig {
     @Override
@@ -150,6 +155,9 @@ public class Config {
     // Whether or not to accept multipart requests.
     // If false, all multipart requests will be dropped.
     public @Optional boolean multipartEnabled = true;
+    
+    // NOTE: Want custom error pages (e.g. for 404 and 500 errors)? Install an @ExceptionHandler
+    // for the exceptions in lightning.http.
   }
   
   public static final class MailConfig implements Mail.MailConfig {
