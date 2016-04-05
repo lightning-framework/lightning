@@ -1,7 +1,12 @@
 package lightning.db;
 
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -62,5 +67,31 @@ public class ResultSets {
   
   public static int encodeBoolean(boolean value) {
     return value ? 1 : 0;
+  }
+  
+  /**
+   * Converts a result set into a list of maps. Each map represents a row and maps column
+   * names to the associated value. Conversion may not necessarily be possible or correct
+   * for all schemas; be careful.
+   * @param result
+   * @return
+   * @throws SQLException
+   */
+  public static List<Map<String, Object>> toList(ResultSet result) throws SQLException {
+    List<Map<String, Object>> data = new ArrayList<>();
+    ResultSetMetaData md = result.getMetaData();
+    int ncols = md.getColumnCount();
+    
+    while (result.next()) {
+      Map<String, Object> record = new HashMap<>(ncols);
+      
+      for (int i = 1; i <= ncols; i++) {
+        record.put(md.getColumnName(i), result.getObject(i));
+      }
+      
+      data.add(record);
+    }
+    
+    return data;
   }
 }
