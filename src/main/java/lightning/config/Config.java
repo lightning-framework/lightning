@@ -20,9 +20,9 @@ public class Config {
   // Whether or not to enable debug mode.
   // Recommended for development, DO NOT LEAVE ON IN PRODUCTION!
   // Enables automatic hot swapping (reloading) of handler classes, exception stack traces in
-  // the browser, and disables HTTP caching of static files. Ensures templates and static files
-  // will always be reloaded from disk on each request. Essentially: quick and easy save and
-  // refresh development.
+  // the browser, template errors in browser, and disables HTTP caching of static files. 
+  // Ensures templates and static files will always be reloaded from disk on each request. 
+  // Essentially: quick and easy save and refresh development.
   public @Optional boolean enableDebugMode = false;
 
   // A list of prefixes on which classes should be automatically reloaded on each incoming
