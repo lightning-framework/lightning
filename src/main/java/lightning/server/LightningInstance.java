@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
+import lightning.db.MySQLDatabaseProviderImpl;
 import lightning.inject.InjectorModule;
 import lightning.json.JsonFactory;
 
@@ -42,7 +43,7 @@ public class LightningInstance {
     config = cfg;
     Log.setLog(null);    
     
-    dbp = new MySQLDatabaseProvider(config);
+    dbp = new MySQLDatabaseProviderImpl(config);
         
     server = new LightningServer();
     server.configure(config, dbp, injector);

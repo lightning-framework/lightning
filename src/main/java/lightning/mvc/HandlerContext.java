@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
@@ -64,7 +65,7 @@ import freemarker.template.Configuration;
  * Each controller lives only on a single thread to service a single request. Instances are 
  * allocated to service a single request and destroyed after a response to that request is sent.
  */
-public class HandlerContext implements AutoCloseable {
+public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final Request request;
   public final Response response;
   public final Config config;
@@ -94,18 +95,24 @@ public class HandlerContext implements AutoCloseable {
     this.cookies = SecureCookieManager.forRequest(request, response, config.server.hmacKey, config.ssl.isEnabled());
     this.url = URLGenerator.forRequest(request);
     this.validator = Validator.create(this);
-    
-    // TODO: I think these MySQLDrivers can cause lock-ups under high load since both the request handler
-    // AND session driver may try to acquire a connection.
-    this.session = Session.forRequest(rq, re, config, new MySQLSessionDriver(dbp));
-    this.groups = new Groups(new MySQLGroupDriver(dbp));
-    this.users = new Users(new MySQLUserDriver(dbp, groups), groups);
-    this.auth = Auth.forSession(session, new MySQLAuthDriver(dbp), users);
-    
     this.dbProxy = new MySQLDatabaseProxy(dbp);
     this.db = dbProxy;
     this.isAsync = false;
     this.fs = fs;
+    this.session = Session.forRequest(rq, re, config, new MySQLSessionDriver(this));
+    this.groups = new Groups(new MySQLGroupDriver(this));
+    this.users = new Users(new MySQLUserDriver(this, groups), groups);
+    this.auth = Auth.forSession(session, new MySQLAuthDriver(this), users);
+  }
+  
+  @Override
+  public MySQLDatabase getDatabase() throws SQLException {
+    return db();
+  }
+
+  @Override
+  public Connection getConnection() throws SQLException {
+    return db().getConnection();
   }
   
   public Mailer mail() throws LightningException {

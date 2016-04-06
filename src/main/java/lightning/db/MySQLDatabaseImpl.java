@@ -50,11 +50,15 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
   private MySQLDatabaseImpl(MySQLDatabaseProvider provider) throws SQLException {
     this.provider = provider;
     connection = provider.getConnection();
-    port = provider.getPort();
-    hostName = provider.getHostName();
-    databaseName = provider.getDatabaseName();
-    password = provider.getPassword();
-    userName = provider.getUser();
+    port = -1;
+    hostName = null;
+    databaseName = null;
+    password = null;
+    userName = null;
+  }
+  
+  public MySQLDatabaseProvider getProvider() {
+    return provider;
   }
 
   /**
