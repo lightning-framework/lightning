@@ -29,9 +29,13 @@ public class Config {
 
   // A list of prefixes on which classes should be automatically reloaded on each incoming
   // request in DEBUG MODE ONLY.
+  // You should ONLY put code that can be safely reloaded by the classloader within the packages 
+  // indicated in these prefixes or you're going to see some strange behavior.
+  // Dependencies that involve classes within these prefixes will not be properly injectable in debug mode,
+  // so do net try to inject dependencies that are located within these prefixes.
   public @Optional List<String> autoReloadPrefixes = ImmutableList.of();
   
-  // A list of prefixes in which to search for routes, websockets, exception handlers, etc.
+  // A list of prefixes in which to search for routes, websockets, exception handlers.
   public @Required List<String> scanPrefixes;
   
   public @Required SSLConfig ssl = new SSLConfig();

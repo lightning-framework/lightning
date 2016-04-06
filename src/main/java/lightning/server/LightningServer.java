@@ -1,11 +1,12 @@
 package lightning.server;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import lightning.ann.WebSocketFactory;
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
+import lightning.inject.Injector;
+import lightning.inject.InjectorModule;
 import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
 
@@ -31,7 +32,7 @@ public class LightningServer {
   private Server server;
   private ServerConnector connector;
     
-  public void configure(Config config, MySQLDatabaseProvider dbp) throws Exception {
+  public void configure(Config config, MySQLDatabaseProvider dbp, InjectorModule userModule) throws Exception {
     server = new Server(new QueuedThreadPool(config.server.minThreads, config.server.maxThreads, config.server.threadTimeoutMs));
     
     if (config.ssl.isEnabled()) {
@@ -86,8 +87,12 @@ public class LightningServer {
     WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
     websocketFilter.getFactory().getPolicy().setIdleTimeout(config.server.websocketTimeoutMs);
     
-    Scanner scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes);
+    Scanner scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
     ScanResult result = scanner.scan();
+    
+    InjectorModule globalModule = new InjectorModule();
+    globalModule.bindClassToInstance(Config.class, config);
+    globalModule.bindClassToInstance(MySQLDatabaseProvider.class, dbp);
     
     for (Class<?> clazz : result.websocketFactories.keySet()) {
       for (Method m : result.websocketFactories.get(clazz)) {
@@ -98,8 +103,9 @@ public class LightningServer {
           public Object createWebSocket(ServletUpgradeRequest req, ServletUpgradeResponse res) {
             try {
               // TODO: Better dependency injection support - maybe with Guice?
-              return m.invoke(null, config, dbp);
-            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+              return m.invoke(null, new Injector(globalModule, userModule).getInjectedArguments(m));
+            } catch (Exception e) {
+              logger.warn("Failed to create websocket:", e);
               return null;
             }
           }
@@ -109,7 +115,7 @@ public class LightningServer {
     }
     
     HandlerCollection handlers = new HandlerCollection();
-    handlers.addHandler(new LightningHandler(config, dbp));
+    handlers.addHandler(new LightningHandler(config, dbp, globalModule, userModule));
     handlers.addHandler(websocketHandler);
     server.setHandler(handlers);
   }

@@ -11,6 +11,7 @@ import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.groups.Groups;
 import lightning.groups.drivers.MySQLGroupDriver;
+import lightning.inject.InjectorModule;
 import lightning.json.JsonFactory;
 import lightning.mail.Mail;
 import lightning.sessions.Session;
@@ -26,17 +27,29 @@ public class LightningInstance {
   private static Config config;
   private static MySQLDatabaseProvider dbp;
   
-  public static void start(File file) throws Exception {
+  public static void start(File file, InjectorModule injector) throws Exception {
     Config cfg = JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), Config.class);
-    start(cfg);
+    start(cfg, injector);
   }
   
-  public static void start(File file, Class<? extends Config> clazz) throws Exception {
+  public static void start(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
     Config cfg = JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), clazz);
-    start(cfg);
+    start(cfg, injector);
+  }
+  
+  public static void start(File file) throws Exception {
+    start(file, new InjectorModule());
   }
   
   public static void start(Config cfg) throws Exception {
+    start(cfg, new InjectorModule());
+  }
+  
+  public static void start(File file, Class<? extends Config> clazz) throws Exception {
+    start(file, clazz, new InjectorModule());
+  }
+  
+  public static void start(Config cfg, InjectorModule injector) throws Exception {
     // TODO(mschurr): Eliminate global state on SecureCookieManager, Hashing, Mail, Session, Groups, Users, Auth.
     config = cfg;
     Log.setLog(null);    
@@ -59,7 +72,7 @@ public class LightningInstance {
     Auth.setDriver(new MySQLAuthDriver(dbp));
     
     server = new LightningServer();
-    server.configure(config, dbp);
+    server.configure(config, dbp, injector);
     server.start();
   }
 }

@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.net.URI;
 import java.util.ArrayList;
 
@@ -17,8 +16,6 @@ import lightning.Lightning;
 import lightning.ann.ExceptionHandler;
 import lightning.ann.Json;
 import lightning.ann.Multipart;
-import lightning.ann.QParam;
-import lightning.ann.RParam;
 import lightning.ann.RequireAuth;
 import lightning.ann.RequireXsrfToken;
 import lightning.ann.Route;
@@ -26,6 +23,7 @@ import lightning.ann.Routes;
 import lightning.ann.Template;
 import lightning.ann.WebSocketFactory;
 import lightning.config.Config;
+import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.debugscreen.DebugScreen;
 import lightning.enums.HTTPMethod;
@@ -44,16 +42,23 @@ import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
 import lightning.http.Request;
 import lightning.http.Response;
+import lightning.inject.Injector;
+import lightning.inject.InjectorModule;
+import lightning.inject.Resolver;
 import lightning.io.FileServer;
 import lightning.json.JsonFactory;
 import lightning.mvc.DefaultExceptionViewProducer;
 import lightning.mvc.HandlerContext;
 import lightning.mvc.ModelAndView;
+import lightning.mvc.URLGenerator;
+import lightning.mvc.Validator;
 import lightning.routing.ExceptionMapper;
 import lightning.routing.RouteMapper;
 import lightning.routing.RouteMapper.Match;
 import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
+import lightning.sessions.Session;
+import lightning.users.User;
 import lightning.util.Iterables;
 
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -88,10 +93,14 @@ public class LightningHandler extends AbstractHandler {
   private ExceptionViewProducer exceptionViewProducer; 
   private FileServer staticFileServer;
   private RouteMapper<Method> routeMapper;
+  private InjectorModule globalModule;
+  private InjectorModule userModule;
   
-  public LightningHandler(Config config, MySQLDatabaseProvider dbp) throws Exception {
+  public LightningHandler(Config config, MySQLDatabaseProvider dbp, InjectorModule globalModule, InjectorModule userModule) throws Exception {
     this.config = config;
     this.dbp = dbp;
+    this.globalModule = globalModule;
+    this.userModule = userModule;
     this.debugScreen = new DebugScreen();
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.internalTemplateConfig.setClassForTemplateLoading(Lightning.class, "templates");
@@ -111,7 +120,7 @@ public class LightningHandler extends AbstractHandler {
         TemplateExceptionHandler.RETHROW_HANDLER);    
     
     this.exceptionHandlers = new ExceptionMapper();
-    this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes);
+    this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
     this.staticFileResourceFactory = config.enableDebugMode
         ? new ResourceCollection(getResourcePaths())
         : Resource.newClassPathResource(config.server.staticFilesPath);
@@ -160,6 +169,8 @@ public class LightningHandler extends AbstractHandler {
     InternalRequest request = InternalRequest.makeRequest(_request, config.server.trustLoadBalancerHeaders);
     InternalResponse response = InternalResponse.makeResponse(_response);
     HandlerContext ctx = null;    
+    Injector injector = null;
+    InjectorModule requestModule = null;
         
     try {      
       // Redirect insecure requests.
@@ -185,6 +196,15 @@ public class LightningHandler extends AbstractHandler {
         return;
       }
       
+      // Create context.
+      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer);
+      requestModule = requestSpecificInjectionModule(ctx);
+      injector = new Injector(
+          globalModule, requestModule, userModule);
+      Context.setContext(ctx);
+      request.setCookieManager(ctx.cookies);
+      response.setCookieManager(ctx.cookies);
+      
       // Enable multi-part support.
       if (request.isMultipart()) {
         if (!config.server.multipartEnabled) {
@@ -198,12 +218,6 @@ public class LightningHandler extends AbstractHandler {
               config.server.multipartRequestLimitBytes, 
               config.server.multipartPieceLimitBytes));
       }
-      
-      // Perform routing.
-      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer);
-      Context.setContext(ctx);
-      request.setCookieManager(ctx.cookies);
-      response.setCookieManager(ctx.cookies);
       
       if (config.enableDebugMode) {
         rescan();
@@ -246,31 +260,17 @@ public class LightningHandler extends AbstractHandler {
           
           // Instantiate the controller.
           Class<?> clazz = m.getDeclaringClass();          
-          Object controller = clazz.newInstance();
+          Object controller = injector.newInstance(clazz);
           
           // Run initializers.
           if (scanResult.initializers.containsKey(m.getDeclaringClass())) {
             for (Method i : scanResult.initializers.get(m.getDeclaringClass())) {
-              i.invoke(controller);
+              i.invoke(controller, injector.getInjectedArguments(i));
             }
           }
           
           // Build invocation arguments.
-          // TODO: Better dependency injection support - maybe w/ Guice?
-          Object[] args = new Object[m.getParameterCount()];
-          
-          Parameter[] params = m.getParameters();
-          for (int i = 0; i < params.length; i++) {
-            if (params[i].getAnnotation(QParam.class) != null) {
-              String name = params[i].getAnnotation(QParam.class).value();
-              args[i] = request.queryParam(name).castTo(params[i].getType());
-            } else if(params[i].getAnnotation(RParam.class) != null) {
-              String name = params[i].getAnnotation(RParam.class).value();
-              args[i] = request.routeParam(name).castTo(params[i].getType());
-            } else {
-              throw new LightningException("Cannot figure out how to inject arguments for route target " + m);
-            }
-          }
+          Object[] args = injector.getInjectedArguments(m);
   
           // Invoke the controller.
           Object output = null;
@@ -325,10 +325,9 @@ public class LightningHandler extends AbstractHandler {
       
       try {
         Method handler = exceptionHandlers.getHandler(e);
-        
+        requestModule.bindToClass(e);
         if (handler != null) {
-          // TODO: Better dependency injection support - maybe with Guice?
-          handler.invoke(null, ctx, e);
+          handler.invoke(null, injector.getInjectedArguments(handler));
           return;
         }
         
@@ -401,7 +400,7 @@ public class LightningHandler extends AbstractHandler {
     for (Class<?> clazz : scanResult.websocketFactories.keySet()) {
       for (Method m : scanResult.websocketFactories.get(clazz)) {
         WebSocketFactory info = m.getAnnotation(WebSocketFactory.class);
-        routeMapper.map(HTTPMethod.GET, info.path(), null);
+        routeMapper.map(HTTPMethod.GET, info.path(), null); // Indicate to pass to next handler in chain.
       }
     }
     
@@ -426,9 +425,10 @@ public class LightningHandler extends AbstractHandler {
       renderInternalTemplate(response, exceptionViewProducer.produce(
           InternalServerErrorException.class, e, request.raw(), response.raw()));
     } catch (Throwable e2) {
+      // This should basically never happen, but just in case everything that can go wrong goes wrong.
       logger.warn("Failed to render critical error page with exception: ", e2);
-      response.status(HTTPStatus.NOT_IMPLEMENTED);
-      response.raw().getWriter().println("500 INTERNAL SERVER ERROR - SEE LOGS!");
+      response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
+      response.raw().getWriter().println("500 INTERNAL SERVER ERROR");
     }
   }
   
@@ -450,5 +450,30 @@ public class LightningHandler extends AbstractHandler {
   
   protected void renderTemplate(Response response, Configuration tplConfig, String name, Object model) throws Exception {
     tplConfig.getTemplate(name).process(model, response.raw().getWriter());
+  }
+  
+  protected InjectorModule requestSpecificInjectionModule(HandlerContext context) {
+    InjectorModule m = new InjectorModule();
+    m.bindClassToInstance(Validator.class, context.validator);
+    m.bindClassToInstance(HandlerContext.class, context);
+    m.bindClassToInstance(Session.class, context.session);
+    m.bindClassToInstance(Request.class, context.request);
+    m.bindClassToInstance(Response.class, context.response);
+    m.bindClassToInstance(HttpServletRequest.class, context.request.raw());
+    m.bindClassToInstance(HttpServletResponse.class, context.response.raw());
+    m.bindClassToInstance(URLGenerator.class, context.url);
+    m.bindClassToResolver(User.class, new Resolver<User>() {
+      @Override
+      public User resolve() throws Exception {
+        return context.user();
+      }
+    });
+    m.bindClassToResolver(MySQLDatabase.class, new Resolver<MySQLDatabase>() {
+      @Override
+      public MySQLDatabase resolve() throws Exception {
+        return context.db();
+      }
+    });
+    return m;
   }
 }

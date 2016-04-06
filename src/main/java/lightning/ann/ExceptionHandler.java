@@ -21,7 +21,10 @@ import java.lang.annotation.Target;
  * To have custom HTTP error pages, add exception handlers for the exceptions in lightning.http.
  *  
  * A correct function signature for an @ExceptionHandler might look like:
- *  public static void handleMyException(HandlerContext ctx, Exception e) throws Exception;
+ *  public static void handleMyException(HandlerContext ctx, MyException e) throws Exception;
+ *  
+ * Exception handler parameters are injectable (see @Route documentation).
+ * In addition, the causing exception can be injected as a parameter.
  */
 public @interface ExceptionHandler {
   Class<? extends Throwable> value();

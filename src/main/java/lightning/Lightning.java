@@ -1,12 +1,9 @@
 package lightning;
 
 import java.io.File;
-import java.io.FileInputStream;
-
-import org.apache.commons.io.IOUtils;
 
 import lightning.config.Config;
-import lightning.json.JsonFactory;
+import lightning.inject.InjectorModule;
 import lightning.server.LightningInstance;
 
 // TODO(mschurr): Provide a way to stop the server after launching it.
@@ -26,7 +23,7 @@ public final class Lightning {
    * @throws Exception
    */
   public static void launch(File file) throws Exception {
-    launch(JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), Config.class));
+    LightningInstance.start(file);
   }
   
   /**
@@ -37,6 +34,18 @@ public final class Lightning {
    * @throws Exception
    */
   public static void launch(File file, Class<? extends Config> clazz) throws Exception {
-    launch(JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), clazz));
+    LightningInstance.start(file, clazz);
+  }
+  
+  public static void launch(Config config, InjectorModule injector) throws Exception {
+    LightningInstance.start(config, injector);
+  }
+  
+  public static void launch(File file, InjectorModule injector) throws Exception {
+    LightningInstance.start(file, injector);
+  }
+  
+  public static void launch(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
+    LightningInstance.start(file, clazz, injector);
   }
 }

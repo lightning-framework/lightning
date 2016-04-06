@@ -12,5 +12,7 @@ import java.lang.annotation.Target;
 /**
  * Controller classes (annotated with @Controller) will have any methods
  * annotated with @Initializer invoked before receiving any traffic.
+ * 
+ * Initializer methods are injectable (see @Route).
  */
 public @interface Initializer {}

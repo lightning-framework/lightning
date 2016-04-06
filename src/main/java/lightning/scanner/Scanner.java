@@ -34,15 +34,18 @@ import com.google.common.collect.Iterables;
 public class Scanner {
   private final List<String> reloadPrefixes;
   private final List<String> scanPrefixes;
+  private final boolean enableAutoReload;
   private static final Logger logger = LoggerFactory.getLogger(Scanner.class);
   
   /**
    * @param classLoader The class loader to use (default one in most cases)
    * @param scanPrefixes List of package prefixes to scan within (e.g. ["lightning.controllers"])
+   * @param enableAutoReload 
    */
-  public Scanner(List<String> reloadPrefixes, List<String> scanPrefixes) {
+  public Scanner(List<String> reloadPrefixes, List<String> scanPrefixes, boolean enableAutoReload) {
     this.reloadPrefixes = reloadPrefixes;
     this.scanPrefixes = scanPrefixes;
+    this.enableAutoReload = enableAutoReload;
   }
   
   private static void putMethod(Map<Class<?>, Set<Method>> map, Method method) {
@@ -61,10 +64,13 @@ public class Scanner {
     Map<Class<?>, Set<Method>> exceptionHandlers = new HashMap<>();
     Map<Class<?>, Set<Method>> routes = new HashMap<>();
     Map<Class<?>, Set<Method>> websocketFactories = new HashMap<>();
-    ClassLoader classLoader = new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), "target/classes");
+    ClassLoader classLoader = enableAutoReload
+        ? new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), "target/classes")
+        : this.getClass().getClassLoader();
     
     for (Reflections scanner : reflections(classLoader)) {      
       for (Method m : scanner.getMethodsAnnotatedWith(Initializer.class)) {
+        // TODO: check returns void, can inject
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
             !Modifier.isStatic(m.getModifiers()) &&
             !Modifier.isAbstract(m.getModifiers()) &&
@@ -79,21 +85,20 @@ public class Scanner {
       }
       
       for (Method m : scanner.getMethodsAnnotatedWith(ExceptionHandler.class)) {
-        // TODO: verify argument is subclass of exception, returns void
+        // TODO: check returns void, can inject
         if (Modifier.isStatic(m.getModifiers()) &&
             Modifier.isPublic(m.getModifiers()) &&
-            !Modifier.isAbstract(m.getModifiers()) &&
-            m.getParameterCount() == 2) {
+            !Modifier.isAbstract(m.getModifiers())) {
           putMethod(exceptionHandlers, m);
         } else {
           logger.error(
               "ERROR: Could not install @ExceptionHandler for {}. "
-            + "ExceptionHandlers must be public, concrete, static, and accept a single Exception as input.", m);
+            + "ExceptionHandlers must be public, concrete, static.", m);
         }
       }
       
       for (Method m : scanner.getMethodsAnnotatedWith(WebSocketFactory.class)) {
-        // TODO: verify number of parameters and parameter types, return value
+        // TODO: verify return value, can inject
         if (Modifier.isStatic(m.getModifiers()) &&
             Modifier.isPublic(m.getModifiers()) &&
             !Modifier.isAbstract(m.getModifiers())) {
@@ -106,7 +111,7 @@ public class Scanner {
       }
       
       for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Route.class), scanner.getMethodsAnnotatedWith(Routes.class))) {
-        // TODO: verify parameter types
+        // TODO: verify can inject
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
             !Modifier.isStatic(m.getModifiers()) &&
             !Modifier.isAbstract(m.getModifiers()) &&

@@ -15,5 +15,8 @@ import java.lang.annotation.Target;
  * 
  * A new instance of each controller is allocated to
  * handle each incoming request.
+ * 
+ * Controllers must have a single public constructor.
+ * Controller constructors are injectable (see @Route).
  */
 public @interface Controller {}
