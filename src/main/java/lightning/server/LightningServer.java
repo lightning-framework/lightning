@@ -102,7 +102,6 @@ public class LightningServer {
           @Override
           public Object createWebSocket(ServletUpgradeRequest req, ServletUpgradeResponse res) {
             try {
-              // TODO: Better dependency injection support - maybe with Guice?
               return m.invoke(null, new Injector(globalModule, userModule).getInjectedArguments(m));
             } catch (Exception e) {
               logger.warn("Failed to create websocket:", e);

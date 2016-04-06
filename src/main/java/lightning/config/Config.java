@@ -44,7 +44,8 @@ public class Config {
   public @Required DBConfig db = new DBConfig();
   
   // TODO: Add options for FreeMarker config.
-  // TODO: Add options for Whoops search paths.
+  // TODO: Add options for Whoops (debug screen) code search paths.
+  // TODO: Add options for Sessions and Auth.
   
   public static final class SSLConfig {
     @Override

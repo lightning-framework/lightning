@@ -49,7 +49,7 @@ public class Mailer {
    *         Failures will be logged; it is not recommended that clients wait upon this future,
    *         particularly if they are servicing a web request.
    */
-  public Future<Boolean> send(Message message) {
+  public Future<Boolean> sendAsync(Message message) {
     return pool.submit(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
@@ -69,8 +69,8 @@ public class Mailer {
    * @param message The message to be sent.
    * @throws Exception If the message was not sent successfully.
    */
-  public void sendAndAwait(Message message) throws Exception {
-    send(message).get();
+  public void send(Message message) throws Exception {
+    sendAsync(message).get();
   }
   
   /**
