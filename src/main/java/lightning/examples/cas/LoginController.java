@@ -7,6 +7,7 @@ import static lightning.server.Context.redirectIfNotLoggedIn;
 import static lightning.server.Context.request;
 import static lightning.server.Context.response;
 import static lightning.server.Context.url;
+import static lightning.server.Context.users;
 import lightning.ann.Controller;
 import lightning.ann.Initializer;
 import lightning.ann.Route;
@@ -15,7 +16,6 @@ import lightning.plugins.cas.CASAuthenticator;
 import lightning.plugins.cas.CASConfig;
 import lightning.plugins.cas.CASUser;
 import lightning.users.User;
-import lightning.users.Users;
 
 import com.google.common.base.Optional;
 
@@ -52,10 +52,10 @@ public class LoginController {
       // Re-use the existing user record (if present), otherwise create a new user.
       // Note: We're just using a fixed constant password here, because the password will never be used
       // for anything since all authentication happens through CAS anyways but the native API requires it.
-      Optional<User> userOpt = Optional.fromNullable(Users.getByName(casUser.username));
+      Optional<User> userOpt = Optional.fromNullable(users().getByName(casUser.username));
       User user = userOpt.isPresent() ? 
           userOpt.get() : 
-          Users.create(casUser.username, casUser.username + DOMAIN, PASSWORD);
+          users().create(casUser.username, casUser.username + DOMAIN, PASSWORD);
       
       // Log the user into the native user account that we created based on their CAS account.
       // Use attempt(...) to subject to security measures including throttling.

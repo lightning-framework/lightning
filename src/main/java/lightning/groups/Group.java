@@ -124,11 +124,11 @@ public final class Group {
    * @return An iterator over users which MAY throw runtime exceptions.
    * @throws GroupsException On I/O failure.
    */
-  public Iterable<User> getUsers() throws GroupsException {
+  public Iterable<User> getUsers(Users users) throws GroupsException {
     try {
       return Iterables.transform(driver.getUsersInGroup(id), (gid) -> {
         try {
-          return Users.getById(gid);
+          return users.getById(gid);
         } catch (Exception e) {
           // Gross, but HTTP servlet will catch it. Not much else to do since Java iterators
           // do not allow exceptions to be thrown in next().

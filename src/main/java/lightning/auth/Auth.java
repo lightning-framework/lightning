@@ -33,26 +33,6 @@ public final class Auth {
   // Number of bytes to use in auth token; note that tokens stored in DB are BASE64 encoded.
   private static final int AUTH_TOKEN_BYTES = 128;
   
-  // Reference to shared authentication driver instance.
-  private static AuthDriver sharedDriver;
-  
-  /**
-   * Sets the driver that will be used for authenticating users.
-   * @param driver An authentication driver.
-   */
-  public static void setDriver(AuthDriver driver) {
-    sharedDriver = driver;
-  }
-  
-  /**
-   * Checks whether or not an auth driver is installed; throws runtime exception if no driver.
-   */
-  private static void checkDriver() {
-    if (sharedDriver == null) {
-      throw new RuntimeException("Error: Must call Auth.setDriver() before using Auth.");
-    }
-  }
-  
   /**
    * An interface that must be implemented by drivers.
    * A single instance will be used; drivers must be thread-safe.
@@ -141,12 +121,12 @@ public final class Auth {
    * @param session
    * @return
    */
-  public static Auth forSession(Session session) {
-    if (sharedDriver == null) {
-      throw new RuntimeException("Must call Auth.setDriver() before calling Auth.forSession().");
+  public static Auth forSession(Session session, AuthDriver driver, Users users) {
+    if (driver == null) {
+      throw new RuntimeException("Must provide a driver when calling Auth.forSession().");
     }
     
-    return new Auth(session, sharedDriver);
+    return new Auth(session, driver, users);
   }
   
   /**
@@ -154,11 +134,9 @@ public final class Auth {
    * @param user To terminate sessions for.
    * @throws AuthException On driver failure.
    */
-  public static void terminateAllSessionsForUser(User user) throws AuthException {
-    checkDriver();
-    
+  public void terminateAllSessionsForUser(User user) throws AuthException {    
     try {
-      sharedDriver.terminateAllSessionsForUser(user.getId());
+      driver.terminateAllSessionsForUser(user.getId());
     } catch (AuthException e) {
       throw e;
     } catch (Exception e) {
@@ -201,12 +179,14 @@ public final class Auth {
   
   private final AuthDriver driver;
   private final Session session;
+  private final Users users;
   private User user;
   private boolean hasTriedAuth;
   
-  private Auth(Session session, AuthDriver driver) {
+  private Auth(Session session, AuthDriver driver, Users users) {
     this.session = session;
     this.driver = driver;
+    this.users = users;
     user = null;
     hasTriedAuth = false;
   }
@@ -494,7 +474,7 @@ public final class Auth {
       
       try {
         // Note: if the user does not exist, we won't be logged in (user will be null). This is intended.
-        user = Users.getById(session.getLong(USER_ID_KEY));
+        user = users.getById(session.getLong(USER_ID_KEY));
       } catch (Exception e) {
         throw new AuthException(AuthException.Type.DRIVER_ERROR, e);
       }
@@ -540,7 +520,7 @@ public final class Auth {
     // Verify that the user exists.
     User user;
     try {
-      user = Users.getById(token.userId);
+      user = users.getById(token.userId);
     } catch (UsersException e) {
       throw new AuthException(AuthException.Type.DRIVER_ERROR, e);
     }
@@ -619,7 +599,7 @@ public final class Auth {
       driver.saveAuthAttempt(AuthAttempt.createSuccessful(user.getId(), getIP(), Time.now()));
       
       // Inform the driver to perform any record-keeping.
-      Users.recordLogin(user);
+      users.recordLogin(user);
     } catch (SessionException e) {
       throw e; // Re-throw.
     } catch (Exception e) {
@@ -657,7 +637,7 @@ public final class Auth {
     throttleIP();
     
     // Fetch the user.
-    User user = Users.getByName(userName);
+    User user = users.getByName(userName);
     
     // Check that the user exists.
     if (user == null) {

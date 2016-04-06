@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableList;
  */
 public final class User {
   private UsersDriver driver;
+  private Groups groups;
   private long id;
   private boolean isDirty;
   private String email;
@@ -48,7 +49,7 @@ public final class User {
   private boolean emailIsVerified;
   public String token;
   
-  public User(UsersDriver driver, long id, String userName, String email, String encryptedPassword, String token, long banExpiry, boolean emailIsVerified, Map<String, Object> properties) {
+  public User(UsersDriver driver, Groups groups, long id, String userName, String email, String encryptedPassword, String token, long banExpiry, boolean emailIsVerified, Map<String, Object> properties) {
     isDirty = false;
     this.driver = driver;
     this.id = id;
@@ -293,11 +294,11 @@ public final class User {
   }
   
   public Iterable<Group> getGroups() throws GroupsException {
-    return Groups.getAllForUser(id);
+    return groups.getAllForUser(id);
   }
   
   private void fetchPrivilegesIfNotExist() throws GroupsException, UsersException {
-    this.effectivePrivileges = Groups.getGroupPrivilegesForUser(id);
+    this.effectivePrivileges = groups.getGroupPrivilegesForUser(id);
     
     try {
       this.privileges = driver.getPrivileges(id);

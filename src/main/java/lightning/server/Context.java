@@ -16,6 +16,7 @@ import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabase;
 import lightning.enums.HTTPMethod;
 import lightning.exceptions.LightningException;
+import lightning.groups.Groups;
 import lightning.groups.Groups.GroupsException;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -36,6 +37,7 @@ import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
 import lightning.users.User;
+import lightning.users.Users;
 import lightning.users.Users.UsersException;
 
 import com.google.gson.FieldNamingPolicy;
@@ -79,6 +81,14 @@ public class Context {
   public static final HandlerContext goAsync() {
     context().goAsync();
     return context();
+  }
+  
+  public static final Groups groups() {
+    return context().groups();
+  }
+  
+  public static final Users users() {
+    return context().users();
   }
   
   public static final boolean contextExists() {

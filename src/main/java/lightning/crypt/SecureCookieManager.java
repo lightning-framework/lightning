@@ -39,29 +39,7 @@ import lightning.http.Response;
 public class SecureCookieManager {
   private static final String HMAC_ALGORITHM = "HmacSHA256";
   private static final int LIFETIME_SECONDS = 60 * 60 * 24 * 14;
-  private static String sharedSecretKey = null;
-  private static boolean alwaysSetSecureOnly = false;
-  public static int hashCharLen = 0;
-  
-  /**
-   * Configure the cookie manager to always set the SecureOnly flag when writing cookies.
-   */
-  public static void alwaysSetSecureOnly() {
-    alwaysSetSecureOnly = true;
-  }
-  
-  /**
-   * Sets the secret key used to encrypt cookies. Must be called before using SecureCookieManager.
-   * Should be called once before starting Spark and must be called with the same value across all machines.
-   * @param secretKey
-   */
-  public static void setSecretKey(String secretKey) {
-    sharedSecretKey = secretKey;
     
-    // Update the character length of the hash algorithm output.
-    hashCharLen = sign("UNUSED", secretKey).length(); 
-  }
-  
   /**
    * Signs a plain text value with an HMAC hash using secretKey.
    * @param plaintext The plain text value to be signed.
@@ -121,24 +99,30 @@ public class SecureCookieManager {
    * @param response Spark HTTP response
    * @return A secure cookie manager for the given (request, response) pair.
    */
-  public static SecureCookieManager forRequest(Request request, Response response) {
-    if (sharedSecretKey == null) {
-      throw new RuntimeException("Error: Must set sharedSecretKey before using SecureCookieManager.");
+  public static SecureCookieManager forRequest(Request request, Response response, String secretKey, boolean alwaysSetSecureOnly) {
+    if (secretKey == null) {
+      throw new RuntimeException("Error: Must have set secret key before using SecureCookieManager.");
     }
     
-    return new SecureCookieManager(request, response);
+    return new SecureCookieManager(request, response, secretKey, alwaysSetSecureOnly);
   }
   
   private final Request request;
   private final Response response;
+  private int hashCharLen = 0;
+  private String sharedSecretKey = null;
+  private boolean alwaysSetSecureOnly = false;
   
   /**
    * @param request Spark HTTP request
    * @param response Spark HTTP response
    */
-  private SecureCookieManager(Request request, Response response) {
+  private SecureCookieManager(Request request, Response response, String secretKey, boolean alwaysSetSecureOnly) {
     this.request = request;
     this.response = response;
+    this.sharedSecretKey = secretKey;
+    this.alwaysSetSecureOnly = alwaysSetSecureOnly;
+    this.hashCharLen = sign("UNUSED", secretKey).length(); 
   }
   
   /**

@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import lightning.config.Config;
 import lightning.crypt.SecureCookieManager;
 import lightning.crypt.SecureCookieManager.InsecureCookieException;
 import lightning.http.Request;
@@ -39,32 +40,9 @@ public final class Session {
   private static final String SESSION_KEY_PREFIX = "$$session-";
   private static final String LAST_USE_KEY = SESSION_KEY_PREFIX + "lastuse";
   private static final String XSRF_KEY = SESSION_KEY_PREFIX + "xsrf";
-  private static SessionStorageDriver sharedStorageDriver = null;
-  private static long inactivityTimeoutSeconds = 60 * 60 * 24 * 14;
   
-  /**
-   * Sets the storage driver used for session storage.
-   * @param driver
-   */
-  public static void setDriver(SessionStorageDriver driver) {
-    sharedStorageDriver = driver;
-  }
-  
-  /**
-   * Sets the default session expiration time.
-   * @param seconds
-   */
-  public static void setInactivityTimeoutSeconds(long seconds) {
-    inactivityTimeoutSeconds = seconds;
-  }
-  
-  /**
-   * @return Default session expire time in seconds.
-   */
-  public static long getInactivityTimeoutSeconds() {
-    return inactivityTimeoutSeconds;
-  }
-  
+  private long inactivityTimeoutSeconds = 60 * 60 * 24 * 14; // TODO: An option for this.
+    
   /**
    * Hashes a session token.
    * @param plaintextValue Raw session token.
@@ -78,12 +56,12 @@ public final class Session {
    * @param request An incoming HTTP request.
    * @return A session object for that request.
    */
-  public static Session forRequest(Request request, Response response) {
-    if (sharedStorageDriver == null) {
-      throw new RuntimeException("Error: Must call setStorageDriver before using Session.");
+  public static Session forRequest(Request request, Response response, Config config, SessionStorageDriver driver) {
+    if (driver == null) {
+      throw new RuntimeException("Error: Must install a session driver before using Session.");
     }
     
-    return new Session(request, response, sharedStorageDriver);
+    return new Session(request, response, config, driver);
   }
   
   /**
@@ -177,13 +155,13 @@ public final class Session {
    * @param response Spark HTTP response.
    * @param storage Driver used to store session information.
    */
-  private Session(Request request, Response response, SessionStorageDriver storage) {
+  private Session(Request request, Response response, Config config, SessionStorageDriver storage) {
     this.request = request;
     this.response = response;
     this.storage = storage;
     isDirty = false;
     isLoaded = false;
-    cookies = SecureCookieManager.forRequest(request, response);
+    cookies = SecureCookieManager.forRequest(request, response, config.server.hmacKey, config.ssl.isEnabled());
     changedKeys = new TreeSet<>();
     
     try {
@@ -393,7 +371,7 @@ public final class Session {
   public String getXSRFToken() throws Exception {
     lazyLoad();
     if (!data.containsKey(XSRF_KEY)) {
-      data.put(XSRF_KEY, lightning.crypt.Hashing.generateToken(XSRF_BYTES, (x) -> false));
+      data.put(XSRF_KEY, lightning.crypt.Hasher.generateToken(XSRF_BYTES, (x) -> false));
       changedKeys.add(XSRF_KEY);
       isDirty = true;
     }
@@ -409,7 +387,7 @@ public final class Session {
   public String newXSRFToken() throws Exception {
     lazyLoad();
 
-    data.put(XSRF_KEY, lightning.crypt.Hashing.generateToken(XSRF_BYTES, (x) -> false));
+    data.put(XSRF_KEY, lightning.crypt.Hasher.generateToken(XSRF_BYTES, (x) -> false));
     changedKeys.add(XSRF_KEY);
     isDirty = true;
     

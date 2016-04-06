@@ -30,6 +30,7 @@ import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningException;
 import lightning.fn.ExceptionViewProducer;
+import lightning.groups.Groups;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
 import lightning.http.HaltException;
@@ -60,6 +61,7 @@ import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
 import lightning.sessions.Session;
 import lightning.users.User;
+import lightning.users.Users;
 import lightning.util.Iterables;
 
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -470,6 +472,8 @@ public class LightningHandler extends AbstractHandler {
     m.bindClassToInstance(HttpServletRequest.class, context.request.raw());
     m.bindClassToInstance(HttpServletResponse.class, context.response.raw());
     m.bindClassToInstance(URLGenerator.class, context.url);
+    m.bindClassToInstance(Groups.class, context.groups());
+    m.bindClassToInstance(Users.class, context.users());
     m.bindClassToResolver(User.class, new Resolver<User>() {
       @Override
       public User resolve() throws Exception {

@@ -3,40 +3,26 @@ package lightning.cache;
 import java.io.Serializable;
 
 public final class Cache {
-  private static CacheDriver driver;
+  private final CacheDriver driver;
   
-  public static void setDriver(CacheDriver driver) {
-    Cache.driver = driver;
-  }
-  
-  public static boolean hasDriver() {
-    return driver != null;
-  }
-  
-  private static void requireDriver() {
-    if (!hasDriver()) {
-      throw new RuntimeException("You must call Cache.setDriver before using.");
-    }
+  public Cache(CacheDriver driver) {
+    this.driver = driver;
   }
   
   @SuppressWarnings("unchecked")
-  public static <T extends Serializable> T get(String key, Class<T> clazz) throws CacheException {
-    requireDriver();
+  public <T extends Serializable> T get(String key, Class<T> clazz) throws CacheException {
     return (T) driver.get(key);
   }
   
-  public static void put(String key, Object value) throws CacheException {
-    requireDriver();
+  public void put(String key, Object value) throws CacheException {
     driver.put(key, value);
   }
   
-  public static boolean has(String key) throws CacheException {
-    requireDriver();
+  public boolean has(String key) throws CacheException {
     return driver.has(key);
   }
   
-  public static boolean delete(String key) throws CacheException {
-    requireDriver();
+  public boolean delete(String key) throws CacheException {
     return driver.delete(key);
   }
 }

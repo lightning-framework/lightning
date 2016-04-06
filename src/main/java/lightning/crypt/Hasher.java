@@ -14,47 +14,20 @@ import com.google.common.base.Charsets;
 /**
  * Provides convenient macros for hashing values.
  */
-public class Hashing {
+public class Hasher {
   private static final String HMAC_ALGORITHM = "HmacSHA256";
-  private static String sharedSecretKey = null;
-  private static int hashCharLen = 0;
-  
-  public static void main(String[] args) throws Exception {
-    Hashing.setSecretKey("swaggggg");
+  private String sharedSecretKey = null;
+  private int hashCharLen = 0;
     
-    System.out.println("HashCharLen = " + hashCharLen);
-    
-    String mySecret = generateToken(16, (x) -> false);
-    System.out.println("SECRET = " + mySecret + " (" + mySecret.length() + ")");
-
-    String signature = createSignature(mySecret);
-    System.out.println("SIGNATURE = " + signature + " (" + signature.length() + ")");
-    
-    String mySignedSecret = sign(mySecret);
-    System.out.println("SIGNED = " + mySignedSecret + " (" + mySignedSecret.length() + ")");
-    
-    String mySecret2 = verify(mySignedSecret);
-    System.out.println("VERIFIED = " + mySecret2 + " (" + mySecret2.length() + ")");
-  }
-
-  /**
-   * Sets the secret key used to encrypt cookies. Must be called before using SecureCookieManager.
-   * Should be called once before starting Spark and must be called with the same value across all machines.
-   * @param secretKey
-   */
-  public static void setSecretKey(String secretKey) {
-    sharedSecretKey = secretKey;
-    
-    // Update the character length of the hash algorithm output.
-    hashCharLen = createSignature("UNUSED").length(); 
-  }
-  
-  private static void requireKey() {
-    if (sharedSecretKey == null) {
-      throw new IllegalStateException("Error: Must call Hashing.setSecretKey before use.");
+  public Hasher(String secretKey) {
+    if (secretKey == null) {
+      throw new IllegalStateException("Error: Must provide a secret key.");
     }
+    
+    this.sharedSecretKey = secretKey;
+    this.hashCharLen = createSignature("UNUSED").length(); 
   }
-  
+    
   @FunctionalInterface
   public static interface InUseChecker {
     public boolean isInUse(String token) throws Exception;
@@ -94,8 +67,7 @@ public class Hashing {
    * @return The raw value.
    * @throws HashVerificationException If not valid.
    */
-  public static String verify(String hash) throws HashVerificationException {
-    requireKey();
+  public String verify(String hash) throws HashVerificationException {
     if (hash == null) {
       throw new HashVerificationException("No hash found.");
     }
@@ -131,8 +103,7 @@ public class Hashing {
    * @param plaintext A plain text string to hash.
    * @return A signed version of plain text.
    */
-  public static String sign(String plaintext) {
-    requireKey();
+  public String sign(String plaintext) {
     return plaintext + createSignature(plaintext);
   }
   
@@ -141,8 +112,7 @@ public class Hashing {
    * @param plaintext The plain text value to be signed.
    * @return The base-64 encoded hash signature.
    */
-  private static String createSignature(String plaintext) {
-    requireKey();
+  private String createSignature(String plaintext) {
     SecretKeySpec key = new SecretKeySpec(sharedSecretKey.getBytes(), HMAC_ALGORITHM);
     Mac mac;
     
@@ -163,8 +133,7 @@ public class Hashing {
    * @param plaintext The alleged plain text value.
    * @return Whether or not the signature for (plain text, secretKey) matches the provided signature.
    */
-  private static boolean verifySignature(String signature, String plaintext) {
-    requireKey();
+  private boolean verifySignature(String signature, String plaintext) {
     return createSignature(plaintext).equals(signature);
   }
 }

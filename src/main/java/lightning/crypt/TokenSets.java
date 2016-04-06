@@ -1,6 +1,6 @@
 package lightning.crypt;
 
-import lightning.crypt.Hashing.HashVerificationException;
+import lightning.crypt.Hasher.HashVerificationException;
 
 import com.google.common.base.Optional;
 
@@ -15,9 +15,9 @@ public class TokenSets {
     return new TokenSet(clientToken);
   }
   
-  public static Optional<TokenSet> fromSignedClientToken(String signedClientToken) {
+  public static Optional<TokenSet> fromSignedClientToken(Hasher hasher, String signedClientToken) {
     try {
-      String clientToken = Hashing.verify(signedClientToken);
+      String clientToken = hasher.verify(signedClientToken);
       return Optional.of(new TokenSet(clientToken));
     } catch (HashVerificationException e) {
       return Optional.absent();
@@ -25,7 +25,7 @@ public class TokenSets {
   }
   
   public static TokenSet createNew() throws Exception {
-    return new TokenSet(Hashing.generateToken(64, (x) -> false));
+    return new TokenSet(Hasher.generateToken(64, (x) -> false));
   }
   
   public static class TokenSet {
@@ -39,12 +39,12 @@ public class TokenSets {
       return clientToken;
     }
     
-    public String getSignedClientToken() {
-      return Hashing.sign(clientToken);
+    public String getSignedClientToken(Hasher hasher) {
+      return hasher.sign(clientToken);
     }
     
     public String getServerToken() {
-      return Hashing.hash(clientToken);
+      return Hasher.hash(clientToken);
     }
   }
 }

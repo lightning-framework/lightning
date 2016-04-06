@@ -11,9 +11,7 @@ import java.util.Set;
  * - Group group = Groups.getByName("my group");
  * - Perform mutations on group
  */
-public final class Groups {
-  private static GroupsDriver sharedDriver;
-  
+public final class Groups {  
   public static class GroupsException extends Exception {
     private static final long serialVersionUID = 1L;
 
@@ -24,10 +22,6 @@ public final class Groups {
     public GroupsException(String message) {
       super(message);
     }
-  }
-  
-  public static void setDriver(GroupsDriver driver) {
-    sharedDriver = driver;
   }
   
   /**
@@ -53,15 +47,16 @@ public final class Groups {
     public void deleteDataForUser(long userId) throws Exception;
   }
   
-  private static void checkDriver() {
-    if (sharedDriver == null) {
-      throw new RuntimeException("Error: Must call setDriver() before using Groups.");
+  private final GroupsDriver sharedDriver;
+  
+  public Groups(GroupsDriver driver) {
+    if (driver == null) {
+      throw new IllegalArgumentException("Must provide a driver.");
     }
+    sharedDriver = driver;
   }
   
-  public static Group get(long id) throws GroupsException {
-    checkDriver();
-    
+  public Group get(long id) throws GroupsException {
     try {
       return sharedDriver.get(id);
     } catch (Exception e) {
@@ -69,9 +64,7 @@ public final class Groups {
     }
   }
   
-  public static Group getByName(String name) throws GroupsException {
-    checkDriver();
-    
+  public Group getByName(String name) throws GroupsException {
     try {
       return sharedDriver.getByName(name);
     } catch (Exception e) {
@@ -79,9 +72,7 @@ public final class Groups {
     }
   }
   
-  public static Iterable<Group> getAll() throws GroupsException {
-    checkDriver();
-    
+  public Iterable<Group> getAll() throws GroupsException {
     try {
       return sharedDriver.getAll();
     } catch (Exception e) {
@@ -89,9 +80,7 @@ public final class Groups {
     }
   }
   
-  public static Iterable<Group> getAllForUser(long userId) throws GroupsException {
-    checkDriver();
-    
+  public Iterable<Group> getAllForUser(long userId) throws GroupsException {
     try {
       return sharedDriver.getAllForUser(userId);
     } catch (Exception e) {
@@ -99,9 +88,7 @@ public final class Groups {
     }
   }
   
-  public static Group create(String name) throws GroupsException {
-    checkDriver();
-    
+  public Group create(String name) throws GroupsException {
     try {
       return sharedDriver.create(name);
     } catch (Exception e) {
@@ -109,9 +96,7 @@ public final class Groups {
     }
   }
   
-  public static void delete(Group group) throws GroupsException {
-    checkDriver();
-    
+  public void delete(Group group) throws GroupsException {
     try {
       sharedDriver.delete(group.getId());
     } catch (Exception e) {
@@ -119,9 +104,7 @@ public final class Groups {
     }
   }
   
-  public static Set<Long> getGroupPrivilegesForUser(long userId) throws GroupsException {
-    checkDriver();
-    
+  public Set<Long> getGroupPrivilegesForUser(long userId) throws GroupsException {
     try {
       return sharedDriver.getGroupPrivilegesForUser(userId);
     } catch (Exception e) {
@@ -129,9 +112,7 @@ public final class Groups {
     }
   }
   
-  public static void deleteDataForUser(long userId) throws GroupsException {
-    checkDriver();
-    
+  public void deleteDataForUser(long userId) throws GroupsException {
     try {
       sharedDriver.deleteDataForUser(userId);
     } catch (Exception e) {

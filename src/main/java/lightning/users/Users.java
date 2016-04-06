@@ -15,18 +15,9 @@ import lightning.groups.Groups;
  * - Can now manipulate user (see methods on User).
  */
 public final class Users {
-  private static UsersDriver sharedDriver;
-  
-  public static void setDriver(UsersDriver driver) {
-    sharedDriver = driver;
-  }
-  
-  private static void checkDriver() {
-    if (sharedDriver == null) {
-      throw new RuntimeException("Error: Must call Users.setDriver() before using Users.");
-    }
-  }
-  
+  private UsersDriver sharedDriver;
+  private Groups groups;
+    
   public static interface UsersDriver {
     public void save(User user, Set<Long> addPrivileges, Set<Long> removePrivileges) throws Exception;
     public Set<Long> getPrivileges(long userId) throws Exception;
@@ -52,6 +43,14 @@ public final class Users {
     }
   }
   
+  public Users(UsersDriver usersDriver, Groups groups) {
+    if (usersDriver == null) {
+      throw new IllegalArgumentException("Must provide a driver.");
+    }
+    sharedDriver = usersDriver;
+    this.groups = groups;
+  }
+  
   public static String hashPassword(String plaintextPassword) {
     return BCrypt.hashpw(plaintextPassword, BCrypt.gensalt(10));
   }
@@ -60,9 +59,7 @@ public final class Users {
     return BCrypt.checkpw(plaintextPassword, hash);
   }
   
-  public static User getById(long id) throws UsersException {
-    checkDriver();
-    
+  public User getById(long id) throws UsersException {
     try {
       return sharedDriver.getUser(id);
     } catch (Exception e) {
@@ -70,9 +67,7 @@ public final class Users {
     }
   }
   
-  public static User getByName(String userName) throws UsersException {
-    checkDriver();
-    
+  public User getByName(String userName) throws UsersException {
     try {
       return sharedDriver.getUserByName(userName);
     } catch (Exception e) {
@@ -80,9 +75,7 @@ public final class Users {
     }
   }
   
-  public static User getByToken(String token) throws UsersException {
-    checkDriver();
-    
+  public User getByToken(String token) throws UsersException {
     try {
       return sharedDriver.getUserByToken(token);
     } catch (Exception e) {
@@ -90,9 +83,7 @@ public final class Users {
     }
   }
   
-  public static User getByEmail(String email) throws UsersException {
-    checkDriver();
-    
+  public User getByEmail(String email) throws UsersException {
     try {
       return sharedDriver.getUserByEmail(email);
     } catch (Exception e) {
@@ -100,9 +91,7 @@ public final class Users {
     }
   }
   
-  public static Iterable<User> getAll() throws UsersException {
-    checkDriver();
-    
+  public Iterable<User> getAll() throws UsersException {
     try {
       return sharedDriver.getAll();
     } catch (Exception e) {
@@ -110,9 +99,7 @@ public final class Users {
     }
   }
   
-  public static User create(String userName, String email, String plaintextPassword) throws UsersException {
-    checkDriver();
-    
+  public User create(String userName, String email, String plaintextPassword) throws UsersException {
     if (!isValidEmail(email)) {
       throw new UsersException("Email not valid.");
     }
@@ -132,20 +119,16 @@ public final class Users {
     }
   }
   
-  public static void delete(User user) throws UsersException {
-    checkDriver();
-    
+  public void delete(User user) throws UsersException {
     try {
-      Groups.deleteDataForUser(user.getId());
+      groups.deleteDataForUser(user.getId());
       sharedDriver.delete(user.getId());
     } catch (Exception e) {
       throw new UsersException(e);
     }
   }
   
-  public static void recordLogin(User user) throws UsersException {
-    checkDriver();
-    
+  public void recordLogin(User user) throws UsersException {
     try {
       sharedDriver.recordLogin(user);
     } catch (Exception e) {
@@ -153,18 +136,15 @@ public final class Users {
     }
   }
   
-  public static boolean isValidUserName(String userName) {
-    checkDriver();
+  public boolean isValidUserName(String userName) {
     return userName != null && userName.length() > 0; // TODO(mschurr): Additional validation;
   }
   
-  public static boolean isValidPassword(String userName, String password) {
-    checkDriver();
+  public boolean isValidPassword(String userName, String password) {
     return password != null && password.length() > 0; // TODO(mschurr): Additional validation;
   }
   
-  public static boolean isValidEmail(String email) {
-    checkDriver();
+  public boolean isValidEmail(String email) {
     return email != null && email.length() > 0; // TODO(mschurr): Additional validation;
   }
 }

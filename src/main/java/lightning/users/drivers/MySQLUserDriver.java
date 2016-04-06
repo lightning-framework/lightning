@@ -19,6 +19,7 @@ import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.NamedPreparedStatement;
 import lightning.db.ResultSets;
+import lightning.groups.Groups;
 import lightning.users.User;
 import lightning.users.Users;
 import lightning.users.Users.UsersDriver;
@@ -32,9 +33,11 @@ import com.google.common.collect.ImmutableList;
  */
 public class MySQLUserDriver implements UsersDriver {
   private final MySQLDatabaseProvider provider;
+  private final Groups groups;
   
-  public MySQLUserDriver(MySQLDatabaseProvider provider) {
+  public MySQLUserDriver(MySQLDatabaseProvider provider, Groups groups) {
     this.provider = provider;
+    this.groups = groups;
   }
   
   public User nextUser(ResultSet result) throws ClassNotFoundException, SQLException, IOException {
@@ -50,6 +53,7 @@ public class MySQLUserDriver implements UsersDriver {
     }
     
     return new User(this, 
+        groups,
         result.getLong("id"), 
         result.getString("username"), 
         result.getString("email"), 
@@ -206,7 +210,7 @@ public class MySQLUserDriver implements UsersDriver {
       long id = query.getInsertionId();
       query.close();
       
-      return new User(this, id, userName, email, encryptedPassword, token, 0, false, properties);
+      return new User(this, groups, id, userName, email, encryptedPassword, token, 0, false, properties);
     }
   }
 

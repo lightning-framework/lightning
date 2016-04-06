@@ -16,6 +16,7 @@ import javax.servlet.http.Part;
 
 import lightning.auth.Auth;
 import lightning.auth.AuthException;
+import lightning.auth.drivers.MySQLAuthDriver;
 import lightning.config.Config;
 import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabase;
@@ -25,7 +26,9 @@ import lightning.enums.CacheType;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningException;
+import lightning.groups.Groups;
 import lightning.groups.Groups.GroupsException;
+import lightning.groups.drivers.MySQLGroupDriver;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
 import lightning.http.HaltException;
@@ -41,8 +44,11 @@ import lightning.mail.Mailer;
 import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
+import lightning.sessions.drivers.MySQLSessionDriver;
 import lightning.users.User;
+import lightning.users.Users;
 import lightning.users.Users.UsersException;
+import lightning.users.drivers.MySQLUserDriver;
 
 import org.eclipse.jetty.util.resource.Resource;
 
@@ -73,6 +79,8 @@ public class HandlerContext implements AutoCloseable {
   private final FileServer fs;
   private boolean isAsync;
   private final MySQLDatabaseProxy dbProxy;
+  private final Groups groups;
+  private final Users users;
   
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
@@ -83,11 +91,17 @@ public class HandlerContext implements AutoCloseable {
     this.config = c;
     this.mail = mailer;
     this.templateEngine = te;
-    this.cookies = SecureCookieManager.forRequest(request, response);
+    this.cookies = SecureCookieManager.forRequest(request, response, config.server.hmacKey, config.ssl.isEnabled());
     this.url = URLGenerator.forRequest(request);
     this.validator = Validator.create(this);
-    this.session = Session.forRequest(rq, re);
-    this.auth = Auth.forSession(session);
+    
+    // TODO: I think these MySQLDrivers can cause lock-ups under high load since both the request handler
+    // AND session driver may try to acquire a connection.
+    this.session = Session.forRequest(rq, re, config, new MySQLSessionDriver(dbp));
+    this.groups = new Groups(new MySQLGroupDriver(dbp));
+    this.users = new Users(new MySQLUserDriver(dbp, groups), groups);
+    this.auth = Auth.forSession(session, new MySQLAuthDriver(dbp), users);
+    
     this.dbProxy = new MySQLDatabaseProxy(dbp);
     this.db = dbProxy;
     this.isAsync = false;
@@ -787,5 +801,13 @@ public class HandlerContext implements AutoCloseable {
     
     fs.sendResource(request.raw(), response.raw(), Resource.newResource(file));
     return;
+  }
+
+  public Groups groups() {
+    return groups;
+  }
+
+  public Users users() {
+    return users;
   }
 }
