@@ -114,10 +114,15 @@ public class LightningHandler extends AbstractHandler {
         TemplateExceptionHandler.RETHROW_HANDLER);
     
     this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
-    this.userTemplateConfig.setDirectoryForTemplateLoading(Iterables.firstOr(Iterables.filter(ImmutableList.of(
+    File templatePath = Iterables.firstOr(Iterables.filter(ImmutableList.of(
         new File("./src/main/java/" + config.server.templateFilesPath),
         new File("./src/main/resources/" + config.server.templateFilesPath)
-    ), f -> f.exists()), new File(config.server.templateFilesPath)));
+    ), f -> f.exists()), new File(config.server.templateFilesPath));
+    if (templatePath.exists()) {
+      this.userTemplateConfig.setDirectoryForTemplateLoading(templatePath);
+    } else {
+      this.userTemplateConfig.setClassForTemplateLoading(getClass(), "/" + config.server.templateFilesPath);
+    }
     this.userTemplateConfig.setShowErrorTips(config.enableDebugMode);
     this.userTemplateConfig.setTemplateExceptionHandler(config.enableDebugMode ?
         TemplateExceptionHandler.HTML_DEBUG_HANDLER :

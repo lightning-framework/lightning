@@ -25,6 +25,8 @@ public class Config {
   // Essentially: quick and easy save and refresh development.
   // NOTE: Websockets are currently not automatically reloaded due to limitations in Jetty. You'll
   //       need to restart to server to see changes to websocket handler code.
+  // Debug mode does not work when deployed to a JAR and assumes the current working directory is set
+  // to the root of your project folder (where pom.xml is located).
   public @Optional boolean enableDebugMode = false;
 
   // A list of prefixes on which classes should be automatically reloaded on each incoming
