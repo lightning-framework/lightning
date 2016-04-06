@@ -13,7 +13,6 @@ import lightning.groups.Groups;
 import lightning.groups.drivers.MySQLGroupDriver;
 import lightning.inject.InjectorModule;
 import lightning.json.JsonFactory;
-import lightning.mail.Mail;
 import lightning.sessions.Session;
 import lightning.sessions.drivers.MySQLSessionDriver;
 import lightning.users.Users;
@@ -50,7 +49,7 @@ public class LightningInstance {
   }
   
   public static void start(Config cfg, InjectorModule injector) throws Exception {
-    // TODO(mschurr): Eliminate global state on SecureCookieManager, Hashing, Mail, Session, Groups, Users, Auth.
+    // TODO(mschurr): Eliminate global state on SecureCookieManager, Hashing, Session, Groups, Users, Auth, Cache.
     config = cfg;
     Log.setLog(null);    
     SecureCookieManager.setSecretKey(config.server.hmacKey);
@@ -58,10 +57,6 @@ public class LightningInstance {
     
     if (config.ssl.isEnabled()) {
       SecureCookieManager.alwaysSetSecureOnly();
-    }
-    
-    if (config.mail.isEnabled()) {
-      Mail.configure(config.mail);
     }
     
     dbp = new MySQLDatabaseProvider(config);

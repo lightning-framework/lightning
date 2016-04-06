@@ -32,6 +32,10 @@ public class Response {
   public void status(int status) {
     response.setStatus(status);
   }
+  
+  public void write(String text) throws IOException {
+    response.getWriter().write(text);
+  }
 
   /**
    * Sets up a redirect to the given url.

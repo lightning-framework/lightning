@@ -47,6 +47,7 @@ import lightning.inject.InjectorModule;
 import lightning.inject.Resolver;
 import lightning.io.FileServer;
 import lightning.json.JsonFactory;
+import lightning.mail.Mailer;
 import lightning.mvc.DefaultExceptionViewProducer;
 import lightning.mvc.HandlerContext;
 import lightning.mvc.ModelAndView;
@@ -95,6 +96,7 @@ public class LightningHandler extends AbstractHandler {
   private RouteMapper<Method> routeMapper;
   private InjectorModule globalModule;
   private InjectorModule userModule;
+  private Mailer mailer;
   
   public LightningHandler(Config config, MySQLDatabaseProvider dbp, InjectorModule globalModule, InjectorModule userModule) throws Exception {
     this.config = config;
@@ -134,6 +136,12 @@ public class LightningHandler extends AbstractHandler {
       this.staticFileServer.disableCaching();
     }
     this.routeMapper = new RouteMapper<>();
+    
+    if (config.mail.isEnabled()) {
+      this.mailer = new Mailer(config.mail);
+      globalModule.bindClassToInstance(Mailer.class, this.mailer);
+    }
+    
     rescan();
   }
   
@@ -197,7 +205,7 @@ public class LightningHandler extends AbstractHandler {
       }
       
       // Create context.
-      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer);
+      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer);
       requestModule = requestSpecificInjectionModule(ctx);
       injector = new Injector(
           globalModule, requestModule, userModule);

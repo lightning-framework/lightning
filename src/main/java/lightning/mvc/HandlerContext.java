@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nullable;
 import javax.servlet.ServletException;
 import javax.servlet.http.Part;
 
@@ -23,6 +24,7 @@ import lightning.db.MySQLDatabaseProxy;
 import lightning.enums.CacheType;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
+import lightning.exceptions.LightningException;
 import lightning.groups.Groups.GroupsException;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -35,6 +37,7 @@ import lightning.http.Request;
 import lightning.http.Response;
 import lightning.io.FileServer;
 import lightning.json.JsonFactory;
+import lightning.mail.Mailer;
 import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
@@ -66,6 +69,7 @@ public class HandlerContext implements AutoCloseable {
   public final Session session;
   public final Auth auth;
   public final MySQLDatabase db;
+  private final @Nullable Mailer mail;
   private final FileServer fs;
   private boolean isAsync;
   private final MySQLDatabaseProxy dbProxy;
@@ -73,10 +77,11 @@ public class HandlerContext implements AutoCloseable {
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
 
-  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, Configuration te, FileServer fs) {
+  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, Configuration te, FileServer fs, @Nullable Mailer mailer) {
     this.request = rq;
     this.response = re;
     this.config = c;
+    this.mail = mailer;
     this.templateEngine = te;
     this.cookies = SecureCookieManager.forRequest(request, response);
     this.url = URLGenerator.forRequest(request);
@@ -87,6 +92,14 @@ public class HandlerContext implements AutoCloseable {
     this.db = dbProxy;
     this.isAsync = false;
     this.fs = fs;
+  }
+  
+  public Mailer mail() throws LightningException {
+    if (mail == null) {
+      throw new LightningException("Mail is not configured.");
+    }
+    
+    return mail;
   }
   
   public void goAsync() {

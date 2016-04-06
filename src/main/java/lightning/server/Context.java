@@ -15,6 +15,7 @@ import lightning.config.Config;
 import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabase;
 import lightning.enums.HTTPMethod;
+import lightning.exceptions.LightningException;
 import lightning.groups.Groups.GroupsException;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -24,6 +25,7 @@ import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
 import lightning.http.Request;
 import lightning.http.Response;
+import lightning.mail.Mailer;
 import lightning.mvc.HandlerContext;
 import lightning.mvc.ModelAndView;
 import lightning.mvc.Param;
@@ -117,6 +119,10 @@ public class Context {
   
   public static final Auth auth() {
     return context().auth;
+  }
+  
+  public static final Mailer mail() throws LightningException {
+    return context().mail();
   }
   
   public static final User user() throws SessionException, AuthException {

@@ -19,6 +19,7 @@ import lightning.users.Users;
 
 import com.google.common.base.Optional;
 
+// TODO: Should accept an optional redirect URL as a query parameter.
 @Controller
 public class LoginController {
   protected CASConfig casConfig;

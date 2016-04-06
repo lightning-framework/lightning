@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit;
 
 import lightning.ann.Optional;
 import lightning.ann.Required;
-import lightning.mail.Mail;
+import lightning.mail.MailerConfig;
 
 import com.google.common.collect.ImmutableList;
 
@@ -164,7 +164,7 @@ public class Config {
     // for the exceptions in lightning.http.
   }
   
-  public static final class MailConfig implements Mail.MailConfig {
+  public static final class MailConfig implements MailerConfig {
     @Override
     public String toString() {
       return "MailConfig [useSSL=" + useSSL + ", address=" + address + ", username=" + username
