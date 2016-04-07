@@ -264,7 +264,6 @@ public final class Auth {
   }
   
   /**
-   * TODO(mschurr): Does this work correctly with load balancers and X-Forwarded-From?
    * @return The IP attached to current session.
    */
   private String getIP() {

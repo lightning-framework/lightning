@@ -6,13 +6,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import lightning.enums.CacheType;
+import lightning.enums.CacheControl;
 
 @Documented
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface Cacheable {
-  CacheType type() default CacheType.PUBLIC;
+  CacheControl type() default CacheControl.PUBLIC;
   long expireMs() default 60000;
 }

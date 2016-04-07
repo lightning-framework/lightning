@@ -15,6 +15,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import lightning.enums.CacheControl;
 import lightning.http.NotFoundException;
 import lightning.util.Mimes;
 import lightning.util.Time;
@@ -73,7 +74,7 @@ public class FileServer implements ResourceFactory {
   private ResourceCache _cache;
 
   private boolean _useFileMappedBuffer = true;
-  private HttpField _cacheControl = null;
+  private PreEncodedHttpField _defaultCacheControl = null;
   private List<String> _gzipEquivalentFileExtensions;
   private ResourceFactory factory;
   
@@ -95,11 +96,11 @@ public class FileServer implements ResourceFactory {
   }
   
   public void usePrivateCaching() {
-    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "private, max-age=3600");
+    _defaultCacheControl = getCacheControl(CacheControl.PRIVATE);
   }
   
   public void usePublicCaching() {
-    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=3600");
+    _defaultCacheControl = getCacheControl(CacheControl.PUBLIC);
   }
   
   public void setMaxCacheSize(int value) {
@@ -119,7 +120,7 @@ public class FileServer implements ResourceFactory {
   }
   
   public void disableCaching() {
-    _cacheControl = new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "no-cache, no-store, max-age=0, must-revalidate");
+    _defaultCacheControl = getCacheControl(CacheControl.NONE);
     _etags = false;
     _cache.flushCache();
     _cache = null;
@@ -204,11 +205,25 @@ public class FileServer implements ResourceFactory {
     String pathInContext = URIUtil.addPaths(servletPath, pathInfo);
     return pathInContext;
   }
+  
+  protected PreEncodedHttpField getCacheControl(CacheControl type) {
+    switch (type) {
+      case NONE:
+        return new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "no-cache, no-store, max-age=0, must-revalidate");
+      case PRIVATE:
+        return new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "private, max-age=3600");
+      default:
+      case PUBLIC:
+        return new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "public, max-age=3600");
+    }
+  }
 
   /* ------------------------------------------------------------ */
   
   // NOTE: Doesn't use resource cache or memory mapping, but still supports full spec.
-  public void sendResource(HttpServletRequest request, HttpServletResponse response, Resource resource) throws IOException {
+  public void sendResource(HttpServletRequest request, HttpServletResponse response, Resource resource, CacheControl cacheType) throws IOException {
+    PreEncodedHttpField cacheControl = getCacheControl(cacheType);
+    
     if (resource == null || !resource.exists()) {
       throw new NotFoundException();
     }
@@ -229,7 +244,7 @@ public class FileServer implements ResourceFactory {
               Mimes.forPath(resource.toString()), response.getBufferSize());
       
       if (passConditionalHeaders(request, response, resource, content)) {
-        close_content = sendData(request, response, false, resource, content, reqRanges);
+        close_content = sendData(request, response, false, resource, content, reqRanges, cacheControl);
       }
     } finally {
       if (close_content  && content != null) {
@@ -339,7 +354,7 @@ public class FileServer implements ResourceFactory {
                 response.setContentType(mt);
             }
             close_content =
-                sendData(request, response, included.booleanValue(), resource, content, reqRanges);
+                sendData(request, response, included.booleanValue(), resource, content, reqRanges, _defaultCacheControl);
           }
         }
       } else {
@@ -533,7 +548,8 @@ public class FileServer implements ResourceFactory {
 
   /* ------------------------------------------------------------ */
   protected boolean sendData(HttpServletRequest request, HttpServletResponse response,
-      boolean include, Resource resource, final HttpContent content, Enumeration<String> reqRanges)
+      boolean include, Resource resource, final HttpContent content, Enumeration<String> reqRanges,
+      PreEncodedHttpField cacheControl)
       throws IOException {
     final long content_length =
         (content == null) ? resource.length() : content.getContentLengthValue();
@@ -563,7 +579,7 @@ public class FileServer implements ResourceFactory {
       // else if we can't do a bypass write because of wrapping
       else if (content == null || written || !(out instanceof HttpOutput)) {
         // write normally
-        putHeaders(response, content, written ? -1 : 0);
+        putHeaders(response, content, written ? -1 : 0, cacheControl);
         ByteBuffer buffer = (content == null) ? null : content.getIndirectBuffer();
         if (buffer != null)
           BufferUtil.writeTo(buffer, out);
@@ -573,7 +589,7 @@ public class FileServer implements ResourceFactory {
       // else do a bypass write
       else {
         // write the headers
-        putHeaders(response, content, 0);
+        putHeaders(response, content, 0, cacheControl);
 
         // write the content asynchronously if supported
         if (request.isAsyncSupported() && !disableAsync) {
@@ -617,7 +633,7 @@ public class FileServer implements ResourceFactory {
 
       // if there are no satisfiable ranges, send 416 response
       if (ranges == null || ranges.size() == 0) {
-        putHeaders(response, content, 0);
+        putHeaders(response, content, 0, cacheControl);
         response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
         response.setHeader(HttpHeader.CONTENT_RANGE.asString(),
             InclusiveByteRange.to416HeaderRangeString(content_length));
@@ -630,7 +646,7 @@ public class FileServer implements ResourceFactory {
       if (ranges.size() == 1) {
         InclusiveByteRange singleSatisfiableRange = ranges.get(0);
         long singleLength = singleSatisfiableRange.getSize(content_length);
-        putHeaders(response, content, singleLength);
+        putHeaders(response, content, singleLength, cacheControl);
         response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
         if (!response.containsHeader(HttpHeader.DATE.asString()))
           response.addDateHeader(HttpHeader.DATE.asString(), System.currentTimeMillis());
@@ -644,7 +660,7 @@ public class FileServer implements ResourceFactory {
       // 216 response which does not require an overall
       // content-length header
       //
-      putHeaders(response, content, -1);
+      putHeaders(response, content, -1, cacheControl);
       String mimetype = (content == null ? null : content.getContentTypeValue());
       if (mimetype == null)
         logger.warn("Unknown mimetype for " + request.getRequestURI());
@@ -716,7 +732,7 @@ public class FileServer implements ResourceFactory {
     return true;
   }
 
-  protected void putHeaders(HttpServletResponse response, HttpContent content, long contentLength) {
+  protected void putHeaders(HttpServletResponse response, HttpContent content, long contentLength, PreEncodedHttpField cacheControl) {
     if (response instanceof Response) {
       Response r = (Response) response;
       r.putHeaders(content, contentLength, _etags);
@@ -724,15 +740,15 @@ public class FileServer implements ResourceFactory {
       if (_acceptRanges)
         f.put(ACCEPT_RANGES);
 
-      if (_cacheControl != null)
-        f.put(_cacheControl);
+      if (cacheControl != null)
+        f.put(cacheControl);
     } else {
       Response.putHeaders(response, content, contentLength, _etags);
       if (_acceptRanges)
         response.setHeader(ACCEPT_RANGES.getName(), ACCEPT_RANGES.getValue());
 
-      if (_cacheControl != null)
-        response.setHeader(_cacheControl.getName(), _cacheControl.getValue());
+      if (cacheControl != null)
+        response.setHeader(cacheControl.getName(), cacheControl.getValue());
     }
     
     if (caching) {

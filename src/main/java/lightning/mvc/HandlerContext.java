@@ -23,7 +23,7 @@ import lightning.crypt.SecureCookieManager;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProxy;
-import lightning.enums.CacheType;
+import lightning.enums.CacheControl;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningException;
@@ -779,7 +779,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @throws Exception
    */
   public void sendFile(File file) throws Exception {
-    sendFile(file, CacheType.PUBLIC);
+    sendFile(file, CacheControl.PUBLIC);
   }
   
   /**
@@ -789,24 +789,19 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    *            is supported (partials, caching, etc) as if it were a static file being served.
    *            Takes advantage of async IO for speed.
    *            File name may be exposed to user.
-   *            Will be sent with Cache-Control: public.
+   *            Will be sent with specified cache control.
    *            TODO: Can this method cache the file contents using resource cache + mmap-ing
    *                  like DefaultServlet does?
    *            TODO: Can this take advantage of GZIP?
    * @param file A file.
    */
-  public void sendFile(File file, CacheType cacheType) throws Exception {
-    if (cacheType == CacheType.PRIVATE) {
-      // TODO(mschurr): Implement this.
-      throw new UnsupportedOperationException("Cache type private is not implemented yet.");
-    }
-    
+  public void sendFile(File file, CacheControl cacheType) throws Exception {    
     if (request.raw().isAsyncSupported()) {
       goAsync();
       this.close();
     }
     
-    fs.sendResource(request.raw(), response.raw(), Resource.newResource(file));
+    fs.sendResource(request.raw(), response.raw(), Resource.newResource(file), cacheType);
     return;
   }
 
