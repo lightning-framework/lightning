@@ -11,35 +11,43 @@ import com.google.common.base.Optional;
  *  - A one-way sha256 hashed token that should be stored with the server
  */
 public class TokenSets {
-  public static TokenSet fromClientToken(String clientToken) {
-    return new TokenSet(clientToken);
+  private final Hasher hasher;
+  
+  public TokenSets(Hasher hasher) {
+    this.hasher = hasher;
   }
   
-  public static Optional<TokenSet> fromSignedClientToken(Hasher hasher, String signedClientToken) {
+  public TokenSet fromClientToken(String clientToken) {
+    return new TokenSet(clientToken, hasher);
+  }
+  
+  public Optional<TokenSet> fromSignedClientToken(String signedClientToken) {
     try {
       String clientToken = hasher.verify(signedClientToken);
-      return Optional.of(new TokenSet(clientToken));
+      return Optional.of(new TokenSet(clientToken, hasher));
     } catch (HashVerificationException e) {
       return Optional.absent();
     }
   }
   
-  public static TokenSet createNew() throws Exception {
-    return new TokenSet(Hasher.generateToken(64, (x) -> false));
+  public TokenSet createNew() throws Exception {
+    return new TokenSet(Hasher.generateToken(64, (x) -> false), hasher);
   }
   
   public static class TokenSet {
     private String clientToken;
+    private final Hasher hasher;
     
-    private TokenSet(String clientToken) {
+    private TokenSet(String clientToken, Hasher hasher) {
       this.clientToken = clientToken;
+      this.hasher = hasher;
     }
     
     public String getClientToken() {
       return clientToken;
     }
     
-    public String getSignedClientToken(Hasher hasher) {
+    public String getSignedClientToken() {
       return hasher.sign(clientToken);
     }
     

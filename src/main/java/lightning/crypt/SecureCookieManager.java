@@ -149,7 +149,7 @@ public class SecureCookieManager {
    */
   public void set(String name, String value, String path, int maxAgeSec, boolean httpOnly) {
     boolean secure = alwaysSetSecureOnly || request.scheme() == HTTPScheme.HTTPS;
-    logger.debug("Setting Cookie: name={} path={} maxAge={} httpOnly={} secure={}", name, path, maxAgeSec, httpOnly, secure, value);
+    logger.debug("Setting Cookie: name={} path={} maxAge={} httpOnly={} secure={} value={}", name, path, maxAgeSec, httpOnly, secure, value);
     Cookie cookie = new Cookie(name, value + sign(name + value, sharedSecretKey));
     cookie.setPath(path);
     cookie.setMaxAge(maxAgeSec);
@@ -235,6 +235,7 @@ public class SecureCookieManager {
    * @param name Cookie name.
    */
   public void delete(String name) {
+    logger.debug("Deleting Cookie: name={}", name);
     response.removeCookie(name);
   }
 }

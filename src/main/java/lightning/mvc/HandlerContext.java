@@ -19,7 +19,9 @@ import lightning.auth.Auth;
 import lightning.auth.AuthException;
 import lightning.auth.drivers.MySQLAuthDriver;
 import lightning.config.Config;
+import lightning.crypt.Hasher;
 import lightning.crypt.SecureCookieManager;
+import lightning.crypt.TokenSets;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProxy;
@@ -68,6 +70,7 @@ import freemarker.template.Configuration;
  * allocated to service a single request and destroyed after a response to that request is sent.
  */
 public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
+  @SuppressWarnings("unused")
   private static final Logger logger = LoggerFactory.getLogger(HandlerContext.class);
   public final Request request;
   public final Response response;
@@ -85,11 +88,13 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   private final MySQLDatabaseProxy dbProxy;
   private final Groups groups;
   private final Users users;
+  private boolean isClosed;
   
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
 
   public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, Configuration te, FileServer fs, @Nullable Mailer mailer) {
+    isClosed = false;
     this.request = rq;
     this.response = re;
     this.config = c;
@@ -118,6 +123,14 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     return db().getConnection();
   }
   
+  public Hasher hasher() {
+    return new Hasher(config.server.hmacKey);
+  }
+  
+  public TokenSets tokens() {
+    return new TokenSets(hasher());
+  }
+  
   public Mailer mail() throws LightningException {
     if (mail == null) {
       throw new LightningException("Mail is not configured.");
@@ -141,10 +154,15 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    */
   @Override
   public void close() throws Exception {
+    if (isClosed) {
+      return;
+    }
+    
+    isClosed = true;
+    
     // If the session was modified, save it.
     try {
       if (session != null && session.isDirty()) {
-        logger.debug("Saving Dirty Session");
         session.save();
       }
     } finally {

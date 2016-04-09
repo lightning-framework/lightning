@@ -9,6 +9,9 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lightning.config.Config;
 import lightning.crypt.SecureCookieManager;
 import lightning.crypt.SecureCookieManager.InsecureCookieException;
@@ -29,11 +32,17 @@ import com.google.common.hash.Hashing;
  * Session are loaded and saved lazily (no operations on storage unless necessary).
  * Any type of Serializable object can be stored in a session.
  * 
+ * TODO: Session will not get saved automatically when user handler sends HTTP content before the 
+ * session is saved (since after content is sent the session manager is not able to write the session
+ * ID cookie). Happens because HandlerContext is closed (which invokes session save) after the user
+ * handler is invoked.
+ * 
  * Example Usage:
  * Session.setStorageDriver(new MyStorageDriverClass());
  * Session session = Session.forRequest(Request request, Response response);
  */
 public final class Session {
+  private static final Logger logger = LoggerFactory.getLogger(Session.class);
   private static final int SESSION_ID_BYTES = 1024;
   private static final int XSRF_BYTES = 48;
   private static final String SESSION_COOKIE_NAME = "_sessiond";
@@ -344,28 +353,6 @@ public final class Session {
   }
   
   /**
-   * Saves the session, throwing an Exception on failure.
-   * If the session is not dirty, has no effect.
-   * @throws SessionException
-   * @throws InsecureCookieException 
-   */
-  public void save() throws SessionException {
-    if (!isLoaded || !isDirty) {
-      if (rawIdentifier != null) {
-        storage.keepAliveIfExists(hashToken(rawIdentifier));
-      }
-      cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
-      return;
-    }
-    
-    data.put(LAST_USE_KEY, Time.now());
-    changedKeys.add(LAST_USE_KEY);
-    storage.put(hashToken(rawIdentifier), data, changedKeys);
-    cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
-    isDirty = false;
-  }
-  
-  /**
    * @return An XSRF token for this session.
    * @throws Exception
    */
@@ -394,6 +381,32 @@ public final class Session {
     
     return (String) data.get(XSRF_KEY);
   }
+
+  /**
+   * Saves the session, throwing an Exception on failure.
+   * If the session is not dirty, has no effect.
+   * @throws SessionException
+   * @throws InsecureCookieException 
+   */
+  public void save() throws SessionException {
+    if (!isLoaded) {
+      return;
+    }
+    
+    if (!isDirty && rawIdentifier != null) {
+      // No need to do a full save, but should ensure the session doesn't expire.
+      storage.keepAliveIfExists(hashToken(rawIdentifier));
+      return;
+    }
+    
+    data.put(LAST_USE_KEY, Time.now());
+    changedKeys.add(LAST_USE_KEY);
+    storage.put(hashToken(rawIdentifier), data, changedKeys);
+    cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+    logger.debug("Wrote session to storage: {}", rawIdentifier);
+    logger.debug("Session data was: {}", data);
+    isDirty = false;
+  }
   
   /**
    * Loads all data attached to this session.
@@ -407,27 +420,30 @@ public final class Session {
     if (rawIdentifier == null) {
       data = new TreeMap<>();
       rawIdentifier = generateSessionId();
-      isLoaded = true;
-      save();
-      return;
+      cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+      logger.debug("Created new session: {}", rawIdentifier);
+    } else {
+      data = storage.get(hashToken(rawIdentifier));
+      logger.debug("Loaded session from database: {}", rawIdentifier);
+      if (data == null) {
+        // No record found, create new record with new ID to prevent fixation attacks.
+        data = new TreeMap<>();
+        rawIdentifier = generateSessionId();
+        cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+        logger.debug("Session invalidated due to fixation attempt; regenerated as {}.", rawIdentifier);
+      } else if (Time.now() - ((Long) data.getOrDefault(LAST_USE_KEY, 0)) > inactivityTimeoutSeconds) {
+        // Session time-outs.
+        storage.invalidate(hashToken(rawIdentifier));
+        rawIdentifier = generateSessionId();
+        cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+        data = new TreeMap<>();
+        logger.debug("Session invalidated due to timeout; regenerated as {}.", rawIdentifier);
+      }
     }
     
-    data = storage.get(hashToken(rawIdentifier));
-    
-    if (data == null) {
-      // No record found, create new record with new ID to prevent fixation attacks.
-      data = new TreeMap<>();
-      rawIdentifier = generateSessionId();
-      isLoaded = true;
-      save();
-    } else if (Time.now() - ((Long) data.getOrDefault(LAST_USE_KEY, 0)) > inactivityTimeoutSeconds) {
-      // Session time-outs.
-      storage.invalidate(hashToken(rawIdentifier));
-      rawIdentifier = generateSessionId();
-      data = new TreeMap<>();
-      isLoaded = true;
-      save();
-    }
+    logger.debug("Data loaded was: {}", data);
+    isLoaded = true;
+    save();    
   }
   
   /**
@@ -437,8 +453,12 @@ public final class Session {
    */
   public void regenerateId() throws SessionException {
     lazyLoad();
+    logger.debug("Regenerating session: {}", rawIdentifier);
     storage.invalidate(hashToken(rawIdentifier));
     isDirty = true;
     rawIdentifier = generateSessionId();
+    cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+    logger.debug("Regenerated with new identifier: {}", rawIdentifier);
+    save();
   }
 }

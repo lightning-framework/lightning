@@ -12,7 +12,9 @@ import javax.servlet.ServletException;
 import lightning.auth.Auth;
 import lightning.auth.AuthException;
 import lightning.config.Config;
+import lightning.crypt.Hasher;
 import lightning.crypt.SecureCookieManager;
+import lightning.crypt.TokenSets;
 import lightning.db.MySQLDatabase;
 import lightning.enums.HTTPMethod;
 import lightning.exceptions.LightningException;
@@ -377,5 +379,13 @@ public class Context {
   
   public static final void halt() {
     context().halt();
+  }
+  
+  public static final Hasher hasher() {
+    return context().hasher();
+  }
+  
+  public static final TokenSets tokens() {
+    return context().tokens();
   }
 }

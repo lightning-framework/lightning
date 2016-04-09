@@ -187,7 +187,7 @@ public class LightningHandler extends AbstractHandler {
     Injector injector = null;
     InjectorModule requestModule = null;
         
-    try {      
+    try {            
       // Redirect insecure requests.
       if (config.ssl.isEnabled() && 
           config.ssl.redirectInsecureRequests &&
@@ -209,6 +209,10 @@ public class LightningHandler extends AbstractHandler {
       if (request.method() == HTTPMethod.GET && staticFileServer.couldConsume(_request)) {
         staticFileServer.handle(_request, _response);
         return;
+      }      
+
+      if (config.enableDebugMode) {
+        logger.info("INCOMING REQUEST ({}): {} {}", request.ip(), request.method(), request.path());
       }
       
       // Create context.
