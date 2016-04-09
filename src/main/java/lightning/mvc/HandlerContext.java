@@ -52,6 +52,8 @@ import lightning.users.Users.UsersException;
 import lightning.users.drivers.MySQLUserDriver;
 
 import org.eclipse.jetty.util.resource.Resource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
 import com.google.gson.FieldNamingPolicy;
@@ -66,6 +68,7 @@ import freemarker.template.Configuration;
  * allocated to service a single request and destroyed after a response to that request is sent.
  */
 public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
+  private static final Logger logger = LoggerFactory.getLogger(HandlerContext.class);
   public final Request request;
   public final Response response;
   public final Config config;
@@ -141,6 +144,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     // If the session was modified, save it.
     try {
       if (session != null && session.isDirty()) {
+        logger.debug("Saving Dirty Session");
         session.save();
       }
     } finally {
@@ -611,7 +615,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @throws Exception
    */
   public final void requireXsrf(String queryParamName) throws Exception {
-    if (!queryParam(queryParamName).isEqualTo(getSession().getXSRFToken())) {
+    if (!queryParam(queryParamName).stringValue().equals(session().getXSRFToken())) {
       throw new BadRequestException("An cross-site request forgery attack was detected and prevented.");
     }
   }

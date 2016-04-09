@@ -217,7 +217,7 @@ public final class Session {
     return isDirty;
   }
   
-  public Iterable<String> keys() throws SessionDriverException {
+  public Iterable<String> keys() throws SessionException {
     lazyLoad();
     return Iterables.filter(data.keySet(), (x) -> !x.startsWith(SESSION_KEY_PREFIX));
   }
@@ -240,17 +240,17 @@ public final class Session {
     data.put(key, value);
   }
   
-  public String getRawID() throws SessionDriverException {
+  public String getRawID() throws SessionException {
     lazyLoad();
     return rawIdentifier;
   }
   
-  public Map<String, Object> asMap() throws SessionDriverException {
+  public Map<String, Object> asMap() throws SessionException {
     lazyLoad();
     return ImmutableMap.copyOf(data);
   }
   
-  public Set<String> allKeys() throws SessionDriverException {
+  public Set<String> allKeys() throws SessionException {
     lazyLoad();
     return asMap().keySet();
   }
@@ -354,6 +354,7 @@ public final class Session {
       if (rawIdentifier != null) {
         storage.keepAliveIfExists(hashToken(rawIdentifier));
       }
+      cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
       return;
     }
     
@@ -396,9 +397,9 @@ public final class Session {
   
   /**
    * Loads all data attached to this session.
-   * @throws SessionDriverException On Failure.
+   * @throws SessionException 
    */
-  private void lazyLoad() throws SessionDriverException {
+  private void lazyLoad() throws SessionException {
     if (isLoaded) {
       return;
     }
@@ -407,6 +408,7 @@ public final class Session {
       data = new TreeMap<>();
       rawIdentifier = generateSessionId();
       isLoaded = true;
+      save();
       return;
     }
     
@@ -416,14 +418,16 @@ public final class Session {
       // No record found, create new record with new ID to prevent fixation attacks.
       data = new TreeMap<>();
       rawIdentifier = generateSessionId();
+      isLoaded = true;
+      save();
     } else if (Time.now() - ((Long) data.getOrDefault(LAST_USE_KEY, 0)) > inactivityTimeoutSeconds) {
       // Session time-outs.
       storage.invalidate(hashToken(rawIdentifier));
       rawIdentifier = generateSessionId();
       data = new TreeMap<>();
+      isLoaded = true;
+      save();
     }
-    
-    isLoaded = true;
   }
   
   /**

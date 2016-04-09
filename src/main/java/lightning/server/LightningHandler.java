@@ -278,10 +278,16 @@ public class LightningHandler extends AbstractHandler {
           Object controller = injector.newInstance(clazz);
           
           // Run initializers.
-          if (scanResult.initializers.containsKey(m.getDeclaringClass())) {
-            for (Method i : scanResult.initializers.get(m.getDeclaringClass())) {
-              i.invoke(controller, injector.getInjectedArguments(i));
+          Class<?> currentClass = m.getDeclaringClass();
+          
+          while (currentClass != null) {
+            if (scanResult.initializers.containsKey(currentClass)) {
+              for (Method i : scanResult.initializers.get(currentClass)) {
+                i.invoke(controller, injector.getInjectedArguments(i));
+              }
             }
+            
+            currentClass = currentClass.getSuperclass();
           }
           
           // Build invocation arguments.
@@ -354,6 +360,7 @@ public class LightningHandler extends AbstractHandler {
     } finally {
       try {
         if (ctx != null) {
+          logger.debug("Closing Context");
           ctx.closeIfNotAsync();
         }
       } catch (Exception e) {

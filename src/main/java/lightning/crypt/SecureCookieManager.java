@@ -11,6 +11,10 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.Cookie;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import lightning.enums.HTTPScheme;
 import lightning.http.Request;
 import lightning.http.Response;
 
@@ -37,6 +41,7 @@ import lightning.http.Response;
  * });
  */
 public class SecureCookieManager {
+  private static final Logger logger = LoggerFactory.getLogger(SecureCookieManager.class);
   private static final String HMAC_ALGORITHM = "HmacSHA256";
   private static final int LIFETIME_SECONDS = 60 * 60 * 24 * 14;
     
@@ -143,10 +148,12 @@ public class SecureCookieManager {
    * @param httpOnly
    */
   public void set(String name, String value, String path, int maxAgeSec, boolean httpOnly) {
+    boolean secure = alwaysSetSecureOnly || request.scheme() == HTTPScheme.HTTPS;
+    logger.debug("Setting Cookie: name={} path={} maxAge={} httpOnly={} secure={}", name, path, maxAgeSec, httpOnly, secure, value);
     Cookie cookie = new Cookie(name, value + sign(name + value, sharedSecretKey));
     cookie.setPath(path);
     cookie.setMaxAge(maxAgeSec);
-    cookie.setSecure(alwaysSetSecureOnly || request.scheme().equals("https"));
+    cookie.setSecure(secure);
     cookie.setHttpOnly(httpOnly);
     response.raw().addCookie(cookie);
   }

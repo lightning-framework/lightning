@@ -418,4 +418,9 @@ public class Param {
   public Object floatOr(Object other) {
     return floatOption().isPresent() ? floatOption().get() : other;
   }
+  
+  @Override
+  public String toString() {
+    return stringValue();
+  }
 }
