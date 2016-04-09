@@ -60,7 +60,7 @@ public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
     ComboPooledDataSource source = new ComboPooledDataSource();
     String url = String.format("jdbc:mysql://%s:%d/%s", config.db.host, config.db.port, config.db.name);
     
-    if (config.db.useSSL) {
+    if (config.db.useSsl) {
       url += "?verifyServerCertificate=true&useSSL=true&requireSSL=true";
     }
     

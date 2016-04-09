@@ -170,12 +170,12 @@ public class Config {
   public static final class MailConfig implements MailerConfig {
     @Override
     public String toString() {
-      return "MailConfig [useSSL=" + useSSL + ", address=" + address + ", username=" + username
+      return "MailConfig [useSSL=" + useSsl + ", address=" + address + ", username=" + username
           + ", password=" + password + ", host=" + host + ", port=" + port + "]";
     }
 
     // Whether or not to use SMTP over SSL.
-    public @Optional boolean useSSL = true;
+    public @Optional boolean useSsl = true;
     
     // Email address
     public @Optional String address;
@@ -208,7 +208,7 @@ public class Config {
     
     @Override
     public boolean useSSL() {
-      return useSSL;
+      return useSsl;
     }
     
     @Override
@@ -262,6 +262,6 @@ public class Config {
     public @Optional int unreturnedConnectionTimeoutS = 50000;
     public @Optional int idleConnectionTestPeriodS = 600;
     public @Optional int maxStatementsCached = 500;
-    public @Optional boolean useSSL = false; // Must have cert for server in your trust store.
+    public @Optional boolean useSsl = false; // Must have cert for server in your trust store.
   }
 }
