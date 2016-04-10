@@ -13,7 +13,8 @@ import java.lang.annotation.Target;
 @Inherited
 /**
  * Controller classes (annotated with @Controller) will have any methods
- * annotated with @Initializer invoked before receiving any traffic.
+ * annotated with @Initializer invoked before receiving any traffic. This
+ * includes methods on super classes.
  * 
  * Initializer methods are injectable (see @Route).
  */

@@ -26,6 +26,7 @@ import lightning.config.Config;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.debugscreen.DebugScreen;
+import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningException;
@@ -210,10 +211,6 @@ public class LightningHandler extends AbstractHandler {
         staticFileServer.handle(_request, _response);
         return;
       }      
-
-      if (config.enableDebugMode) {
-        logger.info("INCOMING REQUEST ({}): {} {}", request.ip(), request.method(), request.path());
-      }
       
       // Create context.
       ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer);
@@ -258,9 +255,19 @@ public class LightningHandler extends AbstractHandler {
           Method m = match.getData();
           
           if (m == null) {
+            // Null indicates a web socket handler is installed at this path.
+            // Set the request as not handled and return so that Jetty will invoke the next
+            // handler in the chain - the web socket handler.
             logger.debug("WebSocket Handler Detected, skip");
             baseRequest.setHandled(false);
+            if (config.enableDebugMode) {
+              logger.info("INCOMING REQUEST ({}): {} {} -> WEBSOCKET", request.ip(), request.method(), request.path());
+            }
             return;
+          }
+          
+          if (config.enableDebugMode) {
+            logger.info("INCOMING REQUEST ({}): {} {} -> {}", request.ip(), request.method(), request.path(), m);
           }
           
           // Perform pre-processing.          
@@ -306,7 +313,7 @@ public class LightningHandler extends AbstractHandler {
               throw e.getCause();
             throw e;
           }
-          
+                    
           // Perform post-processing.
           if (output == null) {} // Assume the handler returned void or null because it did its work.
           else if (m.getAnnotation(Json.class) != null) {
@@ -317,7 +324,7 @@ public class LightningHandler extends AbstractHandler {
             JsonFactory.newJsonParser(info.names()).toJson(output, response.raw().getWriter());
           } else if (m.getAnnotation(Template.class) != null) {
             if (output instanceof ModelAndView) {
-              renderUserTemplate(response, (ModelAndView) output);
+              ctx.render((ModelAndView) output);
             }
             
             Template info = m.getAnnotation(Template.class);
@@ -326,13 +333,17 @@ public class LightningHandler extends AbstractHandler {
               throw new LightningException("Unable to process output of handler: " + match.getData().toString());
             }
             
-            renderUserTemplate(response, new ModelAndView(info.value(), output));
+            ctx.render(new ModelAndView(info.value(), output));
           } else if (output instanceof String) {
+            if (response.raw().getHeader(HTTPHeader.CONTENT_TYPE.getHeaderName()) == null) {
+              response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
+            }
+            
             response.raw().getWriter().print(output);
           } else if (output instanceof File) {
             ctx.sendFile((File) output);
           } else if (output instanceof ModelAndView) {
-            renderUserTemplate(response, (ModelAndView) output);
+            ctx.render((ModelAndView) output);
           } else {
             throw new LightningException("Unable to process output of handler: " + match.getData().toString());
           }
@@ -342,6 +353,10 @@ public class LightningHandler extends AbstractHandler {
       }
       
       // Trigger a 404 page.
+      if (config.enableDebugMode) {
+        logger.info("INCOMING REQUEST ({}): {} {} -> NOT FOUND", request.ip(), request.method(), request.path());
+      }
+      
       throw new NotFoundException();
     } catch (Throwable e) {
       if (!ignoredExceptions.contains(e.getClass())) {
@@ -458,16 +473,8 @@ public class LightningHandler extends AbstractHandler {
     }
   }
   
-  protected void renderUserTemplate(Response response, ModelAndView modelAndView) throws Exception {
-    renderUserTemplate(response, modelAndView.viewName, modelAndView.viewModel);
-  }
-  
   protected void renderInternalTemplate(Response response, ModelAndView modelAndView) throws Exception {
     renderInternalTemplate(response, modelAndView.viewName, modelAndView.viewModel);
-  }
-  
-  protected void renderUserTemplate(Response response, String name, Object model) throws Exception {
-    renderTemplate(response, userTemplateConfig, name, model);
   }
   
   protected void renderInternalTemplate(Response response, String name, Object model) throws Exception {
@@ -475,6 +482,7 @@ public class LightningHandler extends AbstractHandler {
   }
   
   protected void renderTemplate(Response response, Configuration tplConfig, String name, Object model) throws Exception {
+    response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
     tplConfig.getTemplate(name).process(model, response.raw().getWriter());
   }
   

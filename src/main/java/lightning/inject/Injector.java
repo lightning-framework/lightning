@@ -14,7 +14,10 @@ import lightning.http.Request;
 import com.google.common.collect.ImmutableMap;
 
 /**
- * A simple dependency injector.
+ * A simple dependency injector that works at the method invocation level.
+ * 
+ * This is slightly different from libraries like Guice and Dagger (which tend to
+ * operate on constructors).
  * 
  * Injections can be triggered on method parameters either by...
  *  Type (automatically)

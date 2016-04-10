@@ -23,15 +23,26 @@ import java.util.Map;
 public final class NamedPreparedStatement implements AutoCloseable {
   /**
    * Returns a named prepared statement for the given connection and query.
-   * @param connection
+   * @param connection A database connection.
    * @param query A query using named parameters (e.g. SELECT * FROM users WHERE username = :username;)
-   * @return
-   * @throws SQLException
+   * @return A representation of the prepared statement.
+   * @throws SQLException On any error.
    */
   public static NamedPreparedStatement forQuery(Connection connection, String query) throws SQLException {
     return new NamedPreparedStatement(connection, query);
   }
   
+  /**
+   * @param connection A database connection.
+   * @param table The table that will be inserted to.
+   * @param data The data of the row to insert (a map of column names to values).
+   *             The prepared statement will be built from this map (e.g. {"id": 2, "name": "Bob"}
+   *             will become "INSERT INTO table (id, name) VALUES (:id, :name);" and automatically
+   *             set the parameters for :id and :name to the values provided in the map.
+   *             See setFromMap for documentation on what types of values are allowed.
+   * @return A representation of the prepared statement.
+   * @throws SQLException
+   */
   public static NamedPreparedStatement forInsert(Connection connection, String table, Map<String, ?> data) throws SQLException {
     if (data.isEmpty())
       throw new SQLException("No columns specified.");
@@ -41,6 +52,17 @@ public final class NamedPreparedStatement implements AutoCloseable {
     return statement;
   }
   
+  /**
+   * @param connection A database connection.
+   * @param table The table that will be inserted to.
+   * @param data The data of the row to insert (a map of column names to values).
+   *             The prepared statement will be built from this map (e.g. {"id": 2, "name": "Bob"}
+   *             will become "REPLACE INTO table (id, name) VALUES (:id, :name);" and automatically
+   *             set the parameters for :id and :name to the values provided in the map.
+   *             See setFromMap for documentation on what types of values are allowed.
+   * @return A representation of the prepared statement.
+   * @throws SQLException
+   */
   public static NamedPreparedStatement forReplace(Connection connection, String table, Map<String, ?> data) throws SQLException {
     if (data.isEmpty())
       throw new SQLException("No columns specified.");
@@ -105,7 +127,9 @@ public final class NamedPreparedStatement implements AutoCloseable {
   
   /**
    * Sets parameters from a map whose keys are column names and values are data values.
-   * @param data
+   * @param data A map of column names to associated values.
+   *             Accepted types: Long, Integer, String, Timestamp, Boolean, SQLNull, InputStream,
+   *             Double, Float, Date, Time, anything settable via PreparedStatement.setObject.
    * @throws SQLException 
    */
   public void setFromMap(Map<String, ?> data) throws SQLException {
@@ -242,7 +266,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
   }
 
   /**
-   * Sets a parameter.
+   * Sets a parameter (by invoking PreparedStatement.setObject under the hood).
    * @param name  parameter name
    * @param value parameter value
    * @throws SQLException if an error occurred
@@ -257,7 +281,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
   }
 
   /**
-   * Sets a parameter.
+   * Sets a parameter to a string value (by invoking PreparedStatement.setString under the hood).
    * @param name  parameter name
    * @param value parameter value
    * @throws SQLException if an error occurred
@@ -272,9 +296,11 @@ public final class NamedPreparedStatement implements AutoCloseable {
   }
   
   /**
-   * @param name Of the parameter.
-   * @param sqlType Use java.sql.Types
+   * Sets a parameter to a null value by invoking PreparedStatement.setNull under the hood.
+   * @param name Parameter name
+   * @param sqlType Use java.sql.Types.
    * @throws SQLException
+   * @see {@link PreparedStatement#setNull(int, int)}
    */
   public void setNull(String name, int sqlType) throws SQLException {
     int[] indexes = getIndexes(name);
@@ -283,6 +309,13 @@ public final class NamedPreparedStatement implements AutoCloseable {
     }
   }
   
+  /**
+   * Sets a parameter to a null value by invoking PreparedStatement.setNull under the hood.
+   * @param name Parameter name
+   * @param type SQL type
+   * @throws SQLException
+   * @see {@link PreparedStatement#setNull(int, int)}
+   */
   public void setNull(String name, SQLNull type) throws SQLException {
     setNull(name, type.getSqlType());
   }
@@ -456,7 +489,10 @@ public final class NamedPreparedStatement implements AutoCloseable {
   /**
    * Executes the statement, which must be an SQL INSERT statement;
    * Closes the statement and returns the inserted id.
-   * @return Inserted primary key.
+   * @return Inserted primary key (if any). Note that if your query does not
+   *         create any inserted primary keys, this function will throw an 
+   *         exception. If are not generating primary keys, use executeUpdate
+   *         instead.
    * @throws SQLException if an error occurred
    * @see PreparedStatement#executeUpdate()
    */
@@ -529,7 +565,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
   
   /**
    * @return Auto-generated ID of first row.
-   * @throws SQLException
+   * @throws SQLException On error or if no keys generated.
    */
   public long getInsertionId() throws SQLException {
     try (ResultSet result = getGeneratedKeys()) {

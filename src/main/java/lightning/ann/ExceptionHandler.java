@@ -25,6 +25,8 @@ import java.lang.annotation.Target;
  *  
  * Exception handler parameters are injectable (see @Route documentation).
  * In addition, the causing exception can be injected as a parameter.
+ * 
+ * A single method may be annotated with @ExceptionHandler multiple times.
  */
 public @interface ExceptionHandler {
   Class<? extends Throwable> value();

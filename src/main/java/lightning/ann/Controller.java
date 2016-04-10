@@ -20,5 +20,7 @@ import java.lang.annotation.Target;
  * 
  * Controllers must have a single public constructor.
  * Controller constructors are injectable (see @Route).
+ * 
+ * This annotation will be inherited by subclasses.
  */
 public @interface Controller {}

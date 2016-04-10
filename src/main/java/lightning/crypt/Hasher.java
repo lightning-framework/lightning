@@ -35,6 +35,7 @@ public class Hasher {
   
   /**
    * Hashes a token, returning an encoded string.
+   * Uses a modern, one-way hash function (such as sha256).
    * @param plaintextValue Raw authentication token
    * @return Hashed authentication token.
    */

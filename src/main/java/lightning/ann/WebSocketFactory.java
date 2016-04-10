@@ -17,9 +17,12 @@ import java.lang.annotation.Target;
  *   public static ExampleWebsocket produce(Config config, MySQLDatabaseProvider db) throws Exception {
  *     return new ExampleWebsocket(config, db);
  *   }
+ *   
+ * The websocket factory method is INJECTABLE (see @Route). In addition to all of the standard and
+ * user injected type, HttpServletUpgradeRequest and HttpServletUpgradeResponse are injectable.
  * 
  * The class of the returned object must be annotated with @WebSocket
- * and must contain methods annotated with:
+ * and must contain methods annotated with (see ExampleWebSocket):
  *   @OnWebSocketConnect 
  *   @OnWebSocketClose 
  *   @OnWebSocketMessage 

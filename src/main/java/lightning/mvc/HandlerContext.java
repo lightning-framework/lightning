@@ -26,6 +26,7 @@ import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProxy;
 import lightning.enums.CacheControl;
+import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningException;
@@ -791,6 +792,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @throws Exception
    */
   public final void render(ModelAndView modelAndView) throws Exception {
+    response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
     templateEngine.getTemplate(modelAndView.viewName).process(modelAndView.viewModel, response.raw().getWriter());
   }
   

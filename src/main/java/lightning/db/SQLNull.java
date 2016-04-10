@@ -2,6 +2,11 @@ package lightning.db;
 
 import java.sql.Types;
 
+/**
+ * SQL requires calls to setNull() to specify the type of the underlying data.
+ * Provides a convenient representation of NULLs in each of the MySQL types.
+ * May be passed to NamedPreparedStatement's setFromMap() to appropriately set null values.
+ */
 public enum SQLNull {
   ARRAY(Types.ARRAY),
   BIGINT(Types.BIGINT),

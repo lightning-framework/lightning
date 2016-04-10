@@ -13,7 +13,7 @@ import javax.annotation.Nullable;
 import com.google.common.base.Optional;
 
 /**
- * Adds macros for dealing with SQL NULL values in java.sql.ResultSet.
+ * Adds macros for dealing with SQL NULL values in java.sql.ResultSet (because wasNull() is horrible API design).
  */
 public class ResultSets {
   public static @Nullable Long getLong(ResultSet rs, String columnName) throws SQLException {

@@ -9,6 +9,15 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A utility class to help with paginating database queries.
+ * 
+ * Example:
+ *   dbp = new DatabasePaginator(db, "SELECT * FROM my_table;", ImmutableMap.of(), 50);
+ *   for (long j = 0; j < getTotalPages(); j+= 1) {
+ *      dbp.forRowsInPage(j, (row) -> {
+ *        doSomethingWith(row);
+ *      });
+ *   }
+ * 
  */
 public class DatabasePaginator {
   final static Logger logger = LoggerFactory.getLogger(DatabasePaginator.class);

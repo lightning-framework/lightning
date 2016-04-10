@@ -19,6 +19,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Represents an Email Sending System.
  * Wraps the JavaMail API to provide a better interface.
+ * 
+ * Usage:
+ * Message message = mailer().createMessage();
+ * ... mutate the message ...
+ * mailer().send(message);
  */
 public class Mailer {
   private static final Logger logger = LoggerFactory.getLogger(Mailer.class);

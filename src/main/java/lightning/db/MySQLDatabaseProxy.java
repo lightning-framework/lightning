@@ -6,6 +6,10 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Implements a proxy which delegates to another instance of MySQLDatabase.
+ * Calling close() on the proxy has no effect; must call reallyClose() instead.
+ */
 public class MySQLDatabaseProxy implements MySQLDatabase {
   private final MySQLDatabaseProvider provider;
   private MySQLDatabase delegate;

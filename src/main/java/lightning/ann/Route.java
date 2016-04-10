@@ -91,6 +91,7 @@ import lightning.enums.HTTPMethod;
  *   
  *   public void handle(@Inject("mydep") MyDep dep1, MyDep dep2, @MyDepAnn MyDep dep3)
  * 
+ * A single method may be annotated with @Route multiple times. 
  */
 public @interface Route {
   // The path to match (see above for details).

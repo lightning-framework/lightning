@@ -57,10 +57,14 @@ public class LightningServer {
         connector2.setHost(config.server.host);
         connector2.setPort(config.server.port);
         server.addConnector(connector2);    
+        logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
+        logger.info("Lightning Framework :: Insecure requests will be redirected to their HTTPS equivalents.");
       }
       
+      logger.info("Lightning Framework :: Binding to HTTPS @ {}:{}", config.server.host, config.ssl.port);
       connector = new ServerConnector(server, sslContextFactory);
     } else {
+      logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
       connector = new ServerConnector(server);
     }
     
@@ -94,15 +98,22 @@ public class LightningServer {
     globalModule.bindClassToInstance(Config.class, config);
     globalModule.bindClassToInstance(MySQLDatabaseProvider.class, dbp);
     
+    boolean hasWebSockets = false;
+    
     for (Class<?> clazz : result.websocketFactories.keySet()) {
       for (Method m : result.websocketFactories.get(clazz)) {
         WebSocketFactory info = m.getAnnotation(WebSocketFactory.class);
-        logger.debug("Installed WS Handler: {} -> {}", info.path(), m);
+        // TODO: Should verify path contains no wildcards, parameters.
+        logger.info("Lightning Framework :: Registered Web Socket @ {} -> {}", info.path(), m);
+        hasWebSockets = true;
         WebSocketCreator creator = new WebSocketCreator() {
           @Override
           public Object createWebSocket(ServletUpgradeRequest req, ServletUpgradeResponse res) {
             try {
-              return m.invoke(null, new Injector(globalModule, userModule).getInjectedArguments(m));
+              InjectorModule wsModule = new InjectorModule();
+              wsModule.bindClassToInstance(ServletUpgradeRequest.class, req);
+              wsModule.bindClassToInstance(ServletUpgradeResponse.class, res);
+              return m.invoke(null, new Injector(globalModule, userModule, wsModule).getInjectedArguments(m));
             } catch (Exception e) {
               logger.warn("Failed to create websocket:", e);
               return null;
@@ -110,6 +121,15 @@ public class LightningServer {
           }
         };
         websocketFilter.addMapping(new ServletPathSpec(info.path()), creator);
+      }
+    }
+    
+    if (config.enableDebugMode) {
+      logger.warn("Lightning Framework :: NOTICE: You are running this server in DEBUG MODE.");
+      logger.warn("Lightning Framework :: Please do not enable debug mode on production systems as it may leak internals.");
+      if (hasWebSockets) {
+        logger.warn("Lightning Framework :: NOTICE: Websocket handlers can not be automatically reloaded; you will need to "
+            + "restart the server to load websocket handler code changes.");
       }
     }
     
@@ -121,6 +141,7 @@ public class LightningServer {
   
   public void start() throws Exception {
     server.start();
+    logger.info("Lightning Framework :: Ready for requests!");
     server.join();
   }
   

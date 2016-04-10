@@ -12,6 +12,7 @@ import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPStatus;
 import lightning.util.Mimes;
 
+// TODO: Warn if trying to set HTTP header after content has been set.
 public class Response {
   private final HttpServletResponse response;
   protected SecureCookieManager cookies;
