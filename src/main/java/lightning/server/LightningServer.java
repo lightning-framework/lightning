@@ -1,6 +1,8 @@
 package lightning.server;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import lightning.ann.WebSocketFactory;
 import lightning.config.Config;
@@ -105,7 +107,9 @@ public class LightningServer {
   }
   
   private Server createServer(Config config) throws Exception {
-    Server server = new Server(new QueuedThreadPool(config.server.minThreads, config.server.maxThreads, config.server.threadTimeoutMs));
+    BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(config.server.maxQueuedRequests);
+    QueuedThreadPool pool = new QueuedThreadPool(config.server.minThreads, config.server.maxThreads, config.server.threadTimeoutMs, queue);
+    Server server = new Server(pool);
         
     if (config.ssl.isEnabled()) {
       if (config.ssl.redirectInsecureRequests) {
@@ -141,6 +145,8 @@ public class LightningServer {
       NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
       alpn = new ALPNServerConnectionFactory();
       alpn.setDefaultProtocol(http1.getProtocol());
+      // TODO: set jetty.http2.maxConcurrentStreams (default 1024)
+      // TODO: set jetty.http2.initialStreamSendWindow (default 65535)
     }
     
     final SslContextFactory ssl = makeSslFactory(config, config.server.enableHttp2 ? alpn.getProtocol() : null);
@@ -163,6 +169,8 @@ public class LightningServer {
     connector.setSoLingerTime(-1);
     connector.setHost(config.server.host);
     connector.setPort(port);
+    connector.setAcceptQueueSize(config.server.maxAcceptQueueSize);
+    
     server.addConnector(connector);
     
     return connector;
@@ -217,6 +225,7 @@ public class LightningServer {
     hc.setSendServerVersion(false);
     hc.setSendXPoweredBy(false);
     hc.setSendDateHeader(true);
+    hc.setPersistentConnectionsEnabled(config.server.enablePersistentConnections);
     return hc;
   }
 }

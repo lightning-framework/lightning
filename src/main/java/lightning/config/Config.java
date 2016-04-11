@@ -177,6 +177,15 @@ public class Config {
     // Whether or not to accept multipart requests.
     // If false, all multipart requests will be dropped.
     public @Optional boolean multipartEnabled = true;
+
+    // Maximum number of queued requests.
+    public @Optional int maxQueuedRequests = 10000;
+
+    // Maximum number of queued unaccepted connections.
+    public @Optional int maxAcceptQueueSize = 0;
+    
+    // Enable HTTP/1.1 persistent connections.
+    public @Optional boolean enablePersistentConnections = true;
     
     // NOTE: Want custom error pages (e.g. for 404 and 500 errors)? Install an @ExceptionHandler
     // for the exceptions in lightning.http.
