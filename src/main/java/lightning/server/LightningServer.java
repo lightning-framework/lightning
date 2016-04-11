@@ -10,9 +10,15 @@ import lightning.inject.InjectorModule;
 import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
 
+import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
+import org.eclipse.jetty.http2.HTTP2Cipher;
+import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
+import org.eclipse.jetty.http2.server.HTTP2ServerConnectionFactory;
 import org.eclipse.jetty.server.ConnectionFactory;
-import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.NegotiatingServerConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.HandlerCollection;
@@ -30,62 +36,9 @@ import org.slf4j.LoggerFactory;
 public class LightningServer {
   private static final Logger logger = LoggerFactory.getLogger(LightningServer.class);
   private Server server;
-  private ServerConnector connector;
     
   public void configure(Config config, MySQLDatabaseProvider dbp, InjectorModule userModule) throws Exception {
-    server = new Server(new QueuedThreadPool(config.server.minThreads, config.server.maxThreads, config.server.threadTimeoutMs));
-    
-    if (config.ssl.isEnabled()) {
-      SslContextFactory sslContextFactory = new SslContextFactory(config.ssl.keyStoreFile);
-
-      if (config.ssl.keyStorePassword != null) {
-          sslContextFactory.setKeyStorePassword(config.ssl.keyStorePassword);
-      }
-
-      if (config.ssl.trustStoreFile != null) {
-          sslContextFactory.setTrustStorePath(config.ssl.trustStoreFile);
-      }
-
-      if (config.ssl.trustStorePassword != null) {
-          sslContextFactory.setTrustStorePassword(config.ssl.trustStorePassword);
-      }
-      
-      if (config.ssl.redirectInsecureRequests) {
-        ServerConnector connector2 = new ServerConnector(server);
-        connector2.setIdleTimeout(config.server.connectionIdleTimeoutMs);
-        connector2.setSoLingerTime(-1);
-        connector2.setHost(config.server.host);
-        connector2.setPort(config.server.port);
-        server.addConnector(connector2);    
-        logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
-        logger.info("Lightning Framework :: Insecure requests will be redirected to their HTTPS equivalents.");
-      }
-      
-      logger.info("Lightning Framework :: Binding to HTTPS @ {}:{}", config.server.host, config.ssl.port);
-      connector = new ServerConnector(server, sslContextFactory);
-    } else {
-      logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
-      connector = new ServerConnector(server);
-    }
-    
-    connector.setIdleTimeout(config.server.connectionIdleTimeoutMs);
-    connector.setSoLingerTime(-1);
-    connector.setHost(config.server.host);
-    connector.setPort(config.ssl.isEnabled() ? config.ssl.port : config.server.port);
-    server.addConnector(connector);    
-    
-    // TODO(mschurr): Expose additional Jetty options if needed.
-    server.setAttribute("org.eclipse.jetty.server.Request.maxFormContentSize", config.server.maxPostBytes);
-    server.setAttribute("org.eclipse.jetty.server.Request.maxFormKeys", config.server.maxQueryParams);
-    
-    for(Connector y : server.getConnectors()) {
-      for(ConnectionFactory x  : y.getConnectionFactories()) {
-          if(x instanceof HttpConnectionFactory) {
-              ((HttpConnectionFactory)x).getHttpConfiguration().setSendServerVersion(false);
-              ((HttpConnectionFactory)x).getHttpConfiguration().setSendXPoweredBy(false);
-          }
-      }
-    }
+    server = createServer(config);
         
     ServletContextHandler websocketHandler = new ServletContextHandler(null, "/", false, false);
     WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
@@ -149,5 +102,117 @@ public class LightningServer {
     if (server != null) {
       server.stop();
     }
+  }
+  
+  private Server createServer(Config config) throws Exception {
+    Server server = new Server(new QueuedThreadPool(config.server.minThreads, config.server.maxThreads, config.server.threadTimeoutMs));
+        
+    if (config.ssl.isEnabled()) {
+      if (config.ssl.redirectInsecureRequests) {
+        makeConnector(config, server, config.server.port, false);
+        logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
+        logger.info("Lightning Framework :: Insecure requests will be redirected to their HTTPS equivalents.");
+      }
+      
+      logger.info("Lightning Framework :: Binding to HTTPS @ {}:{}", config.server.host, config.ssl.port);
+      makeConnector(config, server, config.ssl.port, true);
+    } else {
+      logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
+      makeConnector(config, server, config.server.port, false);
+    }
+    
+    // TODO(mschurr): Expose additional Jetty options if needed.
+    server.setAttribute("org.eclipse.jetty.server.Request.maxFormContentSize", config.server.maxPostBytes);
+    server.setAttribute("org.eclipse.jetty.server.Request.maxFormKeys", config.server.maxQueryParams);
+
+    return server;
+  }
+  
+  private ServerConnector makeConnector(Config config, Server server, int port, boolean isSSL) {
+    final HttpConfiguration httpConfig = isSSL ? makeHttpsConfig(config) : makeHttpConfig(config);
+    final HttpConnectionFactory http1 = new HttpConnectionFactory(httpConfig);
+    HTTP2ServerConnectionFactory http2 = null;
+    HTTP2CServerConnectionFactory http2c = null;
+    ALPNServerConnectionFactory alpn = null;
+    
+    if (config.server.enableHttp2) {
+      http2 = new HTTP2ServerConnectionFactory(httpConfig);
+      http2c = new HTTP2CServerConnectionFactory(httpConfig);
+      NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
+      alpn = new ALPNServerConnectionFactory();
+      alpn.setDefaultProtocol(http1.getProtocol());
+    }
+    
+    final SslContextFactory ssl = makeSslFactory(config, config.server.enableHttp2 ? alpn.getProtocol() : null);
+    
+    ConnectionFactory[] cfs = new ConnectionFactory[]{http1};
+    
+    if (config.server.enableHttp2) {
+      if (isSSL) {
+        cfs = new ConnectionFactory[]{alpn, http2, http1};
+      } else {
+        cfs = new ConnectionFactory[]{http1, http2c};
+      }
+    }
+    
+    ServerConnector connector = isSSL
+        ?  new ServerConnector(server, ssl, cfs)
+        :  new ServerConnector(server, cfs);
+        
+    connector.setIdleTimeout(config.server.connectionIdleTimeoutMs);
+    connector.setSoLingerTime(-1);
+    connector.setHost(config.server.host);
+    connector.setPort(port);
+    server.addConnector(connector);
+    
+    return connector;
+  }
+  
+  private SslContextFactory makeSslFactory(Config config, String protocol) {
+    if (!config.ssl.isEnabled()) {
+      return null;
+    }
+    
+    SslContextFactory ssl = new SslContextFactory(config.ssl.keyStoreFile);
+    
+    if (config.ssl.keyStorePassword != null) {
+      ssl.setKeyStorePassword(config.ssl.keyStorePassword);
+    }
+
+    if (config.ssl.trustStoreFile != null) {
+      ssl.setTrustStorePath(config.ssl.trustStoreFile);
+    }
+
+    if (config.ssl.trustStorePassword != null) {
+      ssl.setTrustStorePassword(config.ssl.trustStorePassword);
+    }
+    
+    if (config.ssl.keyManagerPassword != null) {
+      ssl.setKeyManagerPassword(config.ssl.keyManagerPassword);
+    }
+    
+    if (config.server.enableHttp2) {
+      ssl.setCipherComparator(HTTP2Cipher.COMPARATOR);
+      ssl.setUseCipherSuitesOrder(true);
+      //ssl.setProtocol(protocol);
+    }
+    
+    return ssl;
+  }
+  
+  private HttpConfiguration makeHttpsConfig(Config config) {
+    HttpConfiguration hc = makeHttpConfig(config);
+    hc.setSecurePort(config.ssl.port);
+    hc.setSecureScheme("https");
+    hc.addCustomizer(new SecureRequestCustomizer());
+    return hc;
+  }
+    
+  private HttpConfiguration makeHttpConfig(Config config) {
+    HttpConfiguration hc = new HttpConfiguration();
+    hc.setSendServerVersion(false);
+    hc.setSendXPoweredBy(false);
+    hc.setSendDateHeader(true);
+    return hc;
   }
 }

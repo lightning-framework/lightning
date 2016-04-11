@@ -8,7 +8,7 @@
   <title>${status} - ${status_text}</title>
   <meta name="viewport" content="width=device-width">
   <style type="text/css">
-    @import url(http://fonts.googleapis.com/css?family=Droid+Sans);
+    @import url(https://fonts.googleapis.com/css?family=Droid+Sans);
     article, aside, details, figcaption, figure, footer, header, hgroup, nav, section { display: block; }
     audio, canvas, video { display: inline-block; *display: inline; *zoom: 1; }
     audio:not([controls]) { display: none; }
