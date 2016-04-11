@@ -32,6 +32,7 @@ This framework was written for use in a course I taught at Rice University.
   - Powerful type-safe HTTP abstractions
   - Support for async request processing
   - Built-in support for websockets
+  - Built-in support for HTTP/2
 
 # Getting Started
 

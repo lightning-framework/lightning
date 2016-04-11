@@ -191,6 +191,10 @@ public class LightningServer {
       ssl.setKeyManagerPassword(config.ssl.keyManagerPassword);
     }
     
+    ssl.addExcludeProtocols("SSL", "SSLv2", "SSLv2Hello", "SSLv3");
+    ssl.setRenegotiationAllowed(false);
+    ssl.addExcludeCipherSuites(".*_RSA_.*SHA1$", ".*_RSA_.*SHA$", ".*_RSA_.*MD5$");
+    
     if (config.server.enableHttp2) {
       ssl.setCipherComparator(HTTP2Cipher.COMPARATOR);
       ssl.setUseCipherSuitesOrder(true);
