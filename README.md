@@ -33,10 +33,13 @@ This framework was written for use in a course I taught at Rice University.
   - Support for async request processing
   - Built-in support for websockets
   - Built-in support for HTTP/2
+  - Built-in support for argument injection
 
 # Getting Started
 
-1. Write a configuration file. See `lightning.config.Config` for options.
+1. Write a configuration file. See documentation of `lightning.config.Config` for a description of options.
+
+In particular, you must define `scan_prefixes` so that the framework knows where to look for routes, exception handlers, and web sockets.
 
 ```json
 {
@@ -50,8 +53,8 @@ This framework was written for use in a course I taught at Rice University.
     "server": {
         "port": 80,
         "hmac_key": "LONG_RANDOM_SOMETHING",
-        "static_files_path": "./",
-        "template_files_path": "./"
+        "static_files_path": "path/in/src/main/resources/",
+        "template_files_path": "path/in/src/main/resources/"
     },
     "db": {
         "host": "localhost",
@@ -72,11 +75,20 @@ If you do not wish to use JSON-formatted configuration files, you may skip the a
 ```java
 class MyApp {
   public static void main(String[] args) {
+    // Optional: To inject custom dependencies into your handlers, use an InjectorModule.
+    // See the documentation for InjectorModule for more information.
+    InjectorModule injector = new InjectorModule();
+    injector.bindClassToInstance(MyDependency.class, new MyDependency());
+    injector.bindNameToInstance("my_string", "Hello!");
+    injector.bindAnnotationToInstance(MyDepAnn.class, "Hello!");
+
     // args[0] contains the path to your config file.
-    Lightning.launch(new File(args[0]));
+    Lightning.launch(new File(args[0]), injector);
   }
 }
 ```
+
+To start the webserver, you can run the launcher you just created. If you are using debug mode, you will want to set the working directory to the root of your project folder (the folder that contains `./src`) so that classes, templates, and files can be automatically reloaded from disk.
 
 3. Define your controllers (within the packages defined in `scan_prefixes` or any subpackage thereof).
 
@@ -91,6 +103,7 @@ import lightning.ann.*;
 class MyController {
   @Route(path="/u/:username", methods={GET})
   @Template("profile.ftl")
+  // Inject the value of the route parameter "username".
   public Map<String, ?> handleProfilePage(@RParam("username") String username) throws Exception {
     return ImmutableMap.of(); // Return the template view model.
   }
@@ -116,6 +129,18 @@ class MyController {
     }
 
     return message; // Will get JSONified.
+  }
+
+  @Initializer
+  // All routes, exception handlers, web socket factories, and initializers are INJECTABLE.
+  // This means the framework will automatically figure out the arguments to fill in to the function
+  // based upon their types and annotations. For example, to inject the three dependencies you
+  // defined in the launcher:
+  public void initialize(MyDependency myDep, @MyDepAnn String myDep2, @Inject("my_string") String myDep3) {
+    // Called automatically when the controller is instantied but before invoking any routes.
+    // In addition to the dependencies you defined in the launcher, the framework can be used to automatically
+    // inject other things: Request, Response, Config, MySQLDatabase, etc.
+    // Note that most of these things are also provided via static methods on lightning.server.Context.
   }
 }
 ```
@@ -173,4 +198,12 @@ You can override the default error pages (e.g. for 404 not found) by installing 
 In debug mode, whenever a request handler throws an Error or Exception you will see a detailed stack trace in your browser (in addition to the console):
 
 ![Debug Page](https://cloud.githubusercontent.com/assets/3498024/14005744/3fa323ba-f134-11e5-9f72-00da49a46ab7.png "Debug Page")
+
+# Examples
+
+The following applications are built using Lightning:
+
+* [Rice Schedule Planner](https://github.com/rice-apps/scheduleplanner)
+* [Tiny URL Demo](https://github.com/mschurr/coll144-assignment6/tree/master/src/main/java/demos/tinyurl)
+* [File Share Demo](https://github.com/mschurr/coll144-assignment6/tree/master/src/main/java/demos/fileshare)
 
