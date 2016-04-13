@@ -16,15 +16,14 @@
  */
 package lightning.routing;
 
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ExceptionMapper {
+public class ExceptionMapper<T> {
     /**
      * Holds a map of Exception classes and associated handlers
      */
-    private Map<Class<? extends Throwable>, Method> exceptionMap;
+    private Map<Class<? extends Throwable>, T> exceptionMap;
 
     /**
      * Class constructor
@@ -40,12 +39,12 @@ public class ExceptionMapper {
      * @param exceptionClass Type of exception
      * @param handler        Handler to map to exception
      */
-    public void map(Class<? extends Throwable> exceptionClass, Method handler) {
+    public void map(Class<? extends Throwable> exceptionClass, T handler) {
         this.exceptionMap.put(exceptionClass, handler);
     }
     
     public boolean has(Class<? extends Throwable> exceptionClass) {
-      return this.exceptionMap.containsKey(exceptionClass);
+      return getHandler(exceptionClass) != null;
     }
     
     public void clear() {
@@ -58,7 +57,7 @@ public class ExceptionMapper {
      * @param exceptionClass Type of exception
      * @return Associated handler
      */
-    public Method getHandler(Class<? extends Throwable> exceptionClass) {
+    public T getHandler(Class<? extends Throwable> exceptionClass) {
         // If the exception map does not contain the provided exception class, it might
         // still be that a superclass of the exception class is.
         if (!this.exceptionMap.containsKey(exceptionClass)) {
@@ -69,7 +68,7 @@ public class ExceptionMapper {
                 if (this.exceptionMap.containsKey(superclass)) {
                     // Use the handler for the mapped superclass, and cache handler
                     // for this exception class
-                    Method handler = this.exceptionMap.get(superclass);
+                    T handler = this.exceptionMap.get(superclass);
                     this.exceptionMap.put(exceptionClass, handler);
                     return handler;
                 }
@@ -79,7 +78,7 @@ public class ExceptionMapper {
             } while (superclass != null);
 
             // No handler found either for the superclasses of the exception class
-            // We cache the null value to prevent future
+            // We cache the null value to prevent future look expense
             this.exceptionMap.put(exceptionClass, null);
             return null;
         }
@@ -94,7 +93,7 @@ public class ExceptionMapper {
      * @param exception Exception that occurred
      * @return Associated handler
      */
-    public Method getHandler(Throwable exception) {
-        return this.getHandler(exception.getClass());
+    public T getHandler(Throwable exception) {
+        return getHandler(exception.getClass());
     }
 }

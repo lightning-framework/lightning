@@ -89,7 +89,7 @@ public class LightningHandler extends AbstractHandler {
   private MySQLDatabaseProvider dbp;
   private Configuration userTemplateConfig;
   private Configuration internalTemplateConfig;
-  private ExceptionMapper exceptionHandlers;
+  private ExceptionMapper<Method> exceptionHandlers;
   private Scanner scanner;
   private ResourceFactory staticFileResourceFactory;
   private ScanResult scanResult;
@@ -129,7 +129,7 @@ public class LightningHandler extends AbstractHandler {
         TemplateExceptionHandler.HTML_DEBUG_HANDLER :
         TemplateExceptionHandler.RETHROW_HANDLER);    
     
-    this.exceptionHandlers = new ExceptionMapper();
+    this.exceptionHandlers = new ExceptionMapper<>();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
     this.staticFileResourceFactory = config.enableDebugMode
         ? new ResourceCollection(getResourcePaths())

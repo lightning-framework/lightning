@@ -11,5 +11,5 @@ import java.util.List;
  * @see com.augustl.pathtravelagent.DefaultPathToPathSegments#parse(String)
  */
 public interface IRequest {
-    public List<String> getPathSegments();
+    public List<String> getPathSegments() throws PathFormatException;
 }

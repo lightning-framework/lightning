@@ -21,6 +21,7 @@ import com.augustl.pathtravelagent.DefaultRouteMatcher;
 import com.augustl.pathtravelagent.IRequest;
 import com.augustl.pathtravelagent.IRouteHandler;
 import com.augustl.pathtravelagent.ParametricChild;
+import com.augustl.pathtravelagent.PathFormatException;
 import com.augustl.pathtravelagent.RouteMatch;
 import com.augustl.pathtravelagent.RouteTreeNode;
 import com.augustl.pathtravelagent.segment.IParametricSegment;
@@ -40,9 +41,11 @@ public class RouteMapper<T> {
   
   static final class RouteRequest implements IRequest {
     private final Request request;
+    private final List<String> segments;
     
-    public RouteRequest(Request request) {
+    public RouteRequest(Request request) throws PathFormatException {
       this.request = request;
+      this.segments = DefaultPathToPathSegments.parse(request.path());
     }
     
     public Request getRequest() {
@@ -51,7 +54,7 @@ public class RouteMapper<T> {
     
     @Override
     public List<String> getPathSegments() {
-      return DefaultPathToPathSegments.parse(request.raw().getPathInfo());
+      return segments;
     }
   }
   
@@ -81,6 +84,10 @@ public class RouteMapper<T> {
     public List<String> getWildcards() {
       return wildcards;
     }
+    
+    public String toString() {
+      return String.format("Match<>{data=%s, params=%s, wildcards=%s}", data, params, wildcards);
+    }
   }
   
   static final class RouteMatchHandler<T> implements IRouteHandler<RouteRequest, Match<T>> {
@@ -89,7 +96,7 @@ public class RouteMapper<T> {
     
     public RouteMatchHandler(PendingRoute<T> route) {
       this.route = route;
-      this.routePath = DefaultPathToPathSegments.parse(route.path);
+      this.routePath = route.segments;
     }
     
     @Override
@@ -127,11 +134,13 @@ public class RouteMapper<T> {
     public final HTTPMethod method;
     public final String path;
     public final T action;
+    public final List<String> segments;
     
-    public PendingRoute(HTTPMethod method, String path, T action) {
+    public PendingRoute(HTTPMethod method, String path, T action) throws PathFormatException {
       this.method = method;
       this.path = path;
       this.action = action;
+      this.segments = DefaultPathToPathSegments.parse(path);
     }
   }
   
@@ -247,7 +256,7 @@ public class RouteMapper<T> {
    * @param path A routing path (e.g. /path/:variable/*).
    * @param action An object to be returned when this route is matched.
    */
-  public void map(HTTPMethod method, String path, T action) {
+  public synchronized void map(HTTPMethod method, String path, T action) throws PathFormatException {
     if (!pending.containsKey(method)) {
       pending.put(method, new ArrayList<>());
     }
@@ -258,7 +267,7 @@ public class RouteMapper<T> {
   /**
    * Clears all existing routes.
    */
-  public void clear() {
+  public synchronized void clear() {
     pending.clear();
     routes.clear();
   }
@@ -273,7 +282,11 @@ public class RouteMapper<T> {
       return null; 
     }
     
-    return matcher.match(routes.get(request.method()), new RouteRequest(request));
+    try {
+      return matcher.match(routes.get(request.method()), new RouteRequest(request));
+    } catch (PathFormatException e) {
+      return null;
+    }
   }
     
   /**
@@ -284,7 +297,7 @@ public class RouteMapper<T> {
    * @param action The action to 
    * @throws RouteFormatException
    */
-  private void buildTree(PendingRoute<T> route, RouteTreeNodeBuilder<RouteRequest, Match<T>> node, Iterator<String> components) throws RouteFormatException {
+  private synchronized void buildTree(PendingRoute<T> route, RouteTreeNodeBuilder<RouteRequest, Match<T>> node, Iterator<String> components) throws RouteFormatException {
     if (!components.hasNext()) {
       node.handler(new RouteMatchHandler<T>(route));
       return;
@@ -314,7 +327,7 @@ public class RouteMapper<T> {
    * Must re-compile the radix tree each time routes are modified.
    * @throws RouteFormatException
    */
-  public void compile() throws RouteFormatException {
+  public synchronized void compile() throws RouteFormatException {
     routes.clear();
     
     for (HTTPMethod method : pending.keySet()) {
@@ -322,11 +335,11 @@ public class RouteMapper<T> {
       
       for (PendingRoute<T> route : pending.get(method)) {
         logger.debug("Installing Route: {} {} -> {}", route.method, route.path, route.action);
-        List<String> components = DefaultPathToPathSegments.parse(route.path);
         
         try {
+          List<String> components = DefaultPathToPathSegments.parse(route.path);
           buildTree(route, root, components.iterator());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | PathFormatException e) {
           routes.clear();
           throw new RouteFormatException("Routing path " + method + " " + route.path + " contains illegal characters.");
         } catch (IllegalStateException e) {

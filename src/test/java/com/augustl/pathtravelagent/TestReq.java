@@ -21,7 +21,7 @@ class TestReq implements IRequest {
     }
 
     @Override
-    public List<String> getPathSegments() {
+    public List<String> getPathSegments() throws PathFormatException {
         return DefaultPathToPathSegments.parse(this.path);
     }
 }

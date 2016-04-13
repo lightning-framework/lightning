@@ -61,10 +61,14 @@ public class DefaultRouteMatcher<T_REQ extends IRequest, T_RES> {
   }
 
   public T_RES match(final RouteTreeNode<T_REQ, T_RES> rootNode, T_REQ req) {
-    return match(rootNode, req, new RouteMatchResult(), req.getPathSegments(), 0);
+    try {
+      return match(rootNode, req, new RouteMatchResult(), req.getPathSegments(), 0);
+    } catch (PathFormatException e) {
+      return null;
+    }
   }
 
-  public T_RES matchOld(final RouteTreeNode<T_REQ, T_RES> rootNode, T_REQ req) {
+  public T_RES matchOld(final RouteTreeNode<T_REQ, T_RES> rootNode, T_REQ req) throws PathFormatException {
     List<String> pathSegments = req.getPathSegments();
     RouteTreeNode<T_REQ, T_RES> targetNode = rootNode;
     RouteMatchResult routeMatchResult = new RouteMatchResult();

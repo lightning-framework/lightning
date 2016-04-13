@@ -52,7 +52,7 @@ public class RouteMatchResult {
     }
     
     public Iterable<String> getStringMatchesInOrder() {
-      return this.getStringMatches().keySet();
+      return stringMatches.keySet();
     }
 
     public List<String> getWildcardMatches() {

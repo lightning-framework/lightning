@@ -10,7 +10,11 @@ import java.util.List;
 public class DefaultPathToPathSegments {
     private static final List<String> EMPTY_PATH_SEGMENTS = new ArrayList<String>();
 
-    public static List<String> parse(String path) {
+    public static List<String> parse(String path) throws PathFormatException {
+        if (path.contains("//")) {
+          throw new PathFormatException();
+        }
+      
         String[] pathSegmentsAry = extractPath(path).split("/");
         if (pathSegmentsAry.length == 0) {
             return EMPTY_PATH_SEGMENTS;
@@ -19,7 +23,7 @@ public class DefaultPathToPathSegments {
         }
     }
 
-    public static String extractPath(String path) {
+    public static String extractPath(String path) throws PathFormatException {
         String[] aroundQueryParams = path.split("\\?", 2);
         if (aroundQueryParams.length == 0) {
             return path;

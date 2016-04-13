@@ -16,7 +16,7 @@ public class HttpExampleTest {
 
     @SuppressWarnings("serial")
     @Test
-    public void testVerbMatching() {
+    public void testVerbMatching() throws PathFormatException {
         RouteTreeNode<HttpReq, HttpRes> r = rf.builder()
             .path("/projects", rf.builder()
                 .handler(new HttpHandler(new HashMap<String, HttpLambda>() {{
@@ -63,7 +63,7 @@ public class HttpExampleTest {
         private final String httpMethod;
         private final List<String> pathSegments;
 
-        public HttpReq(String httpMethod, String path) {
+        public HttpReq(String httpMethod, String path) throws PathFormatException {
             this.httpMethod = httpMethod;
             this.pathSegments = DefaultPathToPathSegments.parse(path);
         }

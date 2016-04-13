@@ -519,11 +519,11 @@ public class PathTravelAgentTest {
     }
 
     @Test
-    public void handlerMerging() {
+    public void handlerMerging() throws PathFormatException {
         class MethodReq implements IRequest {
             private final String method;
             private final List<String> pathSegments;
-            public MethodReq(String method, String path) {
+            public MethodReq(String method, String path) throws PathFormatException {
                 this.method = method;
                 this.pathSegments = DefaultPathToPathSegments.parse(path);
             }
