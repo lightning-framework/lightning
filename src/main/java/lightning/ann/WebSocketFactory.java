@@ -29,11 +29,16 @@ import java.lang.annotation.Target;
  *   @OnWebSocketError
  *   
  * This is consistent with the Jetty websocket API.
- * Note that websockets are SINGLETONS. That is, a single instance of your
- * class will be allocated to handle multiple incoming connections.
- * Note that websockets will not be reloaded when debug mode is enabled
- * due to limitations in Jetty (you'll need to restart the server to see
- * changes reflected).
+ * 
+ * By default, web sockets are not singletons. That is, your factory will be invoked
+ * to create a new instance for each incoming websocket connection. If you wish to use
+ * a singleton, your factory may simply return the same instance at each invocation.
+ * 
+ * Note that websockets will not be reloaded when debug mode is enabled due to limitations 
+ * in Jetty (you'll need to restart the server to see changes reflected). However, if you
+ * are clever in the implementation of your factory, you can use custom classloading to
+ * make sure that the socket's code is reloaded for each new incoming connection (probably
+ * only in debug mode).
  * 
  * For an example:
  * @see lightning.examples.websockets.ExampleWebsocket

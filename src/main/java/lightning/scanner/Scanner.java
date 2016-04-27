@@ -10,6 +10,7 @@ import java.util.Set;
 
 import lightning.ann.Controller;
 import lightning.ann.ExceptionHandler;
+import lightning.ann.Finalizer;
 import lightning.ann.Initializer;
 import lightning.ann.Route;
 import lightning.ann.Routes;
@@ -61,6 +62,7 @@ public class Scanner {
   public ScanResult scan() {
     Set<Class<?>> controllers = new HashSet<>();
     Map<Class<?>, Set<Method>> initializers = new HashMap<>();
+    Map<Class<?>, Set<Method>> finalizers = new HashMap<>();
     Map<Class<?>, Set<Method>> exceptionHandlers = new HashMap<>();
     Map<Class<?>, Set<Method>> routes = new HashMap<>();
     Map<Class<?>, Set<Method>> websocketFactories = new HashMap<>();
@@ -81,6 +83,21 @@ public class Scanner {
           logger.error(
                 "ERROR: Could not install @Initializer for {}. "
               + "Initializers must be public, concrete, non-static, and declared inside of an @Controller.", m);
+        }
+      }
+      
+      for (Method m : scanner.getMethodsAnnotatedWith(Finalizer.class)) {
+        // TODO: check returns void, can inject
+        if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
+            !Modifier.isStatic(m.getModifiers()) &&
+            !Modifier.isAbstract(m.getModifiers()) &&
+            Modifier.isPublic(m.getModifiers())) {
+          controllers.add(m.getDeclaringClass());
+          putMethod(finalizers, m);
+        } else {
+          logger.error(
+                "ERROR: Could not install @Finalizer for {}. "
+              + "Finalizers must be public, concrete, non-static, and declared inside of an @Controller.", m);
         }
       }
       
@@ -126,7 +143,7 @@ public class Scanner {
       }
     }
     
-    return new ScanResult(controllers, initializers, exceptionHandlers, routes, websocketFactories);
+    return new ScanResult(controllers, initializers, exceptionHandlers, routes, websocketFactories, finalizers);
   }
   
   private Reflections[] reflections(ClassLoader classLoader) {

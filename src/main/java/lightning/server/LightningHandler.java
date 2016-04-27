@@ -250,9 +250,11 @@ public class LightningHandler extends AbstractHandler {
         request.setWildcards(match.getWildcards());
         request.setParams(match.getParams());
         
+        Object controller = null;
+        Method m = match.getData();
+        
         try {
           // TODO: Not sure how bad the performance is going to be with reflection here.
-          Method m = match.getData();
           
           if (m == null) {
             // Null indicates a web socket handler is installed at this path.
@@ -286,7 +288,7 @@ public class LightningHandler extends AbstractHandler {
           
           // Instantiate the controller.
           Class<?> clazz = m.getDeclaringClass();          
-          Object controller = injector.newInstance(clazz);
+          controller = injector.newInstance(clazz);
           
           // Run initializers.
           Class<?> currentClass = m.getDeclaringClass();
@@ -347,7 +349,28 @@ public class LightningHandler extends AbstractHandler {
           } else {
             throw new LightningException("Unable to process output of handler: " + match.getData().toString());
           }
-        } catch (HaltException e) {} // Halt exception just says to jump to here.
+        } catch (HaltException e) {
+          // Halt exception just says to jump to here.
+        } finally {
+          // Run any finalizers.
+          if (m != null && controller != null) {
+            Class<?> currentClass = m.getDeclaringClass();
+            
+            while (currentClass != null) {
+              if (scanResult.finalizers.containsKey(currentClass)) {
+                for (Method i : scanResult.finalizers.get(currentClass)) {
+                  try {
+                    i.invoke(controller, injector.getInjectedArguments(i));
+                  } catch (Throwable e) {
+                    logger.error("An error occured executing a finalizer {}: {}", i, e);
+                  }
+                }
+              }
+              
+              currentClass = currentClass.getSuperclass();
+            }
+          }
+        }
         
         return;
       }

@@ -11,6 +11,9 @@ public class ScanResult {
   // Methods in @Controllers annotated with @Initialize:
   public final Map<Class<?>, Set<Method>> initializers;
   
+//Methods in @Controllers annotated with @Finalize:
+ public final Map<Class<?>, Set<Method>> finalizers;
+  
   // Static methods annotated with @ExceptionHandler:
   public final Map<Class<?>, Set<Method>> exceptionHandlers;
   
@@ -25,18 +28,20 @@ public class ScanResult {
       Map<Class<?>, Set<Method>> initializers,
       Map<Class<?>, Set<Method>> exceptionHandlers,
       Map<Class<?>, Set<Method>> routes,
-      Map<Class<?>, Set<Method>> websocketFactories) {
+      Map<Class<?>, Set<Method>> websocketFactories,
+      Map<Class<?>, Set<Method>> finalizers) {
     this.controllers = controllers;
     this.initializers = initializers;
     this.exceptionHandlers = exceptionHandlers;
     this.routes = routes;
     this.websocketFactories = websocketFactories;
+    this.finalizers = finalizers;
   }
   
   @Override
   public String toString() {
     return "ScanResult [controllers=" + controllers + ", initializers=" + initializers
         + ", exceptionHandlers=" + exceptionHandlers + ", routes=" + routes
-        + ", websocketFactories=" + websocketFactories + "]";
+        + ", websocketFactories=" + websocketFactories + ", finalizers=" + finalizers + "]";
   }
 }

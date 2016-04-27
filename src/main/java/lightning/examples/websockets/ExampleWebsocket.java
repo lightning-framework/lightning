@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.collect.ImmutableList;
 
 /**
- * A web socket is a singleton class which handles incoming requests statelessly through
+ * A web socket is a class which handles incoming requests through
  * event handlers.
  */
 @WebSocket
@@ -39,7 +39,7 @@ public class ExampleWebsocket {
     Lightning.launch(config);
   }
   
-  // Returns the singleton instance of the web socket.
+  // Returns an instance of the web socket for the incoming connection.
   // This method is injectable - see the documentation for @WebSocketFactory.
   @WebSocketFactory(path = "/mywebsocket")
   public static ExampleWebsocket produce() {
