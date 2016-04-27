@@ -94,4 +94,23 @@ public class ResultSets {
     
     return data;
   }
+
+  /**
+   * Converts the row the cursor is currently pointing to into a map of column names to 
+   * their associated values and reutnrs it.
+   * @param result
+   * @return
+   * @throws SQLException
+   */
+  public static Map<String, Object> toMap(ResultSet result) throws SQLException {
+    ResultSetMetaData md = result.getMetaData();
+    int ncols = md.getColumnCount();
+    Map<String, Object> record = new HashMap<>(ncols);
+    
+    for (int i = 1; i <= ncols; i++) {
+      record.put(md.getColumnName(i), result.getObject(i));
+    }
+    
+    return record;
+  }
 }

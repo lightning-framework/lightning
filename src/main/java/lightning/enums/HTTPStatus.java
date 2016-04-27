@@ -21,6 +21,7 @@ public enum HTTPStatus {
   INTERNAL_SERVER_ERROR(500),
   NOT_IMPLEMENTED(501),
   OK(200),
+  NOT_MODIFIED(304),
   FOUND(302);
   
   private final int code;
