@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 
 import lightning.config.Config;
+import lightning.config.Config.DBConfig;
 
 import com.mchange.v2.c3p0.ComboPooledDataSource;
 
@@ -32,11 +33,15 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
  */
 public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
   private DataSource source;
-  private final Config config;
+  private final DBConfig config;
   
-  public MySQLDatabaseProviderImpl(Config config) throws SQLException, PropertyVetoException {
+  public MySQLDatabaseProviderImpl(DBConfig config) throws SQLException, PropertyVetoException {
     this.config = config;
     initializeSource();
+  }
+  
+  public MySQLDatabaseProviderImpl(Config config) throws SQLException, PropertyVetoException {
+    this(config.db);
   }
   
   /**
@@ -58,52 +63,52 @@ public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
   private void initializeSource() throws SQLException, PropertyVetoException {    
     // See http://www.mchange.com/projects/c3p0/
     ComboPooledDataSource source = new ComboPooledDataSource();
-    String url = String.format("jdbc:mysql://%s:%d/%s", config.db.host, config.db.port, config.db.name);
+    String url = String.format("jdbc:mysql://%s:%d/%s", config.host, config.port, config.name);
     
-    if (config.db.useSsl) {
+    if (config.useSsl) {
       url += "?verifyServerCertificate=true&useSSL=true&requireSSL=true";
     }
     
     source.setJdbcUrl(url);
     source.setDriverClass("com.mysql.jdbc.Driver");
-    source.setUser(config.db.username);
-    source.setPassword(config.db.password);
-    source.setMinPoolSize(config.db.minPoolSize);
-    source.setMaxPoolSize(config.db.maxPoolSize);
-    source.setAcquireIncrement(config.db.acquireIncrement);
-    source.setMaxStatements(config.db.maxStatementsCached); // To be cached.
-    source.setAcquireRetryAttempts(config.db.acquireRetryAttempts);
-    source.setAcquireRetryDelay(config.db.acquireRetryDelayMs); // milliseconds
-    source.setAutoCommitOnClose(config.db.autoCommitOnClose);
+    source.setUser(config.username);
+    source.setPassword(config.password);
+    source.setMinPoolSize(config.minPoolSize);
+    source.setMaxPoolSize(config.maxPoolSize);
+    source.setAcquireIncrement(config.acquireIncrement);
+    source.setMaxStatements(config.maxStatementsCached); // To be cached.
+    source.setAcquireRetryAttempts(config.acquireRetryAttempts);
+    source.setAcquireRetryDelay(config.acquireRetryDelayMs); // milliseconds
+    source.setAutoCommitOnClose(config.autoCommitOnClose);
     source.setDebugUnreturnedConnectionStackTraces(true);
-    source.setMaxConnectionAge(config.db.maxConnectionAgeS); // seconds
-    source.setMaxIdleTime(config.db.maxIdleTimeS); // seconds
-    source.setInitialPoolSize(config.db.minPoolSize);
-    source.setMaxIdleTimeExcessConnections(config.db.maxIdleTimeExcessConnectionsS); // seconds
-    source.setUnreturnedConnectionTimeout(config.db.unreturnedConnectionTimeoutS); // seconds
+    source.setMaxConnectionAge(config.maxConnectionAgeS); // seconds
+    source.setMaxIdleTime(config.maxIdleTimeS); // seconds
+    source.setInitialPoolSize(config.minPoolSize);
+    source.setMaxIdleTimeExcessConnections(config.maxIdleTimeExcessConnectionsS); // seconds
+    source.setUnreturnedConnectionTimeout(config.unreturnedConnectionTimeoutS); // seconds
     source.setTestConnectionOnCheckin(false);
     source.setTestConnectionOnCheckout(false); // Note: expensive if true
-    source.setIdleConnectionTestPeriod(config.db.idleConnectionTestPeriodS); // seconds
+    source.setIdleConnectionTestPeriod(config.idleConnectionTestPeriodS); // seconds
     this.source = source;
   }
   
   public String getHostName() {
-    return config.db.host;
+    return config.host;
   }
   
   public String getPassword() {
-    return config.db.password;
+    return config.password;
   }
   
   public String getUser() {
-    return config.db.username;
+    return config.username;
   }
   
   public int getPort() {
-    return config.db.port;
+    return config.port;
   }
   
   public String getDatabaseName() {
-    return config.db.name;
+    return config.name;
   }
 }

@@ -43,7 +43,7 @@ public class LightningInstance {
     config = cfg;
     Log.setLog(null);    
     
-    dbp = new MySQLDatabaseProviderImpl(config);
+    dbp = new MySQLDatabaseProviderImpl(config.db);
         
     server = new LightningServer();
     server.configure(config, dbp, injector);
