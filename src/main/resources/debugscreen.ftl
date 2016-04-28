@@ -34,7 +34,7 @@
                         <#list name as namePart><span>${namePart}</span></#list>
                     </div>
                     <p class="exc-message">
-                        <#if message == "">No Exception Message<#else>${message}</#if>
+                        <#if message == "">No Exception Message<#else>${short_message}</#if>
                     </p>
                 </div>
             </header>
@@ -89,6 +89,14 @@
             </div>
             <div class="details">
                 <div class="data-table-container" id="data-tables">
+                    <!-- Print Long Stack Trace -->
+                    <#if message?length != short_message?length>
+                        <div class="data-table">
+                            <h3>Detailed Message</h3>
+                            <pre style="white-space: pre-wrap;">${full_trace}</pre>
+                        </div>
+                    </#if>
+                    <!-- Print Tables -->
                     <#list tables?keys as label>
                         <#assign data = tables[label]>
                         <div class="data-table">

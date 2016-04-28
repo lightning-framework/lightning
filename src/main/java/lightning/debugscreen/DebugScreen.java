@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import lightning.util.Iterables;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 import com.google.common.base.Joiner;
@@ -24,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import freemarker.template.Configuration;
+import freemarker.template.TemplateException;
 import freemarker.template.Version;
 
 /**
@@ -59,6 +63,8 @@ public class DebugScreen {
             List<Map<String, Object>> frames = parseFrames(throwable);
   
             LinkedHashMap<String, Object> model = new LinkedHashMap<>();
+            model.put("short_message", Optional.fromNullable(StringUtils.abbreviate(throwable.getMessage(), 100)).or(""));
+            model.put("full_trace", traceToString(throwable));
             model.put("message", Optional.fromNullable(throwable.getMessage()).or(""));
             model.put("plain_exception", ExceptionUtils.getStackTrace(throwable));
             model.put("frames", frames);
@@ -69,6 +75,7 @@ public class DebugScreen {
             LinkedHashMap<String, Map<String, ? extends Object>> tables = new LinkedHashMap<>();
             installTables(tables, request, response);
             model.put("tables", tables);
+            response.setHeader("Content-Type", "text/html; charset=UTF-8");
             templateConfig.getTemplate("debugscreen.ftl").process(model, response.getWriter());
         } catch (Exception e) {
             // In case we encounter any exceptions trying to render the error page itself,
@@ -129,6 +136,18 @@ public class DebugScreen {
         LinkedHashMap<String, Object> environment = new LinkedHashMap<>();
         environment.put("Thread ID", Thread.currentThread().getId());
         return environment;
+    }
+    
+    private String traceToString(Throwable t) {
+      StringWriter sw = new StringWriter();
+      PrintWriter pw = new PrintWriter(sw);
+      if (t instanceof TemplateException) {
+        ((TemplateException) t).printStackTrace(pw, false, true, false);
+      } else {
+        t.printStackTrace(pw);
+      }
+      pw.close();
+      return sw.toString();
     }
 
     private LinkedHashMap<String, Object> getRequestInfo(HttpServletRequest request) {

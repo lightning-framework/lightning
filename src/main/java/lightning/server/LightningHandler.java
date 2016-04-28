@@ -84,6 +84,11 @@ import freemarker.template.Configuration;
 import freemarker.template.TemplateExceptionHandler;
 import freemarker.template.Version;
 
+/**
+ * TODO: Output is not buffered - this can lead to some strange looking pages if an exception is thrown
+ * after some output has already been sent (both in production and debug mode). May want to come up with
+ * a better solution to this.
+ */
 public class LightningHandler extends AbstractHandler {
   private static final Version FREEMARKER_VERSION = new Version(2, 3, 20);
   private static final Logger logger = LoggerFactory.getLogger(LightningHandler.class);
@@ -113,8 +118,8 @@ public class LightningHandler extends AbstractHandler {
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.internalTemplateConfig.setClassForTemplateLoading(Lightning.class, "templates");
     this.internalTemplateConfig.setShowErrorTips(config.enableDebugMode);
-    this.internalTemplateConfig.setTemplateExceptionHandler(config.enableDebugMode ?
-        TemplateExceptionHandler.HTML_DEBUG_HANDLER :
+    this.internalTemplateConfig.setTemplateExceptionHandler(/*config.enableDebugMode ?
+        TemplateExceptionHandler.HTML_DEBUG_HANDLER :*/
         TemplateExceptionHandler.RETHROW_HANDLER);
     
     this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
@@ -128,8 +133,8 @@ public class LightningHandler extends AbstractHandler {
       this.userTemplateConfig.setClassForTemplateLoading(getClass(), "/" + config.server.templateFilesPath);
     }
     this.userTemplateConfig.setShowErrorTips(config.enableDebugMode);
-    this.userTemplateConfig.setTemplateExceptionHandler(config.enableDebugMode ?
-        TemplateExceptionHandler.HTML_DEBUG_HANDLER :
+    this.userTemplateConfig.setTemplateExceptionHandler(/*config.enableDebugMode ?
+        TemplateExceptionHandler.HTML_DEBUG_HANDLER :*/
         TemplateExceptionHandler.RETHROW_HANDLER);    
     
     this.exceptionHandlers = new ExceptionMapper<>();
