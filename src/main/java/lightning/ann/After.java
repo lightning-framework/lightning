@@ -15,5 +15,5 @@ import lightning.fn.Filter;
 @Repeatable(Afters.class)
 @Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface After {
-  Class<? extends Filter> filter();
+  Class<? extends Filter> value();
 }

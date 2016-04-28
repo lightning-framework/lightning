@@ -11,8 +11,8 @@ public class ScanResult {
   // Methods in @Controllers annotated with @Initialize:
   public final Map<Class<?>, Set<Method>> initializers;
   
-//Methods in @Controllers annotated with @Finalize:
- public final Map<Class<?>, Set<Method>> finalizers;
+  //Methods in @Controllers annotated with @Finalize:
+  public final Map<Class<?>, Set<Method>> finalizers;
   
   // Static methods annotated with @ExceptionHandler:
   public final Map<Class<?>, Set<Method>> exceptionHandlers;

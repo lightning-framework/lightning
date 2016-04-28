@@ -13,7 +13,6 @@ import lightning.fn.Filter;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Repeatable(Befores.class)
-@Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface Before {
-  Class<? extends Filter> filter();
+  Class<? extends Filter> value();
 }

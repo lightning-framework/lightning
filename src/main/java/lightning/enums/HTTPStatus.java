@@ -22,7 +22,8 @@ public enum HTTPStatus {
   NOT_IMPLEMENTED(501),
   OK(200),
   NOT_MODIFIED(304),
-  FOUND(302);
+  FOUND(302),
+  SERVICE_UNAVAILABLE(503);
   
   private final int code;
   private static final Map<Class<? extends Throwable>, HTTPStatus> translator = ImmutableMap.<Class<? extends Throwable>, HTTPStatus>builder()
