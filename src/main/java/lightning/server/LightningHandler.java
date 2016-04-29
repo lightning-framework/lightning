@@ -123,6 +123,7 @@ public class LightningHandler extends AbstractHandler {
         TemplateExceptionHandler.RETHROW_HANDLER);
     
     this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
+    this.userTemplateConfig.setSharedVariable("__LIGHTNING_DEV", config.enableDebugMode);
     File templatePath = Iterables.firstOr(Iterables.filter(ImmutableList.of(
         new File("./src/main/java/" + config.server.templateFilesPath),
         new File("./src/main/resources/" + config.server.templateFilesPath)
