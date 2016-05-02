@@ -78,6 +78,7 @@ CREATE TABLE recovery_tokens (
 CREATE TABLE email_verification_tokens (
   token_hash varchar(255) NOT NULL,
   user_id int(64) UNSIGNED NOT NULL,
+  email varchar(255) NOT NULL,
   origin_ip varchar(255) NOT NULL,
   expires int(64) UNSIGNED NOT NULL,
   PRIMARY KEY (token_hash),

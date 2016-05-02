@@ -216,6 +216,11 @@ public class Param {
     return isNotNull() && StringUtils.isAlphanumericSpace(value.get());
   }
   
+  private static final Pattern andu = Pattern.compile("^[a-zA-Z0-9_]*$");
+  public boolean isAlphaNumericDashUnderscore() {
+    return isNotNull() && andu.matcher(value.get()).matches();
+  }
+  
   public boolean isAlphaNumeric() {
     return isNotNull() && StringUtils.isAlphanumeric(value.get());
   }
@@ -397,6 +402,10 @@ public class Param {
   
   public static Param wrapList(String key, @Nullable String[] values) {
     return new Param(key, values == null ? new String[0] : values);
+  }
+  
+  public static Param wrap(String value) {
+    return new Param(null, new String[]{value});
   }
 
   public Object stringOr(Object other) {

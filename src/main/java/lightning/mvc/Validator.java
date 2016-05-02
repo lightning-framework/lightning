@@ -202,6 +202,14 @@ public class Validator {
       return this;
     }
     
+    public FieldValidator isAlphaNumericDashUnderscore() {
+      if (!field.isAlphaNumericDashUnderscore()) {
+        addError("You must enter a value containing only alphanumeric characters, dashes, and underscores.");
+      }
+      
+      return this;
+    }
+    
     public FieldValidator matches(CustomValidator validator) {
       if (field.isEmpty()) {
         addError("You must provide a non-empty value.");
