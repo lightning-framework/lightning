@@ -140,9 +140,18 @@ public class LightningHandler extends AbstractHandler {
     
     this.exceptionHandlers = new ExceptionMapper<>();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
-    this.staticFileResourceFactory = config.enableDebugMode
-        ? new ResourceCollection(getResourcePaths())
-        : Resource.newClassPathResource(config.server.staticFilesPath);
+    if (config.server.staticFilesPath != null) {
+      this.staticFileResourceFactory = config.enableDebugMode
+          ? new ResourceCollection(getResourcePaths())
+          : Resource.newClassPathResource(config.server.staticFilesPath);
+    } else {
+      this.staticFileResourceFactory = new ResourceFactory() {
+        @Override
+        public Resource getResource(String path) {
+          return null;
+        }
+      };
+    }
     this.exceptionViewProducer = new DefaultExceptionViewProducer();
     this.staticFileServer = new FileServer(this.staticFileResourceFactory);
     this.staticFileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
