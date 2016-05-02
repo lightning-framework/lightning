@@ -1,5 +1,6 @@
 package lightning.mail;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -9,10 +10,10 @@ import java.util.Date;
 import javax.activation.DataHandler;
 import javax.activation.DataSource;
 import javax.activation.FileDataSource;
+import javax.mail.Message.RecipientType;
 import javax.mail.MessagingException;
 import javax.mail.Session;
 import javax.mail.Transport;
-import javax.mail.Message.RecipientType;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
@@ -37,6 +38,24 @@ public final class Message {
   Message(Session session, InternetAddress from) throws MessagingException {
     message = new MimeMessage(session);
     message.setFrom(from);
+  }
+  
+  public String toString() {
+    StringBuffer buffer = new StringBuffer();
+    
+    buffer.append("-- BEGIN EMAIL -------------------------------------------------------------------");
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    try {
+      message.setSentDate(new Date());
+      message.setContent(multipart);
+      message.writeTo(stream);
+      buffer.append(new String(stream.toByteArray(), "UTF-8"));
+    } catch (Exception e) {
+      buffer.append(e.getMessage());
+    }
+    buffer.append("---- END EMAIL -------------------------------------------------------------------");
+    
+    return buffer.toString();
   }
   
   /**

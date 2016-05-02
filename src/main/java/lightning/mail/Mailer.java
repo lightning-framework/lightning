@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
  */
 public class Mailer {
   private static final Logger logger = LoggerFactory.getLogger(Mailer.class);
+  private final MailerConfig config;
   private ExecutorService pool = null;
   private Session session = null;
   private InternetAddress from = null;
@@ -59,6 +60,11 @@ public class Mailer {
       @Override
       public Boolean call() throws Exception {
         try {
+          if (config.useLogDriver()) {
+            logger.info("Send Email: {}", message);
+            return true;
+          }
+          
           message.send();
           return true;
         } catch (Exception e) {
@@ -85,6 +91,7 @@ public class Mailer {
    * @throws UnsupportedEncodingException
    */
   public Mailer(final MailerConfig config) throws AddressException, UnsupportedEncodingException {
+    this.config = config;
     Properties props = new Properties();
     from = new InternetAddress(config.getAddress(), config.getAddress());
     pool = Executors.newFixedThreadPool(10);

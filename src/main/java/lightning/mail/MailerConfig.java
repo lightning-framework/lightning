@@ -7,4 +7,5 @@ public interface MailerConfig {
   public String getHost();
   public String getUsername();
   public String getPassword();
+  public boolean useLogDriver();
 }

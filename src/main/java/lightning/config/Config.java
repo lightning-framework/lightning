@@ -197,6 +197,9 @@ public class Config {
       return "MailConfig [useSSL=" + useSsl + ", address=" + address + ", username=" + username
           + ", password=" + password + ", host=" + host + ", port=" + port + "]";
     }
+    
+    // Doesn't send messages over SMTP, instead logs them.
+    public @Optional boolean useLogDriver = false;
 
     // Whether or not to use SMTP over SSL.
     public @Optional boolean useSsl = true;
@@ -217,7 +220,12 @@ public class Config {
     public @Optional int port = 465;
     
     public boolean isEnabled() {
-      return host != null && username != null;
+      return useLogDriver ||  (host != null && username != null);
+    }
+    
+    @Override
+    public boolean useLogDriver() {
+      return useLogDriver;
     }
     
     @Override
