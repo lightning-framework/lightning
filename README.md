@@ -1,45 +1,48 @@
 # Lightning
 
-An experimental light-weight web framework for Java built on Jetty.
+A simple, light-weight web framework for Java built on Jetty.
 
-The primary goal of this framework is to provide the convenience of PHP-style save-and-refresh development while enabling developers to leverage the type-safety and speed of Java. That said, the framework is still engineered to be fast!
+Our design goals are...
 
-The secondary goal of this framework is to make learning web development simple for beginners by having expressive yet simple APIs and powerful error reporting.
+  * To provide the convenience of PHP-style save-and-refresh development in Java
+  * To make web development simple for beginners by having simple, expressive APIs
 
 This framework was written for use in a course I taught at Rice University.
 
 # Features
 
-  - Built-in distributed sessions
-  - Built-in authentication and user management (groups and permissions in-progress)
+  - Powerful type-safe HTTP abstractions
+  - Built-in annotation-based request routing (w/ wildcards and parameters)
   - Built-in templating with Freemarker
-  - Built-in MySQL support
   - Built-in email support (via SMTP)
   - Built-in SSL support (w/ option to redirect insecure requests)
+  - Built-in MySQL support (w/ connection pooling, transactions)
+  - Built-in distributed sessions (via MySQL or other driver)
+  - Built-in authentication and users (via MySQL or other driver)
   - Built-in support for CAS authentication
   - Built-in support for HTTP multipart request processing and file uploads
   - Built-in validator for POST/GET parameters
-  - Built-in annotation-based routing with parameters and wildcards
-  - Built-in security features
-    - Passwords are encrypted with BCrypt
-    - Cookies are signed and verified with HMAC
-    - Only hashes stored in the database
   - Powerful development (debug) mode
     - **Develop without ever restarting the server** (PHP-style save and refresh)
     - **Detailed in-browser stack traces on errors**
     - Disables caching of static files
     - Disables caching of templates
-  - Powerful type-safe HTTP abstractions
-  - Support for async request processing
+  - Support for async request processing (via Servlet API)
   - Built-in support for websockets
   - Built-in support for HTTP/2
-  - Built-in support for argument injection
+  - Built-in support for custom dependency injection
 
 # Getting Started
 
-1. Write a configuration file. See documentation of `lightning.config.Config` for a description of options.
+### 1) Create a Configuration
 
-In particular, you must define `scan_prefixes` so that the framework knows where to look for routes, exception handlers, and web sockets.
+The first step is to build an instance of `lightning.config.Config`. You can build the instance in code anyway you like. A simple way is to parse it from a JSON-formatted file.
+
+All of the options are well-documented; see the source of `lightning.config.Config` for descriptions.
+
+In your config, you must define `scanPrefixes` - a list of packages in which the framework will look for controllers, exception handlers, and web sockets.
+
+An example JSON-formatted configuration file might look like:
 
 ```json
 {
@@ -66,63 +69,121 @@ In particular, you must define `scan_prefixes` so that the framework knows where
 }
 ```
 
-** NOTE ** You'll want to import the schema provided by lightning in order to have access to users and sessions. You can find this in the `src/main/java/resources/schema` folder of the lightning source code.
+** NOTE ** You'll want to import the schema provided by lightning in order to have access to users and sessions - if you choose to utilize that functionality. You can find the SQL file to import the schema in the `src/main/java/resources/schema` folder of the lightning source code.
 
-2. Write a launcher.
+### 2) Write a launcher for your app.
 
-If you do not wish to use JSON-formatted configuration files, you may skip the above step and instead build your own instance of `Config` in code anyway you like and pass it to `Lightning::launch`.
+The launcher is the main class you will run to start your app. Your launcher can be as simple or sophisticated as you want it to be.
+
+Your launcher should do three things:
+* Build a `lightning.config.Config` instance
+* Build a custom dependency injection module (optional)
+* Invoke `lightning.Lightning.launch(...)`
+
+An example launcher follows:
 
 ```java
 class MyApp {
-  public static void main(String[] args) {
-    // Optional: To inject custom dependencies into your handlers, use an InjectorModule.
+  private static void parseConfig(File file) throws Exception {
+    return JsonFactory.newJsonParser().fromJson(
+        IOUtils.toString(new FileInputStream(file)), 
+        Config.class);
+  }
+
+  public static void main(String[] args) throws Exception {
+    // Parse command-line flags.
+    Flags.parse(args);
+  
+    // Parse the configuration from a JSON file.
+    Config config = parseConfig(new File(args[0]));
+    
+    // Modify config values depending on flags.
+    if (Flags.has("debug")) {
+      config.enableDebugMode = true;
+    }
+  
+    // To inject custom dependencies into your handlers, define an InjectorModule.
     // See the documentation for InjectorModule for more information.
+    // Any dependencies you bind here will be injectable as arguments.
     InjectorModule injector = new InjectorModule();
     injector.bindClassToInstance(MyDependency.class, new MyDependency());
     injector.bindNameToInstance("my_string", "Hello!");
     injector.bindAnnotationToInstance(MyDepAnn.class, "Hello!");
 
-    // args[0] contains the path to your config file.
-    Lightning.launch(new File(args[0]), injector);
+    LightningServer server = Lightning.launch(config, injector);
+    server.join();
   }
 }
 ```
 
-To start the webserver, you can run the launcher you just created. If you are using debug mode, you will want to set the working directory to the root of your project folder (the folder that contains `./src`) so that classes, templates, and files can be automatically reloaded from disk.
+** NOTE ** If you are using debug mode, you will want to set the working directory to the root of your project folder (the folder that contains `/src/main/java`) so that code snippets, classes, templates, and files can be automatically reloaded from disk. Any working directory can be used if you are not running in debug mode.
 
-3. Define your controllers (within the packages defined in `scan_prefixes` or any subpackage thereof).
+### 3) Define your controllers. 
+
+A controller is simply a class that handles incoming requests. Controllers must be annotated with `@Controller` and defined within a subpackage of any of the packages provided in `scanPrefixes`.
+
+The lifetime of a controller matches the lifetime of a request: a new instance is allocated for each incoming request and deallocated after the response is sent.
+
+An example controller follows:
 
 ```java
 // Provides access to request, response, session, auth, user, and other helpers.
 import static lightning.server.Context.*;
 
-import static lightning.enums.HTTPMethod.*;
+// Provides the annotations used by the framework.
 import lightning.ann.*;
+import static lightning.enums.HTTPMethod.*;
 
+// Any class which contains routes must be annotated with @Controller. 
+// This annotation is inherited by subclasses.
 @Controller
 class MyController {
+  // Lightning will automatically scan for annotations to install this route.
+  // Notice we have defined a route with a dynamic parameter (:username).
   @Route(path="/u/:username", methods={GET})
+  // Indicates that this method returns a view model for profile.ftl.
   @Template("profile.ftl")
-  // Inject the value of the route parameter "username".
-  public Map<String, ?> handleProfilePage(@RParam("username") String username) throws Exception {
+  // Inject the value of the route parameter "username" by
+  // annotating the parameter with @RParam.
+  // Lightning is flexible; your handler can accept any number
+  // of injectable arguments and may return any object (or even 
+  // void) depending on what your handler does.
+  public Map<String, ?> handleProfilePage(@RParam("username") String username) 
+      throws Exception {
     return ImmutableMap.of(); // Return the template view model.
   }
 
   @Route(path="/api/messages", methods={POST})
+  // Requires that the XSRF token is present and valid under the query
+  // parameter named "_xsrf".
   @RequireXsrfToken
+  // Requires that there is an authenticated user.
   @RequireAuth
+  // Indicates that the returned value should be JSONified with GSON
+  // and that JSON HTTP response headers should be set.
   @Json
   // Inject query parameters in a type-safe manner using @QParam. If the user provides the wrong
   // type, then a BadRequestException is triggered. Thus, messageId is guaranteed to be an integer.
+  // Exceptions thrown from a handler will generate an error page. For HTTP exceptions (those
+  // defined in lightning.http), the corresponding HTTP error page will be shown with the status code
+  // set. All other exceptions will trigger a generic 500 Internal Server Error in production, or a
+  // in-browser stack trace in development mode. Lightning expects users to take advantage of these
+  // exception handling features when writing code. Note that the error pages can be overriden - see
+  // our notes about installing custom exception handlers.
   public Map<String, ?> handleMessagesApi(@QParam("mid") int messageId) throws Exception {
     Map<String, Object> message = new HashMap<>();
 
+    // db() acquires and returns a database connection on its first invocation.
+    // subsequent invocations will return the same connection.
+    // the connection is automatically freed when the controller is deallocated.
+    // Querying follows the typical JDBC syntax (with the convenient addition of named
+    // parameters in prepared statements).
     try (NamedPreparedStatement query = db()
              .prepare("SELECT * FROM messages WHERE mid = :mid AND userid = :userid;")) {
       query.setLong("userid", user().getId());
       query.setInt("mid", messageId);
       try (ResultSet rs = query.executeQuery()) {
-        notFoundIf(!rs.next());
+        notFoundIf(!rs.next()); // Generate a 404 page and return from handler via NotFoundException.
         message.setContent(rs.getString("content"));
         message.setTime(rs.getDate("time"));
       }
@@ -132,25 +193,42 @@ class MyController {
   }
 
   @Initializer
+  // An initializer will be called automatically before any request processing occurs - in other words,
+  // serving the same purpose as a constructor. Initializers in parent classes will be invoked, too,
+  // when the controller is allocated. Initializers may be preferred to constructors because they are
+  // inheritable without requiring additional code in child classes.
   // All routes, exception handlers, web socket factories, and initializers are INJECTABLE.
   // This means the framework will automatically figure out the arguments to fill in to the function
   // based upon their types and annotations. For example, to inject the three dependencies you
   // defined in the launcher:
   public void initialize(MyDependency myDep, @MyDepAnn String myDep2, @Inject("my_string") String myDep3) {
-    // Called automatically when the controller is instantied but before invoking any routes.
     // In addition to the dependencies you defined in the launcher, the framework can be used to automatically
-    // inject other things: Request, Response, Config, MySQLDatabase, etc.
-    // Note that most of these things are also provided via static methods on lightning.server.Context.
+    // inject other request-specific things: Request, Response, Config, MySQLDatabase, etc.
+    // Note that most of these things are also provided via the static methods on lightning.server.Context.
   }
+
+  @Finalizer
+  // A finalizer is always called before deallocating the controller. Finalizers serve the purpose of
+  // destructors and may safely be used to clean up resources opened in an initializer or constructor.
+  // Finalizers are guaranteed to execute no matter what happens during request processing.
+  public void finalize() throws Exception {}
 }
 ```
 
-4. Define your websockets (if any).
+### 4) Define your websockets (if any).
 
-Websockets are singletons (a single instance is created to service all incoming requests) and utilize the Jetty API. Unfortunately, web sockets currently cannot be automatically reloaded in debug mode (due to some limitations in Jetty) so you'll need to restart the server to see changes to websocket handlers.
+Lightning includes out-of-the-box support for WebSockets. An example follows:
 
 ```java
 class MyWebsockets {
+  // Provide a factory method that creates an instance of a websocket each time a request
+  // is incoming to the given path. WebSocket paths may not use wildcards or parameters,
+  // and must return an object that conforms to the Jetty WebSocket API (as demonstrated).
+  // If you wish to have a singleton websocket object, simply return the same object every
+  // time (but make sure your implementation is stateless). Otherwise, a new object will
+  // be created for every new connection. You will notice that you can dependency inject
+  // both framework objects (such as `Config` and `MySQLDatabaseProvider`) as well as any
+  // custom dependencies you defined before launching the server.
   @WebSocketFactory(path="/mysocket")
   public static MyWebsocket produceWebsocket(Config config, MySQLDatabaseProvider db) {
     return new MyWebsocket();
@@ -167,39 +245,256 @@ class MyWebsockets {
     public void closed(final Session session, final int statusCode, final String reason) {}
 
     @OnWebSocketMessage
-    public void message(final Session session, String message) throws IOException {
+    public void message(final Session session, final String message) throws IOException {
       session.getRemote().sendString("THANKS!");
     }
 
     @OnWebSocketError
-    public void error(final Session session, Throwable error) {}
+    public void error(final Session session, final Throwable error) {}
   }
 }
 ```
+Unfortunately, web sockets currently cannot be automatically reloaded in debug mode (due to some limitations in Jetty) so you'll need to restart the server to see changes to websocket handlers.
 
-5. Define your custom exception handlers (if any).
+### 5) Define your custom exception handlers (if any).
+
+You may define handlers that are invoked when a route throws an Exception in order to "recover" from the error (probably by sending the appropriate error page or redirect). Please keep in mind that the framework, for efficiency, does not buffer output. Thus, HTTP headers (and some content) may already have been sent before the exception handler is invoked (for example, if a controller threw an exception mid-execution).
+
+An example of installing an exception handler follows:
 
 ```java
 class MyExceptionHandlers {
+  // Must specify the class of the exception that this handler matches.
+  // Exception handlers respect the class hierarchy; thus, registering a handler for Throwable.class will
+  // give you a catch-all handler. When matching handlers, the most specific handler is used (for example,
+  // NotFoundException would match this handler even if you also installed a catch-all handler for Throwable).
+  // You may override the framework default error pages by installing handlers for the exceptions in
+  // lightning.http as well as a catch-all handler for Throwable. In this example, installing a handler
+  // for lightning.http.NotFoundException allows you to have custom 404 error pages. You'll notice that the
+  // thrown exception is injectable in addition to global and request-specific framework objects (such as
+  // `Response` and `Config`).
   @ExceptionHandler(NotFoundException.class)
-  public static void handleException(HandlerContext ctx, Exception e) throws Exception {
-    // Called when a route handler throws an exception of type NotFoundException.class (or any subclass
-    // thereof unless a more specific exception handler is installed upon that subclass).
-    // Use ctx to generate the appropriate error page.
-    // If your exception handler throws an exception, the default error page will be shown instead.
+  public static void handleException(Response response, NotFoundException e) throws Exception {
+    // If your exception handler throws an exception, the default framework error page will be shown instead.
+    response.status(404);
   }
 }
 ```
 
-You can override the default error pages (e.g. for 404 not found) by installing an exception handler for the corresponding exception (e.g. `lightning.http.NotFoundException`).
+# Features
 
-# Error Page
+### Threading and Context
+
+A thread is allocated from a pool to each incoming request. The thread is allocated only to that request until either (a) your handler exits normally or exceptionally or (b) the servlet async API is utilized.
+
+Inside of a request handler, you may access information about the incoming request by either (a) invoking the static methods on `lightning.server.Context` or (b) dependency-injecting request-specific objects into your controller. For example, `lightning.server.Context.request()` returns an object encapsulating the current HTTP `Request`. Please note that option (a) does not work with async.
+
+### SQL Database Access
+
+By default, the framework uses a MySQL database - but using this is entirely optional. To use this, you will need to make sure you configure the `db` property in your config.
+
+Lightning will automatically establish a connection pool to your database; if you are not familiar with connection pooling, you should read up on it!
+
+You can invoke `lightning.server.Context.db()` to obtain an instance of `MySQLDatabase` which will let you access your the database you configured. Please be aware of the following (which may differ from connection pools you have used in the past):
+* A database connection is not allocated your thread from the pool until the first invocation of `db()`
+* The database connection will be automatically freed (returned to the pool) when you return from your request handler. Thus, you never need to invoke close() or use try-with-resources, but doing so has no effect.
+
+Lightning provides several extensions on the default `java.sql.*` APIs that make life easier. In particular, we provide `NamedPreparedStatement` which allows you to use named parameters in prepared SQL queries as well as some additional convenience methods. We also provide `MySQLDatabase` which provides some powerful features including easily creating `NamedPreparedStatements`for common operations and re-entrant transactions.
+
+An example of database usage follows:
+
+```java
+try (NamedPreparedStatement query = db().prepare("SELECT * FROM users WHERE age >= :age;")) {
+  query.setInt("age", 21);
+  try (ResultSet result = query.executeQuery()) {
+    while (result.next()) {
+       String username = result.getString("username");
+       doSomethingWith(username);
+    }
+  }
+}
+```
+
+You may also be interested in MySQLDatabase's `paginate`, `prepareReplace`, and `prepareInsert` methods. You can also access the underlying `java.sql.Connection` by invoking `getConnection()`. `lightning.db.ResultSets` provides some convenience macros for dealing with `java.sql.ResultSet`s (particularly their handling of null values). `NamedPreparedStatement` has convenience methods for setting values from a map, fetching generated keys, and other common tasks. `SQLNull` provides typed nulls for use with `NamedPreparedStatement.setFromMap`.
+
+An example of transactions follows:
+
+```java
+int value = db().transaction(() -> {
+  // ... perform your queries here ...
+  
+  db().transaction(() -> {
+    // You can execute transactions within transactions.
+    // Transactions are "re-entrant" on the same database connection.
+    // Thus, the queries on this transaction are simply made part of the larger
+    // containing transaction and will not be committed until the containing
+    // transaction is committed.
+  });
+  
+  // Whatever is returned from the closure is returned by the invocation
+  // of db().transaction(). Returning a value is optional; transaction
+  // closures may also be void-returning methods.
+  return 1;
+});
+```
+
+### Non-SQL Database Access
+
+We recommend doing the following:
+1) Define a custom configuration format (subclass `lightning.config.Config`) which includes additional config options for your database system.
+2) Configure custom dependency injection for your custom config class.
+3) Use your config to configure dependency injection for a connection pooler for your database system.
+4) Create an `AbstractController` from which all your controllers will inherit. Provide convenience methods here for accessing your database by injecting the database pooler into an `@Initializer`.
+
+### Before Filters
+
+You may specify code to execute before a request by defining a filter and using the `@Before` annotation. Filters are similar to controllers: a new instance is allocated for each incoming request, used, and then discarded.
+
+```java
+// Define a filter.
+public class MyFilter implements Filter {
+  // Constructor parameters are injectable.
+  public DenialOfServiceFilter(Config config) {
+    this.config = config;
+  }
+  
+  // Executes the filter. Calling halt() or throwing an exception will
+  // prevent the triggering route from executing.
+  @Override
+  public void execute() throws Exception {
+      halt();
+    }
+  }
+}
+```
+
+We require an `@Before` annotation to be present on each route method using the filter because our design goal was for programmers to be able to look at a route method and see exactly what will happen.
+
+### Halt
+
+Invoking `lightning.server.Context.halt()` will stop request processing by throwing a `HaltException`. Invoking `halt()` is equivalent to returning from the handler (for handlers that return void or null). Invoking `halt()` in a filter will prevent the route from being invoked at all.
+
+### Request/Response
+
+Invoking `lightning.server.Context.request()` and `lightning.server.Context.response()` will return objects representing the request and response. The `lightning.http.Request`, `lightning.http.Response`, and `lightning.mvc.HandlerContext` classes encapsulate request-specific information - refer to their documentation for details. 
+
+### Understanding Parameter Handling
+
+In lightning, most methods that return a user-provided parameter value return an instance of `lightning.mvc.Param` instead of a nullable string or option. For example, this is utilized with HTTP query parameters and headers. In practice, this provides a much more convenient interface for dealing with user input that also catches almost all data type errors.
+
+For example, consider a query parameter for which you want to accept an integer:
+
+```java
+int userValue = queryParam("name").intValue();
+```
+
+If the user did not provide an integer, invoking `intValue` throws a `BadRequestException` which will in turn exit the request handler and generate an HTTP 400 error page. This isn't neccesarily the most user-friendly way of handling this error (a validator would be good for that), but it does ensure that the given value is *always* an integer so that you don't end up accidently storing incorrect data types into your database.
+
+`Param` provides many more convenience methods, too - check them out! `Param` can make your code more readable when dealing with array input, enums, and checkboxes, too.
+
+### Validators
+
+No framework could be complete without built-in form validation - and lightning has it, too! The usage of a validator is as follows:
+
+```java
+validate("agreement").isChecked();
+validate("email").isEmail().isNotEmpty();
+validate("year").isNumberBetween(2000, 2100);
+validate("file").isFileSmallerThan(1024);
+validate("answer").isOneOf("A","B","C","D");
+
+if (validator().passes()) {
+  // Make changes to the database.
+  saveData(request);
+  showSuccessPage();
+} else {
+  // Show errors to user (map of query param names to associated error(s)).
+  Map<String, String> errors = validator.getErrors();
+  showErrorPage(errors);
+}
+
+```
+
+There are many more validators than those shown in the example - check them out! You can also write your own validators or manually add errors. `lightning.context.validator()` will return an instance of a `lightning.mvc.Validator` for the current request - read the documentation!
+
+### Routes
+
+Routes are indicated by annotating a method in an `@Controller` with `@Route`. Routes are automatically installed by the framework by scanning the annotations - it's that easy. Routing is always fast - O(n) with respect to the string length of the path regardless of the number of routes installed.
+
+For more information on route syntax and what route targets may return, see `lightning.ann.Route`.
+
+### Multipart Requests
+
+To service a multipart request, you must annotate the receiving route with `@Mutlipart`.
+
+```java
+@Controller
+class FileUploadController {
+  @Route(path="/upload", methods={POST})
+  @Multipart
+  public void handleUpload() throws Exception {
+    badRequestIf(request().getPart("file").getSize() == 0);
+    InputStream data = request().getPart("file").getInputStream();
+    long size = request().getPart("file").getSize();
+    String fileName = request().getPart("file").getSubmittedFileName();
+    // ... store the file.
+  }
+}
+```
+
+You will probably want to check out the configuration options related to multipart in `lightning.config.Config`.
+
+### Authentication
+
+You may invoke `lightning.server.Context.auth()` to get a request-specific object that can perform authentication, log outs, or give access the authenticated user. In addition, `lightning.server.Context` defines the `isLoggedIn()` and `user()` convenience methods. These methods should be fairly self explanatory; refer to the documentation for `lightning.auth` for more information. Attempting to invoke `user()` when no user is authenticated triggers an UnauthorizedException which by default generates an HTTP 401 error page.
+
+** NOTE ** Requires you to have configured a database connection and imported the framework schema.
+
+### Users/Groups/Privileges
+
+You may invoke `lightning.server.Context.groups()` and `lightning.server.Context.users()` to get objects for interacting with the sets of all groups and users respectively in aggregate.
+
+Once you have obtained a reference to a `lightning.users.User` or `lightning.users.Group`, you may mutate it and invoke save() to push the changes to the database. `User`s may also serve as key-value stores.
+
+Users and groups may have privileges. A privilege is simply an integer stored in the database; you as a programmer must decide its meaning (probably use an enum) and enforce the access constraints it implies.
+
+** NOTE ** Requires you to have configured a database connection and imported the framework schema.
+
+### Sessions
+
+You may invoke the `lightning.server.Context.session()` method to get an object for reading and setting session data. Sessions serve as a key-value store. Keys are strings, and values may be any object that implements `java.io.Serializable`.
+
+** NOTE ** Requires you to have configured a database connection and imported the framework schema.
+
+### Cookies
+
+You may invoke the `lightning.server.Context.cookies()` method to get an object for reading and setting cookies. Please note that our cookie manager will automatically sign the cookie values you set with HMAC SHA256 and verify the signature before reading them back. If the signature does not match, the framework will act as if the cookie was not sent at all. You may set and read raw cookies by using the `request()` and `response()` directly.
+
+** NOTE ** Requires you to set an HMAC key in config.
+
+### Mail
+
+You may invoke the `lightning.server.Context.mail()` method to get an object for sending mail - provided you have configured SMTP or the logging driver in `lightning.config.Config`. Usage is as follows:
+
+```java
+Message message = mail().createMessage();
+message.addRecipient("hello@world.com");
+message.setSubject("Hello World!");
+message.setHTMLText("Hello World!");
+mail().send(message);
+```
+
+On failure, an exception is thrown which by default generates an internal server error page. The API also supports file attachments. You may use templates to create emails by invoking `lightning.server.Context.renderToString(...)` to render a freemarker template to a string.
+
+### Error Page
 
 In debug mode, whenever a request handler throws an Error or Exception you will see a detailed stack trace in your browser (in addition to the console):
 
 ![Debug Page](https://cloud.githubusercontent.com/assets/3498024/14005744/3fa323ba-f134-11e5-9f72-00da49a46ab7.png "Debug Page")
 
-# Examples
+In order to find code snippets, your working directory must be the folder that contains `src/main/java`. If debug mode is not enabled, users will instead be shown a generic 500 internal server error (or, your custom error page if you installed a custom exception handler).
+
+### Examples
 
 The following applications are built using Lightning:
 

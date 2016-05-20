@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.text.ParseException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +54,7 @@ import lightning.users.User;
 import lightning.users.Users;
 import lightning.users.Users.UsersException;
 import lightning.users.drivers.MySQLUserDriver;
+import lightning.util.Time;
 
 import org.eclipse.jetty.util.resource.Resource;
 import org.slf4j.Logger;
@@ -835,5 +837,35 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
 
   public Users users() {
     return users;
+  }
+  
+  public final void enableHttpCaching(CacheControl type, String etag, long lastModifiedTime) {
+    if (config.enableDebugMode || type == CacheControl.NO_CACHE) {
+      return;
+    }
+    
+    if (request.header(HTTPHeader.IF_NONE_MATCH).exists() &&
+        request.header(HTTPHeader.IF_NONE_MATCH).isEqualTo(etag)) {
+      response.status(HTTPStatus.NOT_MODIFIED);
+      halt();
+    }
+    
+    if (request.header(HTTPHeader.IF_MODIFIED_SINCE).exists()) {
+      try {
+        long time = Time.parseFromHttp(request.header(HTTPHeader.IF_MODIFIED_SINCE).stringValue());
+        
+        if (time >= lastModifiedTime) {
+          response.status(HTTPStatus.NOT_MODIFIED);
+          halt();
+        }
+      } catch (ParseException e) {
+        badRequest("HTTP If-Modified-Since header does not conform to spec.");
+      }
+    }
+
+    response.header(HTTPHeader.CACHE_CONTROL, type.toHttpString() + ", max-age=3600");
+    response.header(HTTPHeader.LAST_MODIFIED, Time.formatForHttp(lastModifiedTime));
+    response.header(HTTPHeader.ETAG, etag);
+    response.header(HTTPHeader.EXPIRES, Time.formatForHttp(Time.now() + 3600));
   }
 }

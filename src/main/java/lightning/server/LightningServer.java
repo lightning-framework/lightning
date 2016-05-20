@@ -38,9 +38,11 @@ import org.slf4j.LoggerFactory;
 public class LightningServer {
   private static final Logger logger = LoggerFactory.getLogger(LightningServer.class);
   private Server server;
+  private MySQLDatabaseProvider dbp;
     
-  public void configure(Config config, MySQLDatabaseProvider dbp, InjectorModule userModule) throws Exception {
+  public LightningServer(Config config, MySQLDatabaseProvider dbp, InjectorModule userModule) throws Exception {
     server = createServer(config);
+    this.dbp = dbp;
         
     ServletContextHandler websocketHandler = new ServletContextHandler(null, "/", false, false);
     WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
@@ -94,16 +96,26 @@ public class LightningServer {
     server.setHandler(handlers);
   }
   
-  public void start() throws Exception {
+  public LightningServer start() throws Exception {
     server.start();
     logger.info("Lightning Framework :: Ready for requests!");
-    server.join();
+    return this;
   }
   
-  public void stop() throws Exception {
+  public LightningServer join() throws Exception {
+    server.join();
+    return this;
+  }
+  
+  public LightningServer stop() throws Exception {
     if (server != null) {
       server.stop();
     }
+    return this;
+  }
+  
+  public MySQLDatabaseProvider getDatabasePool() {
+    return dbp;
   }
   
   private Server createServer(Config config) throws Exception {

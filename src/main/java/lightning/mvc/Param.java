@@ -166,6 +166,18 @@ public class Param {
     return isNotNull() && pattern.matcher(value.get()).matches();
   }
   
+  public boolean endsWith(String substring) {
+    return isNotNull() && value.get().endsWith(substring);
+  }
+  
+  public boolean startsWith(String substring) {
+    return isNotNull() && value.get().startsWith(substring);
+  }
+  
+  public boolean contains(String substring) {
+    return isNotNull() && value.get().contains(substring);
+  }
+  
   public boolean isPositiveNonZero() {
     return isAtLeast(0);
   }

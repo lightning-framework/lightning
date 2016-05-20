@@ -5,16 +5,16 @@ import java.io.File;
 import lightning.config.Config;
 import lightning.inject.InjectorModule;
 import lightning.server.LightningInstance;
+import lightning.server.LightningServer;
 
-// TODO(mschurr): Provide a way to stop the server after launching it.
 public final class Lightning {
   /**
    * Starts the application server using the given configuration parameters.
    * @param config
    * @throws Exception On failure to initialize sever.
    */
-  public static void launch(Config config) throws Exception {
-    LightningInstance.start(config);
+  public static LightningServer launch(Config config) throws Exception {
+    return LightningInstance.start(config).join();
   }
   
   /**
@@ -22,8 +22,8 @@ public final class Lightning {
    * @param file A JSON-formatted config file (see source code of Config for structure).
    * @throws Exception
    */
-  public static void launch(File file) throws Exception {
-    LightningInstance.start(file);
+  public static LightningServer launch(File file) throws Exception {
+    return LightningInstance.start(file).join();
   }
   
   /**
@@ -33,19 +33,19 @@ public final class Lightning {
    * @param clazz A custom class you defined which extends config and may contain additional options.
    * @throws Exception
    */
-  public static void launch(File file, Class<? extends Config> clazz) throws Exception {
-    LightningInstance.start(file, clazz);
+  public static LightningServer launch(File file, Class<? extends Config> clazz) throws Exception {
+    return LightningInstance.start(file, clazz).join();
   }
   
-  public static void launch(Config config, InjectorModule injector) throws Exception {
-    LightningInstance.start(config, injector);
+  public static LightningServer launch(Config config, InjectorModule injector) throws Exception {
+    return LightningInstance.start(config, injector).join();
   }
   
-  public static void launch(File file, InjectorModule injector) throws Exception {
-    LightningInstance.start(file, injector);
+  public static LightningServer launch(File file, InjectorModule injector) throws Exception {
+    return LightningInstance.start(file, injector).join();
   }
   
-  public static void launch(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
-    LightningInstance.start(file, clazz, injector);
+  public static LightningServer launch(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
+    return LightningInstance.start(file, clazz, injector).join();
   }
 }

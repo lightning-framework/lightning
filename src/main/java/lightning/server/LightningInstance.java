@@ -17,36 +17,36 @@ public class LightningInstance {
   private static Config config;
   private static MySQLDatabaseProvider dbp;
   
-  public static void start(File file, InjectorModule injector) throws Exception {
+  public static LightningServer start(File file, InjectorModule injector) throws Exception {
     Config cfg = JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), Config.class);
-    start(cfg, injector);
+    return start(cfg, injector);
   }
   
-  public static void start(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
+  public static LightningServer start(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
     Config cfg = JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), clazz);
-    start(cfg, injector);
+    return start(cfg, injector);
   }
   
-  public static void start(File file) throws Exception {
-    start(file, new InjectorModule());
+  public static LightningServer start(File file) throws Exception {
+    return start(file, new InjectorModule());
   }
   
-  public static void start(Config cfg) throws Exception {
-    start(cfg, new InjectorModule());
+  public static LightningServer start(Config cfg) throws Exception {
+    return start(cfg, new InjectorModule());
   }
   
-  public static void start(File file, Class<? extends Config> clazz) throws Exception {
-    start(file, clazz, new InjectorModule());
+  public static LightningServer start(File file, Class<? extends Config> clazz) throws Exception {
+    return start(file, clazz, new InjectorModule());
   }
   
-  public static void start(Config cfg, InjectorModule injector) throws Exception {
+  public static LightningServer start(Config cfg, InjectorModule injector) throws Exception {
     config = cfg;
     Log.setLog(null);    
     
     dbp = new MySQLDatabaseProviderImpl(config.db);
         
-    server = new LightningServer();
-    server.configure(config, dbp, injector);
+    server = new LightningServer(config, dbp, injector);
     server.start();
+    return server;
   }
 }

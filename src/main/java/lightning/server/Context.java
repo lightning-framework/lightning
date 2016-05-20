@@ -60,7 +60,7 @@ public class Context {
     controller.set(c);
   }
   
-  static final HandlerContext context() {
+  public static final HandlerContext context() {
     return controller.get();
   }
   

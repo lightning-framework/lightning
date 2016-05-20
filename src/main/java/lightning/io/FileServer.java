@@ -120,7 +120,7 @@ public class FileServer implements ResourceFactory {
   }
   
   public void disableCaching() {
-    _defaultCacheControl = getCacheControl(CacheControl.NONE);
+    _defaultCacheControl = getCacheControl(CacheControl.NO_CACHE);
     _etags = false;
     _cache.flushCache();
     _cache = null;
@@ -208,7 +208,7 @@ public class FileServer implements ResourceFactory {
   
   protected PreEncodedHttpField getCacheControl(CacheControl type) {
     switch (type) {
-      case NONE:
+      case NO_CACHE:
         return new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "no-cache, no-store, max-age=0, must-revalidate");
       case PRIVATE:
         return new PreEncodedHttpField(HttpHeader.CACHE_CONTROL, "private, max-age=3600");
