@@ -366,7 +366,14 @@ public final class Session {
     data.put(LAST_USE_KEY, Time.now());
     changedKeys.add(LAST_USE_KEY);
     storage.put(hashToken(rawIdentifier), data, changedKeys);
-    cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+    try {
+      String existingCookie = cookies.get(SESSION_COOKIE_NAME);
+      if (existingCookie != null && !existingCookie.equals(rawIdentifier)) {
+        cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+      }
+    } catch (InsecureCookieException e) {
+      cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+    }
     logger.debug("Wrote session to storage: {}", rawIdentifier);
     logger.debug("Session data was: {}", data);
     isDirty = false;
