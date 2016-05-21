@@ -47,7 +47,7 @@ public class Hasher {
    * Generates a random token.
    * @param numBytes The number of bytes
    * @param checker Checks whether or not a token is in use.
-   * @return Raw (un-encrypted) token.
+   * @return Raw (unencrypted) token.
    */
   public static String generateToken(int numBytes, InUseChecker checker) throws Exception {
     while (true) {
@@ -64,6 +64,7 @@ public class Hasher {
   }
   
   /**
+   * Verifies a signed value, returning the raw value if successful.
    * @param hash A signed value.
    * @return The raw value.
    * @throws HashVerificationException If not valid.

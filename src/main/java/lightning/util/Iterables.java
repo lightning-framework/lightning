@@ -5,12 +5,17 @@ import java.util.List;
 import java.util.ListIterator;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 
 /**
  * Provides utility functions for efficiently wrapping Iterable objects.
  * Note: Some of these are provided in Guava as well.
  */
 public class Iterables {
+  public static <T> Iterable<T> empty() {
+    return ImmutableList.of();
+  }
+  
   @FunctionalInterface
   public static interface Filter<T> {
     /**

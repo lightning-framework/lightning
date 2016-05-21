@@ -86,22 +86,22 @@ An example launcher follows:
 class MyApp {
   private static void parseConfig(File file) throws Exception {
     return JsonFactory.newJsonParser().fromJson(
-        IOUtils.toString(new FileInputStream(file)), 
+        IOUtils.toString(new FileInputStream(file)),
         Config.class);
   }
 
   public static void main(String[] args) throws Exception {
     // Parse command-line flags.
     Flags.parse(args);
-  
+
     // Parse the configuration from a JSON file.
     Config config = parseConfig(new File(args[0]));
-    
+
     // Modify config values depending on flags.
     if (Flags.has("debug")) {
       config.enableDebugMode = true;
     }
-  
+
     // To inject custom dependencies into your handlers, define an InjectorModule.
     // See the documentation for InjectorModule for more information.
     // Any dependencies you bind here will be injectable as arguments.
@@ -118,7 +118,7 @@ class MyApp {
 
 ** NOTE ** If you are using debug mode, you will want to set the working directory to the root of your project folder (the folder that contains `/src/main/java`) so that code snippets, classes, templates, and files can be automatically reloaded from disk. Any working directory can be used if you are not running in debug mode.
 
-### 3) Define your controllers. 
+### 3) Define your controllers.
 
 A controller is simply a class that handles incoming requests. Controllers must be annotated with `@Controller` and defined within a subpackage of any of the packages provided in `scanPrefixes`.
 
@@ -134,7 +134,7 @@ import static lightning.server.Context.*;
 import lightning.ann.*;
 import static lightning.enums.HTTPMethod.*;
 
-// Any class which contains routes must be annotated with @Controller. 
+// Any class which contains routes must be annotated with @Controller.
 // This annotation is inherited by subclasses.
 @Controller
 class MyController {
@@ -146,9 +146,9 @@ class MyController {
   // Inject the value of the route parameter "username" by
   // annotating the parameter with @RParam.
   // Lightning is flexible; your handler can accept any number
-  // of injectable arguments and may return any object (or even 
+  // of injectable arguments and may return any object (or even
   // void) depending on what your handler does.
-  public Map<String, ?> handleProfilePage(@RParam("username") String username) 
+  public Map<String, ?> handleProfilePage(@RParam("username") String username)
       throws Exception {
     return ImmutableMap.of(); // Return the template view model.
   }
@@ -322,7 +322,7 @@ An example of transactions follows:
 ```java
 int value = db().transaction(() -> {
   // ... perform your queries here ...
-  
+
   db().transaction(() -> {
     // You can execute transactions within transactions.
     // Transactions are "re-entrant" on the same database connection.
@@ -330,7 +330,7 @@ int value = db().transaction(() -> {
     // containing transaction and will not be committed until the containing
     // transaction is committed.
   });
-  
+
   // Whatever is returned from the closure is returned by the invocation
   // of db().transaction(). Returning a value is optional; transaction
   // closures may also be void-returning methods.
@@ -357,7 +357,7 @@ public class MyFilter implements Filter {
   public DenialOfServiceFilter(Config config) {
     this.config = config;
   }
-  
+
   // Executes the filter. Calling halt() or throwing an exception will
   // prevent the triggering route from executing.
   @Override
@@ -376,7 +376,7 @@ Invoking `lightning.server.Context.halt()` will stop request processing by throw
 
 ### Request/Response
 
-Invoking `lightning.server.Context.request()` and `lightning.server.Context.response()` will return objects representing the request and response. The `lightning.http.Request`, `lightning.http.Response`, and `lightning.mvc.HandlerContext` classes encapsulate request-specific information - refer to their documentation for details. 
+Invoking `lightning.server.Context.request()` and `lightning.server.Context.response()` will return objects representing the request and response. The `lightning.http.Request`, `lightning.http.Response`, and `lightning.mvc.HandlerContext` classes encapsulate request-specific information - refer to their documentation for details.
 
 ### Understanding Parameter Handling
 
@@ -496,9 +496,4 @@ In order to find code snippets, your working directory must be the folder that c
 
 ### Examples
 
-The following applications are built using Lightning:
-
-* [Rice Schedule Planner](https://github.com/rice-apps/scheduleplanner)
-* [Tiny URL Demo](https://github.com/mschurr/coll144-assignment6/tree/master/src/main/java/demos/tinyurl)
-* [File Share Demo](https://github.com/mschurr/coll144-assignment6/tree/master/src/main/java/demos/fileshare)
-
+See [Lightning Examples](https://github.com/lightning-framework/examples)

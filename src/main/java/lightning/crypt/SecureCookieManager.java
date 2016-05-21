@@ -15,30 +15,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import lightning.enums.HTTPScheme;
+import lightning.http.HeadersAlreadySentException;
 import lightning.http.Request;
 import lightning.http.Response;
+import lightning.mvc.Param;
 
 /**
- * Provides functionality for reading and writing secure HTTP cookies in the Spark Java web framework.
+ * Provides functionality for reading and writing secure HTTP cookies.
  * A 'secure' cookie is flagged with HTTPONLY, SECUREONLY, and signed with HMAC SHA256.
  * Only cookies that are not tampered with can read back via has(name) and get(name).
  * Can be used to safely set authentication and session cookies.
- * 
- * Example Usage:
- * SecureCookieManager.setSecretKey("SOMETHING VERY SECRET LONG AND RANDOM");
- * 
- * get("/", (request, response) -> {
- *   SecureCookieManager cookies = SecureCookieManager.forRequest(request, response);
- * 
- *   if (cookies.has("test")) { // Returns false if the cookie was tampered with.
- *     String value = cookies.get("test");
- *     cookies.delete("test");
- *     return "Found Cookie: " + value;
- *   } else {
- *     cookies.set("test", "Hello World!");
- *     return "Set Cookie!";
- *   }
- * });
  */
 public class SecureCookieManager {
   private static final Logger logger = LoggerFactory.getLogger(SecureCookieManager.class);
@@ -112,16 +98,14 @@ public class SecureCookieManager {
     return new SecureCookieManager(request, response, secretKey, alwaysSetSecureOnly);
   }
   
+  // ------------------------------------------------------------------------
+  
   private final Request request;
   private final Response response;
   private int hashCharLen = 0;
   private String sharedSecretKey = null;
   private boolean alwaysSetSecureOnly = false;
   
-  /**
-   * @param request Spark HTTP request
-   * @param response Spark HTTP response
-   */
   private SecureCookieManager(Request request, Response response, String secretKey, boolean alwaysSetSecureOnly) {
     this.request = request;
     this.response = response;
@@ -135,7 +119,7 @@ public class SecureCookieManager {
    * @param name Cookie name
    * @param value Cookie value (raw)
    */
-  public void set(String name, String value) {
+  public void set(String name, String value)  throws HeadersAlreadySentException {
     set(name, value, "/", LIFETIME_SECONDS, true);
   }
   
@@ -147,7 +131,11 @@ public class SecureCookieManager {
    * @param maxAgeSec
    * @param httpOnly
    */
-  public void set(String name, String value, String path, int maxAgeSec, boolean httpOnly) {
+  public void set(String name, String value, String path, int maxAgeSec, boolean httpOnly) throws HeadersAlreadySentException {
+    if (response.hasSentHeaders()) {
+      throw new HeadersAlreadySentException();
+    }
+    
     boolean secure = alwaysSetSecureOnly || request.scheme() == HTTPScheme.HTTPS;
     logger.debug("Setting Cookie: name={} path={} maxAge={} httpOnly={} secure={} value={}", name, path, maxAgeSec, httpOnly, secure, value);
     Cookie cookie = new Cookie(name, value + sign(name + value, sharedSecretKey));
@@ -181,21 +169,21 @@ public class SecureCookieManager {
    * @throws InsecureCookieException On failure to find and validate the cookie.
    */
   public String get(String name) throws InsecureCookieException {
-    String value = request.unencryptedCookie(name);
+    Param value = request.unencryptedCookie(name);
     
     // Ensure the cookie was set.
-    if (value == null) {
+    if (!value.exists()) {
       throw new InsecureCookieException("No such cookie exists.");
     }
     
     // Ensure a signature can be present.
-    if (value.length() < hashCharLen) {
+    if (value.stringValue().length() < hashCharLen) {
       throw new InsecureCookieException("No signature found.");
     }
     
     // Split the plain text value and signature.
-    String plaintext = value.substring(0, value.length() - hashCharLen);
-    String hash = value.substring(value.length() - hashCharLen, value.length());
+    String plaintext = value.stringValue().substring(0, value.stringValue().length() - hashCharLen);
+    String hash = value.stringValue().substring(value.stringValue().length() - hashCharLen, value.stringValue().length());
     
     // Verify the signature.
     if (!verifySignature(hash, name + plaintext, sharedSecretKey)) {
@@ -234,7 +222,7 @@ public class SecureCookieManager {
    * Deletes the cookie with the given name.
    * @param name Cookie name.
    */
-  public void delete(String name) {
+  public void delete(String name) throws HeadersAlreadySentException {
     logger.debug("Deleting Cookie: name={}", name);
     response.removeCookie(name);
   }

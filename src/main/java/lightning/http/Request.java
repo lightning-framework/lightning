@@ -12,23 +12,29 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.Part;
 
-import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-
 import lightning.crypt.SecureCookieManager;
 import lightning.crypt.SecureCookieManager.InsecureCookieException;
 import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPScheme;
+import lightning.mvc.ObjectParam;
 import lightning.mvc.Param;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+
+/**
+ * Lightning's representation of an incoming HTTP request.
+ */
 public class Request {
   protected final HttpServletRequest request;
   protected List<String> wildcardMatches;
   protected Map<String, String> parameters;
   protected SecureCookieManager cookies;
   protected final boolean trustLoadBalancerHeaders;
+  protected Map<String, Object> properties;
 
   public Request(HttpServletRequest request, boolean trustLoadBalancerHeaders) {
     this.request = request;
@@ -36,16 +42,52 @@ public class Request {
     parameters = ImmutableMap.of();
     cookies = null;
     this.trustLoadBalancerHeaders = trustLoadBalancerHeaders;
+    properties = null;
+  }
+  
+  /**
+   * Returns a property attached to the request.
+   * @param name
+   * @return
+   */
+  public ObjectParam property(String name) {
+    if (properties == null) {
+      return new ObjectParam(null);
+    }
+    
+    return new ObjectParam(properties.get(name));
+  }
+  
+  /**
+   * Sets a property attached to the request.
+   * @param name
+   * @param value
+   */
+  public void property(String name, Object value) {
+    if (properties == null) {
+      properties = new HashMap<>();
+    }
+    
+    properties.put(name, value);
+  }
+  
+  /**
+   * Returns all of the properties attached to the request.
+   * @return
+   */
+  public Set<String> properties() {
+    if (properties == null) {
+      return ImmutableSet.of();
+    }
+    
+    return Collections.unmodifiableSet(properties.keySet());
   }
 
   /**
-   * Returns a list of all cookies names attached to the request whose cryptographic signatures
-   * could be verified.
-   * 
-   * @return
+   * @return The names of all valid, signed cookies attached to the request.
    */
-  public Iterable<String> cookies() {
-    return cookies.all();
+  public Set<String> cookies() {
+    return Collections.unmodifiableSet(cookies.all());
   }
 
   /**
@@ -55,10 +97,10 @@ public class Request {
    * If the framework receives a cookie from a user that is not signed correctly, the framework will
    * ignore that cookie (act as if it does not exist).
    * 
-   * If you wish to read cookies that are unsigned, use the unencryptedCookie(s) methods.
+   * If you wish to read cookies that are unsigned, use the unencryptedCookie(...) method.
    * 
-   * @param name A cookie name.
-   * @return
+   * @param name The name of a cookie.
+   * @return The value of the cookie (expressed as a Param).
    */
   public Param cookie(String name) {
     try {
@@ -69,34 +111,30 @@ public class Request {
   }
 
   /**
-   * @return The underlying HttpServletRequest.
+   * @return Returns the underlying Jetty request.
    */
   public HttpServletRequest raw() {
     return request;
   }
 
   /**
-   * Fetches the value of an HTTP header.
-   * 
    * @param header An HTTP header.
-   * @return
+   * @return The value of the given header.
    */
   public Param header(HTTPHeader header) {
     return header(header.getHeaderName());
   }
 
   /**
-   * Fetches the value of an HTTP header.
-   * 
    * @param headerName An HTTP header name.
-   * @return
+   * @return The value of the given header.
    */
   public Param header(String headerName) {
     return Param.wrap(headerName, request.getHeader(headerName));
   }
 
   /**
-   * @return The method of the current request.
+   * @return The HTTP method of the current request.
    */
   public HTTPMethod method() {
     return HTTPMethod.valueOf(request.getMethod().toUpperCase());
@@ -110,37 +148,31 @@ public class Request {
   }
 
   /**
-   * Fetches the value of a route parameter.
-   * 
    * @param name A route parameter name (do not prefix with :).
-   * @return
+   * @return The value of the given route parameter.
    */
   public Param routeParam(String name) {
     return Param.wrap(name, parameters.get(name));
   }
 
   /**
-   * @return A set of all route parameter names.
+   * @return Returns the list of all set route parameter names.
    */
   public Set<String> routeParams() {
-    return parameters.keySet();
+    return Collections.unmodifiableSet(parameters.keySet());
   }
 
   /**
-   * Returns the wildcard path of the matched route. This is the path starting from the location of
-   * the wildcard. For example, a route to "/u/*" for path "/u/my/page" would reutrn "my/page"
-   * 
-   * @return
+   * @return The wildcard path of the matched route. This is the path starting from the location of
+   *         the wildcard. For example, a route to "/u/*" for path "/u/my/page" would return "my/page"
    */
   public String wildcardPath() {
     return Joiner.on("/").join(wildcardMatches);
   }
 
   /**
-   * Returns the wildcard segments of the matched route. For example, a route to "/u/*" for path
-   * "/u/my/page" would return ["my", "page"].
-   * 
-   * @return
+   * @return The wildcard segments of the matched route. For example, a route to "/u/*" for path
+   *         "/u/my/page" would return ["my", "page"].
    */
   public List<String> wildcards() {
     return Collections.unmodifiableList(wildcardMatches);
@@ -158,17 +190,15 @@ public class Request {
    * POST data or GET parameters.
    * 
    * @param name A query parameter name.
-   * @return
+   * @return The value of the given query parameter.
    */
   public Param queryParam(String name) {
     return Param.wrapList(name, request.getParameterValues(name));
   }
 
   /**
-   * Returns the scheme (HTTP or HTTPS). NOTE: Respects X-Forwarded-Proto if
-   * server.trustLoadBalancerHeaders is true.
-   * 
-   * @return
+   * @return Returns the HTTP scheme (HTTP or HTTPS). Respects the X-Forwarded-Proto header if the
+   *         server is configured to honor it.
    */
   public HTTPScheme scheme() {
     if (trustLoadBalancerHeaders && header(HTTPHeader.X_FORWARDED_PROTO).exists()) {
@@ -190,39 +220,38 @@ public class Request {
   }
 
   /**
-   * NOTE: Prefer using cookies().
-   * 
-   * @return A map of all cookie names to cookie values.
+   * @return A map of all cookie names to cookie values. Prefer using cookies().
    */
-  public Map<String, String> unencryptedCookies() {
-    // TODO: Make O(1) by caching
-    Map<String, String> result = new HashMap<String, String>();
+  public Map<String, Param> unencryptedCookies() {
+    Map<String, Param> result = new HashMap<>();
     Cookie[] cookies = request.getCookies();
+    
     if (cookies != null) {
       for (Cookie cookie : cookies) {
-        result.put(cookie.getName(), cookie.getValue());
+        result.put(cookie.getName(), Param.wrap(cookie.getName(), cookie.getValue()));
       }
     }
+    
     return result;
   }
 
   /**
-   * NOTE: Prefer using cookie(name).
-   * 
    * @param name A cookie name.
-   * @return The value of the cookie with given name, or null if it doesn't exist.
+   * @return The raw value of the cookie with given name, or null if it doesn't exist. Prefer using
+   *         cookie(...).
    */
-  public String unencryptedCookie(String name) {
-    // TODO: Make O(1) by caching
+  public Param unencryptedCookie(String name) {
     Cookie[] cookies = request.getCookies();
+    
     if (cookies != null) {
       for (Cookie cookie : cookies) {
         if (cookie.getName().equals(name)) {
-          return cookie.getValue();
+          return Param.wrap(name, cookie.getValue());
         }
       }
     }
-    return null;
+    
+    return Param.wrap(name, null);
   }
 
   /**
@@ -233,9 +262,8 @@ public class Request {
   }
 
   /**
-   * NOTE: Respectes X-Forwarded-For if server.setLoadBalancerHeaders is true.
-   * 
-   * @return The IP address of the client.
+   * @return The IP address of the client (as a String). Respects the X-Forwarded-For header
+   *         if the server is configured to honor it.
    */
   public String ip() {
     if (trustLoadBalancerHeaders && header(HTTPHeader.X_FORWARDED_FOR).exists()) {
@@ -256,37 +284,47 @@ public class Request {
    * @return The set of all query parameter names attached to the request.
    */
   public Set<String> queryParams() {
-    return request.getParameterMap().keySet();
+    return Collections.unmodifiableSet(request.getParameterMap().keySet());
   }
 
   /**
-   * @return Whether or not the request was received securely.
+   * @return Whether or not the request was received securely (via HTTPS).
    */
   public boolean isSecure() {
     return scheme().isSecure();
   }
 
   /**
-   * @return Content type of incoming request (maybe null).
+   * @return Content type of incoming request (may not exist).
    */
-  public String contentType() {
-    return request.getContentType();
+  public Param contentType() {
+    return Param.wrap(request.getContentType());
   }
 
   /**
-   * @return the part of this request's URL from the protocol name up to the query string in the
+   * @return The part of this request's URL from the protocol name up to the query string in the
    *         first line of the HTTP request.
    */
   public String uri() {
     return request.getRequestURI();
   }
 
+  /**
+   * @return Whether or not the incoming request is an HTTP multi-part request.
+   */
   public boolean isMultipart() {
     return method() == HTTPMethod.POST 
         && request.getContentType() != null
         && request.getContentType().startsWith("multipart/form-data");
   }
 
+  /**
+   * @param name A part name.
+   * @return The part with the given name in a multipart-request.
+   * @throws BadRequestException If incoming request is not multipart or part is missing.
+   * @throws IOException
+   * @throws ServletException
+   */
   public Part getPart(String name) throws BadRequestException, IOException, ServletException {
     if (!isMultipart()) {
       throw new BadRequestException("Expected a multipart request.");

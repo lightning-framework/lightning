@@ -4,6 +4,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import lightning.crypt.SecureCookieManager;
 
+/**
+ * Lightning's internal representation of an HTTP response.
+ * Used internally to prevent users from referencing these APIs.
+ */
 public class InternalResponse extends Response {
   public InternalResponse(HttpServletResponse response) {
     super(response);

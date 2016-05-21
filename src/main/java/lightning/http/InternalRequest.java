@@ -7,6 +7,10 @@ import javax.servlet.http.HttpServletRequest;
 
 import lightning.crypt.SecureCookieManager;
 
+/**
+ * Lightning's internal representation of an HTTP request.
+ * Used internally to prevent users from accessing these API methods.
+ */
 public class InternalRequest extends Request {
   public InternalRequest(HttpServletRequest request, boolean trustLoadBalancerHeaders) {
     super(request, trustLoadBalancerHeaders);
