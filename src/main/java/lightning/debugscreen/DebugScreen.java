@@ -46,7 +46,7 @@ public class DebugScreen {
 
     public DebugScreen(SourceLocator... sourceLocators) {
         templateConfig = new Configuration(new Version(2, 3, 23));
-        templateConfig.setClassForTemplateLoading(getClass(), "/");
+        templateConfig.setClassForTemplateLoading(getClass(), "/lightning");
         this.sourceLocators = sourceLocators;
     }
     
