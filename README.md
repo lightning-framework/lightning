@@ -346,13 +346,13 @@ We recommend doing the following:
 3) Use your config to configure dependency injection for a connection pooler for your database system.
 4) Create an `AbstractController` from which all your controllers will inherit. Provide convenience methods here for accessing your database by injecting the database pooler into an `@Initializer`.
 
-### Before Filters
+### Filters
 
-You may specify code to execute before a request by defining a filter and using the `@Before` annotation. Filters are similar to controllers: a new instance is allocated for each incoming request, used, and then discarded.
+You may specify code to execute before a request by defining a filter and using the `@Filter` annotation. Filters are similar to controllers: a new instance is allocated for each incoming request, used, and then discarded.
 
 ```java
 // Define a filter.
-public class MyFilter implements Filter {
+public class MyFilter implements RouteFilter {
   // Constructor parameters are injectable.
   public DenialOfServiceFilter(Config config) {
     this.config = config;
@@ -368,7 +368,7 @@ public class MyFilter implements Filter {
 }
 ```
 
-We require an `@Before` annotation to be present on each route method using the filter because our design goal was for programmers to be able to look at a route method and see exactly what will happen.
+We require an `@Filter` annotation to be present on each route method using the filter because our design goal was for programmers to be able to look at a route method and see exactly what will happen.
 
 ### Halt
 

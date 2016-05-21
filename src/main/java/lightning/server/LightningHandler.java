@@ -13,8 +13,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import lightning.Lightning;
-import lightning.ann.Before;
-import lightning.ann.Befores;
+import lightning.ann.Filter;
+import lightning.ann.Filters;
 import lightning.ann.ExceptionHandler;
 import lightning.ann.Json;
 import lightning.ann.Multipart;
@@ -33,7 +33,7 @@ import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningException;
 import lightning.fn.ExceptionViewProducer;
-import lightning.fn.Filter;
+import lightning.fn.RouteFilter;
 import lightning.groups.Groups;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -304,13 +304,13 @@ public class LightningHandler extends AbstractHandler {
             ctx.requireXsrf(info.inputName());
           }
           
-          if (m.getAnnotation(Befores.class) != null) {
-            for (Before filter : m.getAnnotation(Befores.class).value()) {
-              Filter instance = (Filter) injector.newInstance(filter.value());
+          if (m.getAnnotation(Filters.class) != null) {
+            for (Filter filter : m.getAnnotation(Filters.class).value()) {
+              RouteFilter instance = (RouteFilter) injector.newInstance(filter.value());
               instance.execute();
             }
-          } else if (m.getAnnotation(Before.class) != null) {
-            Filter instance = (Filter) injector.newInstance(m.getAnnotation(Before.class).value());
+          } else if (m.getAnnotation(Filter.class) != null) {
+            RouteFilter instance = (RouteFilter) injector.newInstance(m.getAnnotation(Filter.class).value());
             instance.execute();
           }
           

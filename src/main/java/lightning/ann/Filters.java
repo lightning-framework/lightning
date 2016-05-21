@@ -7,12 +7,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Aggregates @Before.
+ * Aggregates Filter.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface Befores {
-  @SuppressWarnings("deprecation")
-  Before[] value();
+public @interface Filters {
+  Filter[] value();
 }

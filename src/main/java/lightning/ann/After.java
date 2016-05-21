@@ -7,7 +7,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import lightning.fn.Filter;
+import lightning.enums.FilterPriority;
+import lightning.enums.HTTPMethod;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
@@ -15,5 +16,7 @@ import lightning.fn.Filter;
 @Repeatable(Afters.class)
 @Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface After {
-  Class<? extends Filter> value();
+  public String value(); // Request path (follows same syntax as @Route).
+  HTTPMethod[] methods() default {HTTPMethod.GET};
+  FilterPriority priority() default FilterPriority.NORMAL;
 }

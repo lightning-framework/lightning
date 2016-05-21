@@ -1,6 +1,6 @@
 package lightning.fn;
 
 @FunctionalInterface
-public interface Filter {
+public interface RouteFilter {
   public void execute() throws Exception;
 }
