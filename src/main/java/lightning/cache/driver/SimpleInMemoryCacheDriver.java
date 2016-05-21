@@ -8,10 +8,10 @@ import lightning.cache.CacheException;
 /**
  * A horrible implementation of an in-memory cache with no expiration or size limit.
  */
-public class InMemoryCacheDriver implements CacheDriver {
+public class SimpleInMemoryCacheDriver implements CacheDriver {
   public ConcurrentHashMap<String, Object> map;
   
-  public InMemoryCacheDriver() {
+  public SimpleInMemoryCacheDriver() {
     map = new ConcurrentHashMap<>();
   }
 

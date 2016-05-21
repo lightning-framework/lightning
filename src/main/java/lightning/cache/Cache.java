@@ -1,6 +1,6 @@
 package lightning.cache;
 
-import java.io.Serializable;
+import lightning.mvc.ObjectParam;
 
 public final class Cache {
   private final CacheDriver driver;
@@ -9,9 +9,8 @@ public final class Cache {
     this.driver = driver;
   }
   
-  @SuppressWarnings("unchecked")
-  public <T extends Serializable> T get(String key, Class<T> clazz) throws CacheException {
-    return (T) driver.get(key);
+  public ObjectParam get(String key) throws CacheException {
+    return new ObjectParam(driver.get(key));
   }
   
   public void put(String key, Object value) throws CacheException {

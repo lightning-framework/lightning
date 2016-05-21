@@ -33,9 +33,6 @@ public class ExampleWebsocket {
     config.server.hmacKey = "ABCDEFG";
     config.server.staticFilesPath = ".";
     config.server.templateFilesPath = ".";
-    //config.server.enableHttp2 = true;
-    //config.ssl.keyStoreFile = "";
-    //config.ssl.keyStorePassword = "";
     Lightning.launch(config);
   }
   

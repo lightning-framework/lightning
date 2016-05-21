@@ -3,30 +3,29 @@ package lightning.sessions;
 import java.io.Serializable;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import lightning.config.Config;
 import lightning.crypt.SecureCookieManager;
 import lightning.crypt.SecureCookieManager.InsecureCookieException;
 import lightning.http.Request;
 import lightning.http.Response;
+import lightning.mvc.ObjectParam;
 import lightning.util.Iterables;
 import lightning.util.Time;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.hash.Hashing;
 
 /**
- * Implements a session system for the Spark web framework.
- * Improves upon Spark's native session functionality by adding extra security features and
+ * Implements a session system.
+ * Improves upon native session functionality by adding extra security features and
  * (by allowing custom storage drivers) supporting distributed session management.
  * 
  * Session are loaded and saved lazily (no operations on storage unless necessary).
@@ -36,10 +35,6 @@ import com.google.common.hash.Hashing;
  * session is saved (since after content is sent the session manager is not able to write the session
  * ID cookie). Happens because HandlerContext is closed (which invokes session save) after the user
  * handler is invoked.
- * 
- * Example Usage:
- * Session.setStorageDriver(new MyStorageDriverClass());
- * Session session = Session.forRequest(Request request, Response response);
  */
 public final class Session {
   private static final Logger logger = LoggerFactory.getLogger(Session.class);
@@ -149,6 +144,8 @@ public final class Session {
     public void keepAliveIfExists(String hashedId) throws SessionDriverException;
   }
   
+  // -----------------------------------------------------------------  
+  
   private final SessionStorageDriver storage;
   private final SecureCookieManager cookies;
   private final Request request;
@@ -226,7 +223,11 @@ public final class Session {
     return isDirty;
   }
   
-  public Iterable<String> keys() throws SessionException {
+  /**
+   * @return All valid keys stored on the session.
+   * @throws SessionException
+   */
+  private Iterable<String> userKeys() throws SessionException {
     lazyLoad();
     return Iterables.filter(data.keySet(), (x) -> !x.startsWith(SESSION_KEY_PREFIX));
   }
@@ -239,7 +240,7 @@ public final class Session {
    */
   public void set(String key, Object value) throws SessionException {
     if (key.startsWith(SESSION_KEY_PREFIX))
-      return;    
+      throw new SessionException("Error: Key is reserved by session manager.");    
     if (!(value instanceof Serializable)) // Note: Also prevents storing null pointers!
       throw new SessionException("Error: Unable to store nonserializable object in Session.");
     
@@ -254,12 +255,19 @@ public final class Session {
     return rawIdentifier;
   }
   
-  public Map<String, Object> asMap() throws SessionException {
+  public Map<String, ObjectParam> asMap() throws SessionException {
     lazyLoad();
-    return ImmutableMap.copyOf(data);
+    
+    Map<String, ObjectParam> map = new HashMap<>();
+    
+    for (String key : userKeys()) {
+      map.put(key, get(key));
+    }
+    
+    return map;
   }
   
-  public Set<String> allKeys() throws SessionException {
+  public Set<String> keys() throws SessionException {
     lazyLoad();
     return asMap().keySet();
   }
@@ -270,58 +278,14 @@ public final class Session {
    * @return The data stored under key.
    * @throws SessionException On I/O failure.
    */
-  public Object get(String key) throws SessionException {
+  public ObjectParam get(String key) throws SessionException {
     if (key.startsWith(SESSION_KEY_PREFIX))
       return null;
-    if (!data.containsKey(key))
-      throw new SessionException("Attempted to access data for non-existent key.");
-    
     lazyLoad();
-    return data.get(key);
-  }
-  
-  public long getLong(String key) throws SessionException {
-    return (Long) get(key);
-  }
-  
-  public int getInt(String key) throws SessionException {
-    return (Integer) get(key);
-  }
-  
-  public String getString(String key) throws SessionException {
-    return (String) get(key);
-  }
-  
-  public char getChar(String key) throws SessionException {
-    return (Character) get(key);
-  }
-  
-  public boolean getBoolean(String key) throws SessionException {
-    return (Boolean) get(key);
-  }
-  
-  public double getDouble(String key) throws SessionException {
-    return (Double) get(key);
-  }
-  
-  public float getFloat(String key) throws SessionException {
-    return (Float) get(key);
-  }
-  
-  @SuppressWarnings("unchecked")
-  public <T> List<T> getList(String key, Class<T> type) throws SessionException {
-    return (List<T>) get(key);
-  }
-  
-  @SuppressWarnings("unchecked")
-  public <T> Set<T> getSet(String key, Class<T> type) throws SessionException {
-    return (Set<T>) get(key);
-  }
-  
-  @SuppressWarnings("unchecked")
-  public <K,V> Map<K,V> getMap(String key, Class<K> keyType, Class<V> valueType) throws SessionException {
-    return (Map<K,V>) get(key);
-  }
+    if (!data.containsKey(key))
+      return new ObjectParam(null);
+    return new ObjectParam(data.get(key));
+  }  
   
   /**
    * Removes any stored information for the given key.
@@ -418,7 +382,7 @@ public final class Session {
     }
         
     if (rawIdentifier == null) {
-      data = new TreeMap<>();
+      data = new HashMap<>();
       rawIdentifier = generateSessionId();
       cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
       logger.debug("Created new session: {}", rawIdentifier);
@@ -427,7 +391,7 @@ public final class Session {
       logger.debug("Loaded session from database: {}", rawIdentifier);
       if (data == null) {
         // No record found, create new record with new ID to prevent fixation attacks.
-        data = new TreeMap<>();
+        data = new HashMap<>();
         rawIdentifier = generateSessionId();
         cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
         logger.debug("Session invalidated due to fixation attempt; regenerated as {}.", rawIdentifier);
@@ -436,7 +400,7 @@ public final class Session {
         storage.invalidate(hashToken(rawIdentifier));
         rawIdentifier = generateSessionId();
         cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
-        data = new TreeMap<>();
+        data = new HashMap<>();
         logger.debug("Session invalidated due to timeout; regenerated as {}.", rawIdentifier);
       }
     }

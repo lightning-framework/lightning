@@ -7,6 +7,9 @@ import lightning.inject.InjectorModule;
 import lightning.server.LightningInstance;
 import lightning.server.LightningServer;
 
+/**
+ * Provides static convenience methods for initializing the framework.
+ */
 public final class Lightning {
   /**
    * Starts the application server using the given configuration parameters.
@@ -18,7 +21,7 @@ public final class Lightning {
   }
   
   /**
-   * Starts the application server by reading configuration from a given file.
+   * Starts the application server by reading configuration from a given file (JSON).
    * @param file A JSON-formatted config file (see source code of Config for structure).
    * @throws Exception
    */
@@ -37,14 +40,38 @@ public final class Lightning {
     return LightningInstance.start(file, clazz).join();
   }
   
+  /**
+   * Starts the application server with the given configuration and dependency injection module.
+   * @param config
+   * @param injector
+   * @return
+   * @throws Exception
+   */
   public static LightningServer launch(Config config, InjectorModule injector) throws Exception {
     return LightningInstance.start(config, injector).join();
   }
   
+  /**
+   * Starts the application server by reading config from the given JSON file and using the given
+   * dependency injection module.
+   * @param file
+   * @param injector
+   * @return
+   * @throws Exception
+   */
   public static LightningServer launch(File file, InjectorModule injector) throws Exception {
     return LightningInstance.start(file, injector).join();
   }
   
+  /**
+   * Starts the application server by reading config from the given JSON file and using the given
+   * dependency injection module.
+   * @param file The JSON-formatted config file
+   * @param clazz The class used to parse the config file (a subclass of lightning.config.Config).
+   * @param injector The dependency injection module.
+   * @return An instance of the server.
+   * @throws Exception On failure.
+   */
   public static LightningServer launch(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
     return LightningInstance.start(file, clazz, injector).join();
   }

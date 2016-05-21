@@ -21,7 +21,7 @@ import com.google.common.base.Optional;
 
 // TODO: Should accept an optional redirect URL as a query parameter.
 @Controller
-public class LoginController {
+public class CasAuthController {
   protected CASConfig casConfig;
   protected CASAuthenticator casAuth;
   protected final String DOMAIN = "@rice.edu";

@@ -256,7 +256,7 @@ public final class Auth {
       return false;
     }
     
-    if (Time.now() - session.getLong(LAST_PASSWORD_TIME_KEY) > SESSION_TIMEOUT) {
+    if (Time.now() - session.get(LAST_PASSWORD_TIME_KEY).longValue() > SESSION_TIMEOUT) {
       return false;
     }
     
@@ -406,7 +406,7 @@ public final class Auth {
     
       // Delete the session token from the database (if any).
       if (session.has(AUTH_TOKEN_KEY)) {
-        driver.deleteSessionAuthToken(new AuthToken(session.getString(AUTH_TOKEN_KEY)));
+        driver.deleteSessionAuthToken(new AuthToken(session.get(AUTH_TOKEN_KEY).stringValue()));
       }
     } catch (Exception e) {
       throw new AuthException(AuthException.Type.DRIVER_ERROR, e);
@@ -434,7 +434,7 @@ public final class Auth {
         && session.has(LAST_ACTIVE_KEY)
         && session.has(USER_ID_KEY)) {
       // Check if the session has expired.
-      if (Time.now() - session.getLong(LAST_ACTIVE_KEY) > SESSION_TIMEOUT) {
+      if (Time.now() - session.get(LAST_ACTIVE_KEY).longValue() > SESSION_TIMEOUT) {
         this.logout(false); // Reset these session variables if so.
         return;
       }
@@ -445,7 +445,7 @@ public final class Auth {
       // Fetch token from db.
       AuthToken token;
       try {
-        token = driver.getSessionAuthToken(session.getString(AUTH_TOKEN_KEY));
+        token = driver.getSessionAuthToken(session.get(AUTH_TOKEN_KEY).stringValue());
       } catch (Exception e) {
         throw new AuthException(AuthException.Type.DRIVER_ERROR, e);
       }
@@ -457,7 +457,7 @@ public final class Auth {
       }
       
       // Verify userId matches.
-      if (token.userId != session.getLong(USER_ID_KEY)) {
+      if (token.userId != session.get(USER_ID_KEY).longValue()) {
         this.logout(false);
         return;
       }
@@ -473,7 +473,7 @@ public final class Auth {
       
       try {
         // Note: if the user does not exist, we won't be logged in (user will be null). This is intended.
-        user = users.getById(session.getLong(USER_ID_KEY));
+        user = users.getById(session.get(USER_ID_KEY).longValue());
       } catch (Exception e) {
         throw new AuthException(AuthException.Type.DRIVER_ERROR, e);
       }

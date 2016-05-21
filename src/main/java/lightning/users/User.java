@@ -1,6 +1,7 @@
 package lightning.users;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -11,7 +12,7 @@ import java.util.TreeSet;
 import lightning.groups.Group;
 import lightning.groups.Groups;
 import lightning.groups.Groups.GroupsException;
-import lightning.sessions.Session.SessionException;
+import lightning.mvc.ObjectParam;
 import lightning.users.Users.UsersDriver;
 import lightning.users.Users.UsersException;
 import lightning.util.Time;
@@ -126,7 +127,7 @@ public final class User {
   }
   
   public Map<String, Object> __getPropertyMap() {
-    return this.properties;
+    return Collections.unmodifiableMap(this.properties);
   }
   
   public void setPassword(String plaintextPassword) {
@@ -138,8 +139,8 @@ public final class User {
     return Users.checkPassword(encryptedPassword, plaintextPassword);
   }
   
-  public Iterable<String> getProperties() {
-    return properties.keySet();
+  public Set<String> getProperties() {
+    return Collections.unmodifiableSet(properties.keySet());
   }
   
   public boolean hasProperty(String key) {
@@ -160,60 +161,18 @@ public final class User {
     isDirty = true;
   }
   
-  public Object getProperty(String key) {
+  public ObjectParam getProperty(String key) {
     if (!properties.containsKey(key)) {
-      throw new IllegalArgumentException("Key '" + key + "' is not set. Use hasProperty() to check membership before fetching.");
+      return new ObjectParam(null);
     }
     
-    return properties.get(key);
+    return new ObjectParam(properties.get(key));
   }
   
   public long getPropertyCount() {
     return properties.size();
   }
   
-  public long getLong(String key) {
-    return (Long) getProperty(key);
-  }
-  
-  public int getInt(String key) {
-    return (Integer) getProperty(key);
-  }
-  
-  public String getString(String key) {
-    return (String) getProperty(key);
-  }
-  
-  public char getChar(String key) {
-    return (Character) getProperty(key);
-  }
-  
-  public boolean getBoolean(String key) {
-    return (Boolean) getProperty(key);
-  }
-  
-  public double getDouble(String key) {
-    return (Double) getProperty(key);
-  }
-  
-  public float getFloat(String key) {
-    return (Float) getProperty(key);
-  }
-  
-  @SuppressWarnings("unchecked")
-  public <T> List<T> getList(String key, Class<T> type) throws SessionException {
-    return (List<T>) getProperty(key);
-  }
-  
-  @SuppressWarnings("unchecked")
-  public <T> Set<T> getSet(String key, Class<T> type) throws SessionException {
-    return (Set<T>) getProperty(key);
-  }
-  
-  @SuppressWarnings("unchecked")
-  public <K,V> Map<K,V> getMap(String key, Class<K> keyType, Class<V> valueType) throws SessionException {
-    return (Map<K,V>) getProperty(key);
-  }
   
   public boolean hasPrivilege(long pid) throws GroupsException, UsersException {
     return hasPrivileges(ImmutableList.of(pid));
