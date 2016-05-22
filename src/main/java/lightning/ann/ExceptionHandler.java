@@ -15,6 +15,8 @@ import java.lang.annotation.Target;
  * Indicates that a given method handles Exceptions of the given type.
  * User-defined exception handlers will take precedence over framework defined handlers.
  * 
+ * ExceptionHandlers may defined within any class in the scan prefixes defined in your config.
+ * 
  * When matching exception handlers, the framework respects the class hierarchy.
  * Thus, to have a catch-all handler, you could declare a handler for Throwable.class. 
  * 

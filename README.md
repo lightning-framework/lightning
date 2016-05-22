@@ -346,7 +346,7 @@ We recommend doing the following:
 3) Use your config to configure dependency injection for a connection pooler for your database system.
 4) Create an `AbstractController` from which all your controllers will inherit. Provide convenience methods here for accessing your database by injecting the database pooler into an `@Initializer`.
 
-### Filters
+### Annotation-Based Before Filters
 
 You may specify code to execute before a request by defining a filter and using the `@Filter` annotation. Filters are similar to controllers: a new instance is allocated for each incoming request, used, and then discarded.
 
@@ -369,6 +369,39 @@ public class MyFilter implements RouteFilter {
 ```
 
 We require an `@Filter` annotation to be present on each route method using the filter because our design goal was for programmers to be able to look at a route method and see exactly what will happen.
+
+### Path-Based Before Filters
+
+You may specify code snippets to execute before routes on given paths.
+
+```java
+import lightning.ann.Before;
+import lightning.http.AccessViolationException;
+import lightning.http.NotAuthorizedException;
+
+import static lightning.enums.FilterPriority.*;
+import static lightning.enums.HTTPMethod.*;
+import static lightning.server.Context.*;
+
+public class AccessControlFilters {
+  @Before(path="/admin/*", methods={GET, POST}, priority=HIGH)
+  public static void doFilter(HandlerContext context) throws Exception {
+    if (!user().hasPrivilege(Privilege.ADMIN)) {
+      throw new AccessViolationException();
+    }
+  }
+
+  @Before(path="/admin/*", methods={GET, POST}, priority=HIGHEST)
+  @Before(path="/account/*", methods={GET, POST}, priority=HIGHEST)
+  public static void doFilter(HandlerContext context) throws Exception {
+    if (!auth().isLoggedIn()) {
+      throw new NotAuthorizedException();
+    }
+  }
+}
+```
+
+For more information on the semantics of path-based filters, see `lightning.ann.Before`.
 
 ### Halt
 

@@ -18,6 +18,8 @@ import lightning.enums.HTTPMethod;
  * should handle traffic on the given path for the given
  * HTTP method(s).
  * 
+ * Routes may defined within any class in the scan prefixes defined in your config.
+ * 
  * The path may contain parameters or wild cards.
  * 
  * A parameter is indicated by prefixing a path segment with ":".

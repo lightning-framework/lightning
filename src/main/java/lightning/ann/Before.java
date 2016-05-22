@@ -14,6 +14,8 @@ import lightning.enums.HTTPMethod;
  * A @Before filter annotates a static method that will be invoked before a request on the given path
  * for the given HTTP methods. 
  * 
+ * Before filters may defined within any class in the scan prefixes defined in your config.
+ * 
  * A method may be annotated by multiple @Before annotations.
  * 
  * You may control the order in which filters execute by changing the priority in the annotation. Filters

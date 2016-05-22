@@ -16,6 +16,8 @@ import java.lang.annotation.Target;
  * The method will be invoked once for every incoming upgrade request. You may choose to return a
  * singleton instance each time, or to have a separate instance per socket connection.
  * 
+ * WebSocketFactories may defined within any class in the scan prefixes defined in your config.
+ * 
  * An example method signature might be:
  *   public static ExampleWebsocket produce(Config config, MySQLDatabaseProvider db) throws Exception {
  *     return new ExampleWebsocket(config, db);
