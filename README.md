@@ -31,6 +31,7 @@ This framework was written for use in a course I taught at Rice University.
   - Built-in support for websockets
   - Built-in support for HTTP/2
   - Built-in support for custom dependency injection
+  - Annotation and path-based filters
 
 # Getting Started
 
