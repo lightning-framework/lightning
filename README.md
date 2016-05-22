@@ -286,9 +286,15 @@ class MyExceptionHandlers {
 
 ### Threading and Context
 
-A thread is allocated from a pool to each incoming request. The thread is allocated only to that request until either (a) your handler exits normally or exceptionally or (b) the servlet async API is utilized.
+A thread is allocated from a pool to each incoming request. The thread is allocated only to that request until either (a) your handler exits normally or exceptionally or (b) the async API is utilized.
 
-Inside of a request handler, you may access information about the incoming request by either (a) invoking the static methods on `lightning.server.Context` or (b) dependency-injecting request-specific objects into your controller. For example, `lightning.server.Context.request()` returns an object encapsulating the current HTTP `Request`. Please note that option (a) does not work with async.
+Inside of a request handler, you may access information about the incoming request by either (a) invoking the static methods on `lightning.server.Context` (which uses `ThreadLocal` under the hood) or (b) dependency-injecting request-specific objects into your controller. Please note that option (a) does not work with async.
+
+`lightning.mvc.HandlerContext` defines objects which encapsulate all request-specific information for a request. The static methods on `lightning.server.Context` delegate to methods on the `ThreadLocal` `HandlerContext`. You can dependency inject `HandlerContext` for use with the async API.
+
+### Dependency Injection
+
+See `lightning.inject.Injector` for an explanation of dependency injection in Lightning.
 
 ### SQL Database Access
 
@@ -342,10 +348,13 @@ int value = db().transaction(() -> {
 ### Non-SQL Database Access
 
 We recommend doing the following:
-1) Define a custom configuration format (subclass `lightning.config.Config`) which includes additional config options for your database system.
-2) Configure custom dependency injection for your custom config class.
-3) Use your config to configure dependency injection for a connection pooler for your database system.
-4) Create an `AbstractController` from which all your controllers will inherit. Provide convenience methods here for accessing your database by injecting the database pooler into an `@Initializer`.
+
+  1) Define a custom configuration format (subclass `lightning.config.Config`) which includes additional config options for your database system.
+  2) Configure custom dependency injection for your custom config class.
+  3) Use your config to configure dependency injection for a connection pooler for your database system.
+  4) Create an `AbstractController` from which all your controllers will inherit. Provide convenience methods here for accessing your database by injecting the database pooler into an `@Initializer`.
+
+See the [RethinkDB Demo](https://github.com/lightning-framework/examples/tree/master/rethinkdb-demo) for an example.
 
 ### Annotation-Based Before Filters
 
@@ -410,11 +419,11 @@ Invoking `lightning.server.Context.halt()` will stop request processing by throw
 
 ### Request/Response
 
-Invoking `lightning.server.Context.request()` and `lightning.server.Context.response()` will return objects representing the request and response. The `lightning.http.Request`, `lightning.http.Response`, and `lightning.mvc.HandlerContext` classes encapsulate request-specific information - refer to their documentation for details.
+Invoking `lightning.server.Context.request()` and `lightning.server.Context.response()` will return objects representing the HTTP request and HTTP response. See `lightning.http.Request` and `lightning.http.Response`.
 
 ### Understanding Parameter Handling
 
-In lightning, most methods that return a user-provided parameter value return an instance of `lightning.mvc.Param` instead of a nullable string or option. For example, this is utilized with HTTP query parameters and headers. In practice, this provides a much more convenient interface for dealing with user input that also catches almost all data type errors.
+In Lightning, most methods that return a user-provided string value return an instance of `lightning.mvc.Param` instead of a nullable string or `Optional<String>`. For example, this is utilized with HTTP query parameters and headers. In practice, this provides a much more convenient interface for dealing with user input that also catches almost all data type errors.
 
 For example, consider a query parameter for which you want to accept an integer:
 
@@ -422,9 +431,22 @@ For example, consider a query parameter for which you want to accept an integer:
 int userValue = queryParam("name").intValue();
 ```
 
-If the user did not provide an integer, invoking `intValue` throws a `BadRequestException` which will in turn exit the request handler and generate an HTTP 400 error page. This isn't neccesarily the most user-friendly way of handling this error (a validator would be good for that), but it does ensure that the given value is *always* an integer so that you don't end up accidently storing incorrect data types into your database.
+If the user did not provide an integer, invoking `intValue` throws a `BadRequestException` which will in turn exit the request handler and generate an HTTP 400 error page. This isn't neccesarily the most user-friendly way of handling this error (should be used in combination with a validator for that), but it does ensure that the given value is *always* an integer so that you don't end up accidently storing incorrect data types into your database system.
 
 `Param` provides many more convenience methods, too - check them out! `Param` can make your code more readable when dealing with array input, enums, and checkboxes, too.
+
+A similar variant (`ObjectParam`) exists for reading values from type-unsafe server-side data stores (session properties, user properties, cache properties, etc.) and casting them to the desired types in a fail-safe manner.
+
+```java
+// Exception thrown if property does not exist or is not a List<String>.
+List<String> data = session().get("data").listValue(String.class);
+```
+
+### Cache
+
+TODO: COMING SOON!
+
+** NOTE ** Usage of these APIs is entirely optional. Requires you to have configured a cache driver.
 
 ### Validators
 
@@ -480,25 +502,25 @@ You will probably want to check out the configuration options related to multipa
 
 ### Authentication
 
-You may invoke `lightning.server.Context.auth()` to get a request-specific object that can perform authentication, log outs, or give access the authenticated user. In addition, `lightning.server.Context` defines the `isLoggedIn()` and `user()` convenience methods. These methods should be fairly self explanatory; refer to the documentation for `lightning.auth` for more information. Attempting to invoke `user()` when no user is authenticated triggers an UnauthorizedException which by default generates an HTTP 401 error page.
+You may invoke `lightning.server.Context.auth()` to get a request-specific object that can perform authentication, log outs, or give access the authenticated user. In addition, `lightning.server.Context` defines the `isLoggedIn()` and `user()` convenience methods. These methods should be fairly self explanatory; refer to the documentation for `lightning.auth` for more information. Attempting to invoke `user()` when no user is authenticated triggers a NotAuthorizedException which by default generates an HTTP 401 error page.
 
-** NOTE ** Requires you to have configured a database connection and imported the framework schema.
+** NOTE ** Usage of these APIs is entirely optional. Requires you to have configured an auth driver.
 
 ### Users/Groups/Privileges
 
 You may invoke `lightning.server.Context.groups()` and `lightning.server.Context.users()` to get objects for interacting with the sets of all groups and users respectively in aggregate.
 
-Once you have obtained a reference to a `lightning.users.User` or `lightning.users.Group`, you may mutate it and invoke save() to push the changes to the database. `User`s may also serve as key-value stores.
+Once you have obtained a reference to a `lightning.users.User` or `lightning.users.Group`, you may mutate it and invoke save() to push the changes to the database. `User`s may also serve as key-value stores (storing any type of serializable objects), though using your own storage is preferred to prevent potential data races.
 
-Users and groups may have privileges. A privilege is simply an integer stored in the database; you as a programmer must decide its meaning (probably use an enum) and enforce the access constraints it implies.
+Users and groups may have privileges. A privilege is simply an integer - you as a programmer must decide its meaning (probably use an enum) and enforce the access constraints it implies in your code (filters and the lightning annotations are good for this).
 
-** NOTE ** Requires you to have configured a database connection and imported the framework schema.
+** NOTE ** Usage of these APIs is entirely optional. Requires you to have configured a user driver and groups driver.
 
 ### Sessions
 
 You may invoke the `lightning.server.Context.session()` method to get an object for reading and setting session data. Sessions serve as a key-value store. Keys are strings, and values may be any object that implements `java.io.Serializable`.
 
-** NOTE ** Requires you to have configured a database connection and imported the framework schema.
+** NOTE ** Usage of these APIs is entirely optional. Requires you to have configured a session driver.
 
 ### Cookies
 
@@ -508,7 +530,7 @@ You may invoke the `lightning.server.Context.cookies()` method to get an object 
 
 ### Mail
 
-You may invoke the `lightning.server.Context.mail()` method to get an object for sending mail - provided you have configured SMTP or the logging driver in `lightning.config.Config`. Usage is as follows:
+You may invoke the `lightning.server.Context.mail()` method to get an object for sending mail. Usage is as follows:
 
 ```java
 Message message = mail().createMessage();
@@ -518,16 +540,81 @@ message.setHTMLText("Hello World!");
 mail().send(message);
 ```
 
-On failure, an exception is thrown which by default generates an internal server error page. The API also supports file attachments. You may use templates to create emails by invoking `lightning.server.Context.renderToString(...)` to render a freemarker template to a string.
+On failure, an exception is thrown which by default generates an internal server error page. The API also supports file attachments.
 
-### Error Page
+You may use templates to create emails by invoking `lightning.server.Context.renderToString(...)` to render a freemarker template to a string and then using `setHTMLText`.
 
-In debug mode, whenever a request handler throws an Error or Exception you will see a detailed stack trace in your browser (in addition to the console):
+** NOTE ** Requires you to have configured SMTP or the logging driver in `lightning.config.Config`.
+
+### Async API
+
+You can make asynchronous handlers using the Servlet async API (with some caveats).
+
+```java
+import static lightning.enums.HTTPMethod.*;
+import static lightning.server.Context.*;
+import lightning.ann.Route;
+import lightning.ann.Controller;
+import lightning.mvc.HandlerContext;
+
+@Controller
+class MyController {
+  @Route(path="/", methods={GET})
+  public void handle() throws Exception {
+    // Inform the context you wish to go async and get an object that holds lightning's request-specific context.
+    HandlerContext context = goAsync();
+
+    // You may now invoke the servlet async API.
+    if (context.request().raw().isAsyncSupported()) {
+      final AsyncContext asyncContext = request.startAsync();
+
+      scheduleAsyncCallback(() -> {
+        // ... DO WHATEVER TASKS YOU NEED TO DO ...
+
+        // IMPORTANT: MUST CLOSE CONTEXT TO AVOID MEMORY LEAK!
+        asyncContext.complete();
+        context.close();
+      });
+    }
+  }
+}
+```
+
+### Configuring Drivers
+
+You will need to manually configure drivers for Sessions, Groups, Users, Auth, and the Cache.
+
+Lightning ships with the following drivers:
+  * Cache: NONE
+  * Sessions: MySQL
+  * Groups: MySQL
+  * Users: MySQL
+  * Auth: MySQL
+
+By default, Lightning will attempt to utilize the MySQL drivers if you have configured a `db` in `Config`. You will need to manually import the schema (contained in `src/main/resources/lightning/schema`).
+
+TODO: MORE FLEXIBLE OPTIONS COMING SOON!
+
+### Debug Mode
+
+Lightning features a powerful debug mode. Debug mode can be enabled by setting `lightning.config.Config`'s `enableDebugMode` property.
+
+To use debug mode, you must set your working directory the project root (the folder containing Maven's `pom.xml` and `src/main/java`) and follow the Maven directory structure conventions. You cannot use debug mode when deployed to a JAR.
+
+You should ONLY use debug mode for development. Do not leave it on in production as it exposes system internals.
+
+Enabling debug mode will...
+
+  * Enable automatic reloading of handlers, routes, filters, etc.
+  * Enable exception stack traces in the browser (in production a generic 500 Internal Server Error page is shown)
+  * Enable template errors in thte browser
+  * Disable all HTTP caching
+  * Force reloads of static files and templates from disk each request
+
+An example in-browser stack trace (errors are also shown in console):
 
 ![Debug Page](https://cloud.githubusercontent.com/assets/3498024/14005744/3fa323ba-f134-11e5-9f72-00da49a46ab7.png "Debug Page")
 
-In order to find code snippets, your working directory must be the folder that contains `src/main/java`. If debug mode is not enabled, users will instead be shown a generic 500 internal server error (or, your custom error page if you installed a custom exception handler).
-
 ### Examples
 
-See [Lightning Examples](https://github.com/lightning-framework/examples)
+You can find examples of Lightning applications in our [Lightning Examples](https://github.com/lightning-framework/examples) repo.
