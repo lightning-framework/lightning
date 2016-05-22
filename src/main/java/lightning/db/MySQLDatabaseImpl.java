@@ -1,7 +1,6 @@
 package lightning.db;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -19,85 +18,18 @@ import java.util.concurrent.locks.ReentrantLock;
  * @see http://zetcode.com/db/mysqljava/
  */
 public class MySQLDatabaseImpl implements MySQLDatabase {
-  //private final static Logger logger = LoggerFactory.getLogger(MySQLDatabase.class);
-  private final String hostName;
-  private final int port;
-  private final String userName;
-  private final String password;
-  private final String databaseName;
   private final Connection connection;
   private final MySQLDatabaseProvider provider;
 
-  private MySQLDatabaseImpl(String hostName, int port, String userName, String password,
-      String databaseName) throws SQLException {
-    this.hostName = hostName;
-    this.port = port;
-    this.userName = userName;
-    this.password = password;
-    this.databaseName = databaseName;
-    
-    try {
-      Class.forName("com.mysql.jdbc.Driver");
-    } catch (ClassNotFoundException e) {
-      throw new IllegalStateException("Unable to find driver com.mysql.jdbc.Driver.");
-    }
-
-    String url = String.format("jdbc:mysql://%s:%d/%s", hostName, port, databaseName);
-    connection = DriverManager.getConnection(url, userName, password);
-    provider = null;
-  }
-  
   private MySQLDatabaseImpl(MySQLDatabaseProvider provider) throws SQLException {
     this.provider = provider;
-    connection = provider.getConnection();
-    port = -1;
-    hostName = null;
-    databaseName = null;
-    password = null;
-    userName = null;
+    this.connection = provider.getConnection();
   }
   
   public MySQLDatabaseProvider getProvider() {
     return provider;
   }
-
-  /**
-   * Creates and returns a new connection to this database.
-   */
-  public MySQLDatabase createIdenticalConnection() throws SQLException {
-    if (provider != null) {
-      return MySQLDatabase.createConnection(provider);
-    } else {
-      return MySQLDatabase.createConnection(hostName, port, userName, password, databaseName);
-    }
-  }
-  
-  /**
-   * Executes a transaction (deprecated).
-   * 
-   * @param transaction An anonymous function (closure) containing queries.
-   * @return The value returned by the closure.
-   * @throws SQLException On failure of any query. Transaction is automatically rolled back on
-   *         failure.
-   */
-  @Deprecated
-  public <T> T zzzOldTransaction(Transaction<T> transaction) throws Exception {
-    try {
-      transactionLock.lock();
-      connection.setAutoCommit(false);
-      T result = transaction.execute();
-      connection.commit();
-      connection.setAutoCommit(true);
-      transactionLock.unlock();
-      return result;
-    } catch (Exception e) {
-      connection.rollback();
-      connection.setAutoCommit(true);
-      transactionLock.unlock();
-      throw e; // Re-throw.
-    }
-  }
-  
+   
   private final Stack<Transaction<?>> transactions = new Stack<>();
   private final ReentrantLock transactionLock = new ReentrantLock();
   
@@ -270,21 +202,6 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
     }
 
     return statement;
-  }
-
-  /**
-   * IMPORTANT: PREFER USING createConnection(MySQLDatabaseProvider) IF YOU ARE USING MORE THAN ONE THREAD!
-   * @param hostName Of the MySQL server.
-   * @param port Of the MySQL server.
-   * @param userName For the MySQL server.
-   * @param password For the MySQL server.
-   * @param databaseName To access on the MySQL server.
-   * @return A connection to the database.
-   * @throws SQLException On failure.
-   */
-  public static MySQLDatabase createConnection(String hostName, int port, String userName,
-      String password, String databaseName) throws SQLException {
-    return new MySQLDatabaseImpl(hostName, port, userName, password, databaseName);
   }
   
   /**

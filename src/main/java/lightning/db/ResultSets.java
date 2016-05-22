@@ -48,10 +48,6 @@ public class ResultSets {
     return rs.getObject(columnIdx) != null ? rs.getFloat(columnIdx) : null;
   }
   
-  public static Optional<Long> getLongOption(ResultSet rs, String columnName) throws SQLException {
-    return rs.getObject(columnName) != null ? Optional.of(rs.getLong(columnName)) : Optional.absent();
-  }
-  
   public static @Nullable Boolean getBoolean(ResultSet rs, String columnName) throws SQLException {
     if (rs.getObject(columnName) == null) {
       return null;
@@ -59,6 +55,10 @@ public class ResultSets {
     
     int value = rs.getInt(columnName);
     return value <= 0 ? false : true;
+  }
+  
+  public static Optional<Long> getLongOption(ResultSet rs, String columnName) throws SQLException {
+    return rs.getObject(columnName) != null ? Optional.of(rs.getLong(columnName)) : Optional.absent();
   }
   
   public static Optional<Boolean> getBooleanOption(ResultSet rs, String columnName) throws SQLException {

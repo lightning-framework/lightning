@@ -30,12 +30,6 @@ public class MySQLDatabaseProxy implements MySQLDatabase {
   }
 
   @Override
-  public MySQLDatabase createIdenticalConnection() throws SQLException {
-    lazyLoad();
-    return delegate.createIdenticalConnection();
-  }
-
-  @Override
   public <T> T transaction(Transaction<T> transaction) throws Exception {
     lazyLoad();
     return delegate.transaction(transaction);
