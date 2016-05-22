@@ -548,7 +548,7 @@ You may use templates to create emails by invoking `lightning.server.Context.ren
 
 ### Async API
 
-You can make asynchronous handlers using the Servlet async API (with some caveats).
+You can make asynchronous handlers using the Servlet async API.
 
 ```java
 import static lightning.enums.HTTPMethod.*;
@@ -572,8 +572,8 @@ class MyController {
         // ... DO WHATEVER TASKS YOU NEED TO DO ...
 
         // IMPORTANT: MUST CLOSE CONTEXT TO AVOID MEMORY LEAK!
+        context.close(); // Close lightning's context first.
         asyncContext.complete();
-        context.close();
       });
     }
   }
