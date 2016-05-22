@@ -12,7 +12,7 @@ import com.google.gson.FieldNamingPolicy;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 /**
- * Indicates that a routing target returns JSON.
+ * Indicates that a @Route target returns JSON.
  * 
  * The value returned from the target will be 
  * automatically JSONified (via GSON) and 

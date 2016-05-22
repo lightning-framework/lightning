@@ -10,8 +10,11 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 /**
- * Produces an instance of a websocket handler and installs that
- * handler on the given path.
+ * Annotates a public static factory method that produces @WebSocket objects in response to upgrade requests.
+ * Lightning will automatically install the factory of the given path.
+ * The method must return an instance of @WebSocket when invoked.
+ * The method will be invoked once for every incoming upgrade request. You may choose to return a
+ * singleton instance each time, or to have a separate instance per socket connection.
  * 
  * An example method signature might be:
  *   public static ExampleWebsocket produce(Config config, MySQLDatabaseProvider db) throws Exception {
@@ -19,7 +22,7 @@ import java.lang.annotation.Target;
  *   }
  *   
  * The websocket factory method is INJECTABLE (see @Route). In addition to all of the standard and
- * user injected type, HttpServletUpgradeRequest and HttpServletUpgradeResponse are injectable.
+ * user injected types, HttpServletUpgradeRequest and HttpServletUpgradeResponse are injectable.
  * 
  * The class of the returned object must be annotated with @WebSocket
  * and must contain methods annotated with (see ExampleWebSocket):
@@ -38,12 +41,13 @@ import java.lang.annotation.Target;
  * in Jetty (you'll need to restart the server to see changes reflected). However, if you
  * are clever in the implementation of your factory, you can use custom classloading to
  * make sure that the socket's code is reloaded for each new incoming connection (probably
- * only in debug mode).
+ * only in debug mode) or even for each new incoming message/event.
  * 
  * For an example:
  * @see lightning.examples.websockets.ExampleWebsocket
  */
 public @interface WebSocketFactory {
   // Specifies the path on which the websocket will be installed.
+  // This path must be exact; wildcards and parameters are disallowed.
   String path();
 }

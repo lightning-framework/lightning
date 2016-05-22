@@ -15,6 +15,7 @@ import com.google.common.collect.ImmutableMap;
 
 /**
  * An authentication driver that stores information in a MySQL database.
+ * TODO: Automatic cleanup of expired data.
  */
 public class MySQLAuthDriver implements AuthDriver {
   public final MySQLDatabaseProvider provider;

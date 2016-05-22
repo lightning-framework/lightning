@@ -5,8 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A dependency injection module specifies injection bindings.
- * See documentation for Injector.
+ * A dependency injection module specifies a set of injection bindings.
+ * For more information, see the documentation for Injector.
  */
 public class InjectorModule {
   private final Map<Class<?>, Object> classBindings;
@@ -25,6 +25,12 @@ public class InjectorModule {
     annotationResolverBindings = new HashMap<>();
   }
   
+  /**
+   * Binds parameters of the given type to the given instance.
+   * Correctly respects the type hierarchy.
+   * @param clazz A type.
+   * @param instance An object of given type.
+   */
   public <T> void bindClassToInstance(Class<T> clazz, T instance) {    
     Class<?> currentClass = clazz;
     
@@ -34,6 +40,12 @@ public class InjectorModule {
     }
   }
   
+  /**
+   * Binds parameters of the given type to the instance produced by the given resolver.
+   * Correctly respects the type hierarchy.
+   * @param clazz A type.
+   * @param resolver A resolver.
+   */
   public <T> void bindClassToResolver(Class<T> clazz, Resolver<T> resolver) {    
     Class<?> currentClass = clazz;
     
@@ -43,22 +55,49 @@ public class InjectorModule {
     }
   }
   
+  /**
+   * Binds parameters annotated with @Inject(name) to the given instance.
+   * @param name A unique name.
+   * @param instance An object.
+   */
   public <T> void bindNameToInstance(String name, T instance) {
     nameBindings.put(name, instance);
   }
   
+  /**
+   * Binds parameters annotated with @Inject(name) to the instance produced by the given resolver.
+   * @param name A unique name.
+   * @param resolver A resolver.
+   */
   public <T> void bindNameToResolver(String name, Resolver<T> resolver) {
     nameResolverBindings.put(name, resolver);
   }
   
+  /**
+   * Binds parameters annotated with the given annotation to the given instance.
+   * @param annotation An annotation for method parameters.
+   * @param instance An object.
+   */
   public <T> void bindAnnotationToInstance(Class<? extends Annotation> annotation, T instance) {
     annotationBindings.put(annotation, instance);
   }
   
+  /**
+   * Binds parameters annotated with the given annotation to the instance produced by the given resolver.
+   * @param annotation An annotation for method parameters.
+   * @param resolver A resolver.
+   */
   public <T> void bindAnnotationToResolver(Class<? extends Annotation> annotation, Resolver<T> resolver) {
     annotationResolverBindings.put(annotation, resolver);
   }
   
+  /**
+   * Returns the value currently bound for the given class (via bindClassTo{Resolver|Instance}).
+   * Correctly functions with inheritance.
+   * @param clazz A class.
+   * @return The bound value or null if no bound value.
+   * @throws Exception On failure.
+   */
   @SuppressWarnings("unchecked")
   public <T> T getBindingForClass(Class<T> clazz) throws Exception {
     T result = (T) classBindings.get(clazz);
@@ -74,6 +113,12 @@ public class InjectorModule {
     return null;
   }
   
+  /**
+   * Returns the value currently bound for the given name (via bindNameTo{Resolver|Instance}).
+   * @param name A unique name.
+   * @return The bound value or null if no bound value.
+   * @throws Exception On failure.
+   */
   public Object getBindingForName(String name) throws Exception {
     Object result = nameBindings.get(name);
     
@@ -88,6 +133,12 @@ public class InjectorModule {
     return null;
   }
   
+  /**
+   * Returns the value currently bound for the given annotation (via bindAnnotationTo{Instance|Resolver}).
+   * @param annotation An annotation type.
+   * @return The bound value or null if no bound value.
+   * @throws Exception On failure.
+   */
   public Object getBindingForAnnotation(Class<? extends Annotation> annotation) throws Exception {
     Object result = annotationBindings.get(annotation);
     
@@ -102,6 +153,10 @@ public class InjectorModule {
     return null;
   }
 
+  /**
+   * Binds the given throwable object to be injectable.
+   * @param e Any throwable object.
+   */
   public void bindToClass(Throwable e) {
     Class<?> currentClass = e.getClass();
     

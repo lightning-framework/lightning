@@ -29,6 +29,9 @@ import lightning.enums.HTTPMethod;
  * 
  * Route params and wildcards are available within filter methods (set according to the path specified in
  * the filter).
+ * 
+ * Filter matching is fast (exact asymptotic behavior depends on how your filters are structured), but matching
+ * is mostly proportional to the length of the request path * the number of matched filters.
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

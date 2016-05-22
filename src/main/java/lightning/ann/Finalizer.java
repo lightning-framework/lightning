@@ -24,11 +24,13 @@ import java.lang.annotation.Target;
  * Finalizers MAY throw exceptions. These exceptions will be logged, but will not be
  * visible to the user either as a debug page or a 500 internal server error as
  * presumably the response body and headers would already be sent before finalizers
- * execute. All finalizers will always execute, regardless of whether or not any
- * of them throw exceptions.
+ * execute. All finalizers will ALWAYS execute, regardless of whether or not any
+ * of them throw exceptions. Thus, finalizers may be used reliably as destructors for
+ * resource clean-up.
  * 
  * Finalizers MUST return void.
  * Finalizers are not executed in any particular order.
+ * Finalizers are inherited from parent classes.
  * Finalizers are dependency-injectable.
  */
 public @interface Finalizer {}

@@ -257,6 +257,12 @@ public class RouteMapper<T> {
    * @param action An object to be returned when this route is matched.
    */
   public synchronized void map(HTTPMethod method, String path, T action) throws PathFormatException {
+    if (path.equals("*")) {
+      map(method, "/", action);
+      map(method, "/*", action);
+      return;
+    }
+    
     if (!pending.containsKey(method)) {
       pending.put(method, new ArrayList<>());
     }

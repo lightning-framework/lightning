@@ -10,11 +10,14 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 /**
- * Use to indicate that a given routing target
+ * Use to indicate that a given @Route target
  * accepts HTTP multipart input (typically for
  * file uploads).
  * 
  * Will initialize multipart handling on the
  * request automatically.
+ * 
+ * Multipart requests will only be accepted by
+ * handlers that have this annotation present.
  */
 public @interface Multipart {}

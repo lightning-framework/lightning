@@ -27,6 +27,9 @@ import java.lang.annotation.Target;
  * In addition, the causing exception can be injected as a parameter.
  * 
  * A single method may be annotated with @ExceptionHandler multiple times.
+ * 
+ * ExceptionHandlers may throw exceptions. If an ExceptionHandler throws an exception, the framework
+ * will catch it and display a 500 Internal Server error page (production) or debug screen (debug).
  */
 public @interface ExceptionHandler {
   Class<? extends Throwable> value();

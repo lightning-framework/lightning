@@ -10,8 +10,10 @@ import java.lang.annotation.Target;
 import lightning.fn.RouteFilter;
 
 /**
- * Used to annotate a route target. Allows the programmer to specify code snippet(s) that will run
- * before the route target is invoked.
+ * Must annotate a method annotated with at least one @Route.
+ * 
+ * Allows the programmer to specify code snippet(s) that will run before the route 
+ * target is invoked.
  * 
  * If multiple filters are installed, the order in which they execute is undefined.
  */
