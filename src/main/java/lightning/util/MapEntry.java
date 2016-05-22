@@ -33,12 +33,14 @@ public final class MapEntry<K, V> implements Map.Entry<K, V> {
   
   @Override
   public int hashCode() {
+    // Defined by Java spec.
     return (this.getKey()==null ? 0 : this.getKey().hashCode()) ^
         (this.getValue()==null ? 0 : this.getValue().hashCode());
   }
 
   @Override
   public boolean equals(Object obj) {
+    // Defined by Java spec.
     if (!(obj instanceof MapEntry)) {
       return false;
     }

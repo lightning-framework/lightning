@@ -141,10 +141,10 @@ public class Config {
      * 
      * Static files will be served gzipped if a .gz version exists (e.g. styles.css.gz). 
      */
-    public @Required String staticFilesPath; // Relative to src/main|resources/java in your eclipse project folder.
+    public @Optional String staticFilesPath; // Relative to src/main|resources/java in your eclipse project folder.
     
     // Path in which freemarker templates are located.
-    public @Required String templateFilesPath; // Relative to src/main|resources/java in your eclipse project folder.
+    public @Optional String templateFilesPath; // Relative to src/main|resources/java in your eclipse project folder.
     
     // Host on which to listen.
     public @Optional String host = "0.0.0.0";

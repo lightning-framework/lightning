@@ -34,7 +34,10 @@ import com.google.common.hash.Hashing;
  * TODO: Session will not get saved automatically when user handler sends HTTP content before the 
  * session is saved (since after content is sent the session manager is not able to write the session
  * ID cookie). Happens because HandlerContext is closed (which invokes session save) after the user
- * handler is invoked.
+ * handler is invoked. Could be fixed by output buffering.
+ * 
+ * TODO: People that don't have cookies enabled will create tons of rows, need way to purge these first.
+ *       Maybe by having a committed flag and dropping sessions not committed within X seconds?
  */
 public final class Session {
   private static final Logger logger = LoggerFactory.getLogger(Session.class);

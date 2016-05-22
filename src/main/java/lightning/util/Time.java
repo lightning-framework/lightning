@@ -8,7 +8,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * Defines functionality for dealing with times as UNIX time (in seconds).
+ * Defines functionality for dealing with times as UNIX time (in seconds granularity).
  */
 public class Time {
   static {

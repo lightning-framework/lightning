@@ -25,7 +25,6 @@ import org.eclipse.jetty.util.ClassLoadingObjectInputStream;
 /**
  * A session driver implementation that uses a MySQL database.
  * TODO: Implement automatic cleanup of old sessions.
- * TODO: People that don't have cookies enabled will create tons of rows, need way to purge these first.
  */
 public class MySQLSessionDriver implements SessionStorageDriver {
   private final MySQLDatabaseProvider provider;

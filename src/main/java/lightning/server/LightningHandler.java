@@ -130,14 +130,16 @@ public class LightningHandler extends AbstractHandler {
     
     this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.userTemplateConfig.setSharedVariable("__LIGHTNING_DEV", config.enableDebugMode);
-    File templatePath = Iterables.firstOr(Iterables.filter(ImmutableList.of(
-        new File("./src/main/java/" + config.server.templateFilesPath),
-        new File("./src/main/resources/" + config.server.templateFilesPath)
-    ), f -> f.exists()), new File(config.server.templateFilesPath));
-    if (templatePath.exists()) {
-      this.userTemplateConfig.setDirectoryForTemplateLoading(templatePath);
-    } else {
-      this.userTemplateConfig.setClassForTemplateLoading(getClass(), "/" + config.server.templateFilesPath);
+    if (config.server.templateFilesPath != null) {
+      File templatePath = Iterables.firstOr(Iterables.filter(ImmutableList.of(
+          new File("./src/main/java/" + config.server.templateFilesPath),
+          new File("./src/main/resources/" + config.server.templateFilesPath)
+      ), f -> f.exists()), new File(config.server.templateFilesPath));
+      if (templatePath.exists() && config.enableDebugMode) {
+        this.userTemplateConfig.setDirectoryForTemplateLoading(templatePath);
+      } else {
+        this.userTemplateConfig.setClassForTemplateLoading(getClass(), "/" + config.server.templateFilesPath);
+      }
     }
     this.userTemplateConfig.setShowErrorTips(config.enableDebugMode);
     this.userTemplateConfig.setTemplateExceptionHandler(/*config.enableDebugMode ?
