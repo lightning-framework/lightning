@@ -303,14 +303,15 @@ By default, the framework uses a MySQL database - but using this is entirely opt
 Lightning will automatically establish a connection pool to your database; if you are not familiar with connection pooling, you should read up on it!
 
 You can invoke `lightning.server.Context.db()` to obtain an instance of `MySQLDatabase` which will let you access your the database you configured. Please be aware of the following (which may differ from connection pools you have used in the past):
-* A database connection is not allocated your thread from the pool until the first invocation of `db()`
-* The database connection will be automatically freed (returned to the pool) when you return from your request handler. Thus, you never need to invoke close() or use try-with-resources, but doing so has no effect.
+* A database connection is not allocated to your thread from the pool until the first invocation of `db()`
+* The database connection will be automatically freed (returned to the pool) when you return from your request handler. Thus, you never need to invoke close() or use try-with-resources, but doing so has no effect. You do, however, still need to close any `NamedPreparedStatement`s, `PreparedStatement`s, and `ResultSet`s that you create.
 
 Lightning provides several extensions on the default `java.sql.*` APIs that make life easier. In particular, we provide `NamedPreparedStatement` which allows you to use named parameters in prepared SQL queries as well as some additional convenience methods. We also provide `MySQLDatabase` which provides some powerful features including easily creating `NamedPreparedStatements`for common operations and re-entrant transactions.
 
 An example of database usage follows:
 
 ```java
+// Note the usage of Java's try-with-resources to ensure proper freeing of resources.
 try (NamedPreparedStatement query = db().prepare("SELECT * FROM users WHERE age >= :age;")) {
   query.setInt("age", 21);
   try (ResultSet result = query.executeQuery()) {
@@ -510,45 +511,51 @@ You may invoke `lightning.server.Context.auth()` to get a request-specific objec
 
 You may invoke `lightning.server.Context.groups()` and `lightning.server.Context.users()` to get objects for interacting with the sets of all groups and users respectively in aggregate.
 
-Once you have obtained a reference to a `lightning.users.User` or `lightning.users.Group`, you may mutate it and invoke save() to push the changes to the database. `User`s may also serve as key-value stores (storing any type of serializable objects), though using your own storage is preferred to prevent potential data races.
+Once you have obtained a reference to a `lightning.users.User` or `lightning.users.Group`, you may mutate it and invoke save() to push the changes to the database. `User`s may also serve as key-value stores (storing any type of serializable objects), though using your own storage is preferred to prevent potential data races, in addition to having some predefined properties (id, username, email, password, etc.). Passwords are encrypted and salted using BCrypt.
 
-Users and groups may have privileges. A privilege is simply an integer - you as a programmer must decide its meaning (probably use an enum) and enforce the access constraints it implies in your code (filters and the lightning annotations are good for this).
+Users and groups may have privileges. Users may be a member of one or more groups. A privilege is simply an integer - you as a programmer must decide its meaning (probably use an enum) and enforce the access constraints it implies in your code (filters and the lightning annotations are good for this).
+
+See `lightning.users` and `lightning.groups` for more details.
 
 ** NOTE ** Usage of these APIs is entirely optional. Requires you to have configured a user driver and groups driver.
 
 ### Sessions
 
-You may invoke the `lightning.server.Context.session()` method to get an object for reading and setting session data. Sessions serve as a key-value store. Keys are strings, and values may be any object that implements `java.io.Serializable`.
+You may invoke the `lightning.server.Context.session()` method to get an object for reading and setting session data. Sessions are created on-demand and are lazy-loaded. Sessions serve as a key-value store. Keys are strings, and values may be any object that implements `java.io.Serializable`. Sessions expire after a period of inactivity. Sessions also expose an XSRF token.
 
 ** NOTE ** Usage of these APIs is entirely optional. Requires you to have configured a session driver.
 
 ### Cookies
 
-You may invoke the `lightning.server.Context.cookies()` method to get an object for reading and setting cookies. Please note that our cookie manager will automatically sign the cookie values you set with HMAC SHA256 and verify the signature before reading them back. If the signature does not match, the framework will act as if the cookie was not sent at all. You may set and read raw cookies by using the `request()` and `response()` directly.
+You may invoke the `lightning.server.Context.cookies()` method to get an API for reading and setting cookies. Please note that our cookie manager will automatically sign the cookie values you set with HMAC SHA256 and verify the signature before reading them back. If the signature does not match, the framework will act as if the cookie was not sent at all. This is an effective way to prevent users form modifying or forging cookies (though keep in mind this does not protect against copying another user's cookies).
 
-** NOTE ** Requires you to set an HMAC key in config.
+If you do not wish to utilize the signed cookies API, you may set and read raw cookies by using the unencrypted cookie methods on `request()` and `response()` directly.
+
+** NOTE ** Using the signed cookies API requires you to set an HMAC key in config.
 
 ### Mail
 
-You may invoke the `lightning.server.Context.mail()` method to get an object for sending mail. Usage is as follows:
+You may invoke the `lightning.server.Context.mail()` method to get an API for sending mail. Usage is as follows:
 
 ```java
 Message message = mail().createMessage();
 message.addRecipient("hello@world.com");
 message.setSubject("Hello World!");
 message.setHTMLText("Hello World!");
-mail().send(message);
+mail().send(message); // Blocks until delivery is successful.
 ```
 
-On failure, an exception is thrown which by default generates an internal server error page. The API also supports file attachments.
+If a message fails to send, an exception is thrown.
 
-You may use templates to create emails by invoking `lightning.server.Context.renderToString(...)` to render a freemarker template to a string and then using `setHTMLText`.
+The API also supports file attachments and other features. See `lightning.mail.Message` for details.
+
+You may use templates to create emails by invoking `lightning.server.Context.renderToString(template, model)` to render a freemarker template to a string and then using `setHTMLText` on the result.
 
 ** NOTE ** Requires you to have configured SMTP or the logging driver in `lightning.config.Config`.
 
-### Async API
+### Asynchronous Handlers
 
-You can make asynchronous handlers using the Servlet async API.
+For now, you can make asynchronous handlers using the Servlet Async API.
 
 ```java
 import static lightning.enums.HTTPMethod.*;
@@ -582,7 +589,7 @@ class MyController {
 
 ### Configuring Drivers
 
-You will need to manually configure drivers for Sessions, Groups, Users, Auth, and the Cache.
+You may need to manually configure drivers for Sessions, Groups, Users, Auth, and the Cache.
 
 Lightning ships with the following drivers:
   * Cache: NONE
@@ -591,7 +598,7 @@ Lightning ships with the following drivers:
   * Users: MySQL
   * Auth: MySQL
 
-By default, Lightning will attempt to utilize the MySQL drivers if you have configured a `db` in `Config`. You will need to manually import the schema (contained in `src/main/resources/lightning/schema`).
+By default, Lightning will attempt to utilize the MySQL drivers if you have configured a `db` in `Config`. You will need to manually import the schema (contained in `src/main/resources/lightning/schema`) into your database.
 
 TODO: MORE FLEXIBLE OPTIONS COMING SOON!
 
@@ -607,7 +614,7 @@ Enabling debug mode will...
 
   * Enable automatic reloading of handlers, routes, filters, etc.
   * Enable exception stack traces in the browser (in production a generic 500 Internal Server Error page is shown)
-  * Enable template errors in thte browser
+  * Enable template errors in the browser
   * Disable all HTTP caching
   * Force reloads of static files and templates from disk each request
 
