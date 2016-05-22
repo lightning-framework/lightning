@@ -9,6 +9,9 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import lightning.enums.FilterPriority;
 import lightning.enums.HTTPMethod;
 
@@ -21,6 +24,7 @@ import com.google.common.collect.ImmutableList;
  * @param <T> The target type.
  */
 public class FilterMapper<T> { 
+  protected static final Logger logger = LoggerFactory.getLogger(FilterMapper.class);
   
   public static final class Filter<T> {
     public final T handler;
@@ -51,6 +55,10 @@ public class FilterMapper<T> {
     public List<String> wildcards(String path) throws PathFormatException {
       List<String> parts = DefaultPathToPathSegments.parse(path);
       List<String> wildcards = new ArrayList<>();
+      
+      if (segments.isEmpty()) {
+        return wildcards;
+      }
       
       if (segments.get(segments.size() - 1).equals("*")) {
         for (int i = segments.size() - 1; i < parts.size(); i++) {
@@ -256,6 +264,14 @@ public class FilterMapper<T> {
   }
   
   public synchronized void addFilter(FilterType type, String path, HTTPMethod[] methods, FilterPriority priority, T handler) throws PathFormatException {
+    logger.debug("Installing Filter: {} {} {} ({}) -> {}", type, methods, path, priority, handler);
+    
+    if (path.equals("*")) {
+      addFilter(type, "/", methods, priority, handler);
+      addFilter(type, "/*", methods, priority, handler);
+      return;
+    }
+    
     List<String> segments = DefaultPathToPathSegments.parse(path);
     
     for (HTTPMethod method : methods) {

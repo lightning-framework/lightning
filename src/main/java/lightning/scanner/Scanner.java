@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import lightning.ann.Before;
+import lightning.ann.Befores;
 import lightning.ann.Controller;
 import lightning.ann.ExceptionHandler;
 import lightning.ann.Finalizer;
@@ -66,6 +68,7 @@ public class Scanner {
     Map<Class<?>, Set<Method>> exceptionHandlers = new HashMap<>();
     Map<Class<?>, Set<Method>> routes = new HashMap<>();
     Map<Class<?>, Set<Method>> websocketFactories = new HashMap<>();
+    Map<Class<?>, Set<Method>> beforeFilters = new HashMap<>();
     ClassLoader classLoader = enableAutoReload
         ? new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), "target/classes")
         : this.getClass().getClassLoader();
@@ -127,6 +130,19 @@ public class Scanner {
         }
       }
       
+      for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Before.class), scanner.getMethodsAnnotatedWith(Befores.class))) {
+        // TODO: verify return value, can inject
+        if (Modifier.isStatic(m.getModifiers()) &&
+            Modifier.isPublic(m.getModifiers()) &&
+            !Modifier.isAbstract(m.getModifiers())) {
+          putMethod(beforeFilters, m);
+        } else {
+          logger.error(
+              "ERROR: Could not install @Before filter for {}. "
+            + "Before filters must be public, concrete, static.", m);
+        }
+      }
+      
       for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Route.class), scanner.getMethodsAnnotatedWith(Routes.class))) {
         // TODO: verify can inject
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
@@ -143,7 +159,7 @@ public class Scanner {
       }
     }
     
-    return new ScanResult(controllers, initializers, exceptionHandlers, routes, websocketFactories, finalizers);
+    return new ScanResult(controllers, initializers, exceptionHandlers, routes, websocketFactories, finalizers, beforeFilters);
   }
   
   private Reflections[] reflections(ClassLoader classLoader) {

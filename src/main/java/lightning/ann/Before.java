@@ -10,13 +10,32 @@ import java.lang.annotation.Target;
 import lightning.enums.FilterPriority;
 import lightning.enums.HTTPMethod;
 
+/**
+ * A @Before filter annotates a static method that will be invoked before a request on the given path
+ * for the given HTTP methods. 
+ * 
+ * A method may be annotated by multiple @Before annotations.
+ * 
+ * You may control the order in which filters execute by changing the priority in the annotation. Filters
+ * with higher priority will execute first. Filters with the same priority may execute in any order.
+ * 
+ * Filter methods are injectable with both global and request-specific objects.
+ * 
+ * Filters may invoke halt() to prevent further processing of the request.
+ * 
+ * If a filter halts or throws an exception, it will prevent execution of filters that have not yet executed.
+ * 
+ * Filters will only execute if the given path/method also matches an @Route.
+ * 
+ * Route params and wildcards are available within filter methods (set according to the path specified in
+ * the filter).
+ */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @Repeatable(Befores.class)
-@Deprecated // TODO: NOT YET IMPLEMENTED
 public @interface Before {
-  public String value(); // Request path (follows same syntax as @Route).
+  String path(); // Request path (follows same syntax as @Route).
   HTTPMethod[] methods() default {HTTPMethod.GET};
   FilterPriority priority() default FilterPriority.NORMAL;
 }

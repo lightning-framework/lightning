@@ -20,6 +20,8 @@ import lightning.enums.HTTPScheme;
 import lightning.mvc.ObjectParam;
 import lightning.mvc.Param;
 
+import com.augustl.pathtravelagent.DefaultPathToPathSegments;
+import com.augustl.pathtravelagent.PathFormatException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -43,6 +45,45 @@ public class Request {
     cookies = null;
     this.trustLoadBalancerHeaders = trustLoadBalancerHeaders;
     properties = null;
+  }
+  
+  /**
+   * @return The path segments contained in the request.
+   * @throws PathFormatException
+   */
+  public List<String> segments() throws PathFormatException {
+    return DefaultPathToPathSegments.parse(path());
+  }
+  
+  /**
+   * Returns whether or not the request matches a path expression.
+   * @param path A path expression (in route format, see @Route).
+   * @return Whether or not the request path conforms to the given path.
+   * @throws PathFormatException
+   */
+  public boolean matches(String path) throws PathFormatException {
+    List<String> segments = DefaultPathToPathSegments.parse(path);
+    List<String> parts = segments();
+    
+    if (parts.size() < segments.size()) {
+      return false;
+    }
+    
+    for (int i = 0; i < segments.size(); i++) {
+      if (segments.get(i).startsWith(":")) {
+        continue;
+      }
+      
+      if (segments.get(i).equals("*")) {
+        break;
+      }
+      
+      if (!segments.get(i).equals(parts.get(i))) {
+        return false;
+      }
+    }
+    
+    return true;
   }
   
   /**

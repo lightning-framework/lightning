@@ -17,6 +17,19 @@ public class FilterMapperTest {
   public static HTTPMethod[] GET = new HTTPMethod[]{HTTPMethod.GET};
   public static HTTPMethod[] POST = new HTTPMethod[]{HTTPMethod.POST};
   public static HTTPMethod[] GET_POST = new HTTPMethod[]{HTTPMethod.GET, HTTPMethod.POST};
+    
+  @Test
+  public void testRootWildcard() throws Exception {
+    FilterMapper<String> mapper = new FilterMapper<>();
+    mapper.addFilterBefore("*", GET, NORMAL, "handler");
+    
+    FilterMatch<String> match;
+    match = mapper.lookup("/", HTTPMethod.GET);
+    assertEquals(1, match.beforeFilters().size());
+    
+    match = mapper.lookup("/lol", HTTPMethod.GET);
+    assertEquals(1, match.beforeFilters().size());
+  }
   
   @Test
   public void testRealistic() throws Exception {

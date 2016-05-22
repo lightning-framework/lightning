@@ -13,6 +13,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import lightning.Lightning;
+import lightning.ann.Before;
+import lightning.ann.Befores;
 import lightning.ann.Filter;
 import lightning.ann.Filters;
 import lightning.ann.ExceptionHandler;
@@ -59,6 +61,8 @@ import lightning.mvc.ModelAndView;
 import lightning.mvc.URLGenerator;
 import lightning.mvc.Validator;
 import lightning.routing.ExceptionMapper;
+import lightning.routing.FilterMapper;
+import lightning.routing.FilterMapper.FilterMatch;
 import lightning.routing.RouteMapper;
 import lightning.routing.RouteMapper.Match;
 import lightning.scanner.ScanResult;
@@ -105,6 +109,7 @@ public class LightningHandler extends AbstractHandler {
   private ExceptionViewProducer exceptionViewProducer; 
   private FileServer staticFileServer;
   private RouteMapper<Method> routeMapper;
+  private FilterMapper<Method> filterMapper;
   private InjectorModule globalModule;
   private InjectorModule userModule;
   private Mailer mailer;
@@ -115,6 +120,7 @@ public class LightningHandler extends AbstractHandler {
     this.globalModule = globalModule;
     this.userModule = userModule;
     this.debugScreen = new DebugScreen();
+    this.filterMapper = new FilterMapper<>();
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.internalTemplateConfig.setClassForTemplateLoading(Lightning.class, "templates");
     this.internalTemplateConfig.setShowErrorTips(config.enableDebugMode);
@@ -264,10 +270,6 @@ public class LightningHandler extends AbstractHandler {
       if (match != null) {
         logger.debug("Found route match: data={} params={} wildcards={}", match.getData(), match.getParams(), match.getWildcards());
         
-        // Mutate the request.
-        request.setWildcards(match.getWildcards());
-        request.setParams(match.getParams());
-        
         Object controller = null;
         Method m = match.getData();
         
@@ -285,6 +287,28 @@ public class LightningHandler extends AbstractHandler {
             }
             return;
           }
+          
+          // Execute any before filters.
+          FilterMatch<Method> filters = filterMapper.lookup(request.path(), request.method());
+          
+          for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
+            if (config.enableDebugMode) {
+              logger.info("INCOMING REQUEST ({}): {} {} -> FILTER {}", request.ip(), request.method(), request.path(), filter.handler);
+            }
+            request.setWildcards(filter.wildcards(request.path()));
+            request.setParams(filter.params(request.path()));
+            try {
+              filter.handler.invoke(null, injector.getInjectedArguments(filter.handler));
+            } catch (InvocationTargetException e) {
+              if (e.getCause() != null)
+                throw e.getCause();
+              throw e;
+            }
+          }
+          
+          // Mutate the request.
+          request.setWildcards(match.getWildcards());
+          request.setParams(match.getParams());
           
           if (config.enableDebugMode) {
             logger.info("INCOMING REQUEST ({}): {} {} -> {}", request.ip(), request.method(), request.path(), m);
@@ -454,7 +478,7 @@ public class LightningHandler extends AbstractHandler {
     
   protected synchronized void rescan() throws Exception {
     scanResult = scanner.scan();
-    logger.debug("Scanned Annotations: {}", scanResult);
+    logger.debug("Scanned Annotations: {}, {}", config.scanPrefixes, scanResult);
     
     // Map exception handlers.
     exceptionHandlers.clear();
@@ -497,6 +521,27 @@ public class LightningHandler extends AbstractHandler {
     }
     
     routeMapper.compile();
+    
+    // Map filters.
+    filterMapper.clear();
+    
+    for (Class<?> clazz : scanResult.beforeFilters.keySet()) {
+      for (Method m : scanResult.beforeFilters.get(clazz)) {
+        
+        if (m.getAnnotation(Before.class) != null) {
+          Before info = m.getAnnotation(Before.class);
+          filterMapper.addFilterBefore(info.path(), info.methods(), info.priority(), m);
+        }
+        
+        Befores infos = m.getAnnotation(Befores.class);
+        
+        if (infos != null) {
+          for (Before info : infos.value()) {
+            filterMapper.addFilterBefore(info.path(), info.methods(), info.priority(), m);
+          }
+        }
+      }
+    }
   }
   
   protected void sendCriticalErrorPage(Request request, Response response, Throwable e) throws IOException {
