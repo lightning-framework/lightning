@@ -12,7 +12,7 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 
-public final class JsonFactory {
+public final class GsonFactory {
   public static Gson newJsonParser() {
     return newJsonParserBuilder().create();
   }

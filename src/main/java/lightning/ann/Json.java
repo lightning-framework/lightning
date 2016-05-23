@@ -6,7 +6,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import com.google.gson.FieldNamingPolicy;
+import lightning.enums.JsonFieldNamingPolicy;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
@@ -24,5 +24,5 @@ public @interface Json {
   String prefix() default "";
   
   // An optional naming policy to use for GSON:
-  FieldNamingPolicy names() default FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES;
+  JsonFieldNamingPolicy names() default JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES;
 }

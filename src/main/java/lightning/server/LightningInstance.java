@@ -7,7 +7,7 @@ import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProviderImpl;
 import lightning.inject.InjectorModule;
-import lightning.json.JsonFactory;
+import lightning.json.GsonFactory;
 
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jetty.util.log.Log;
@@ -18,12 +18,12 @@ public class LightningInstance {
   private static MySQLDatabaseProvider dbp;
   
   public static LightningServer start(File file, InjectorModule injector) throws Exception {
-    Config cfg = JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), Config.class);
+    Config cfg = GsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), Config.class);
     return start(cfg, injector);
   }
   
   public static LightningServer start(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
-    Config cfg = JsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), clazz);
+    Config cfg = GsonFactory.newJsonParser().fromJson(IOUtils.toString(new FileInputStream(file)), clazz);
     return start(cfg, injector);
   }
   

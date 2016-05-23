@@ -1,13 +1,14 @@
 # Lightning
 
-A simple, light-weight web framework for Java built on Jetty.
+A simple yet expressive web framework for Java built on Jetty.
 
 Our design goals are...
 
   * To provide the convenience of PHP-style save-and-refresh development in Java
   * To make web development simple for beginners by having simple, expressive APIs
   * To provide core HTTP functionality while giving developers complete freedom in choosing
-    how to manage sessions, users, groups, auth, and templating.
+    how to manage the other components of their applications such as db, email, cache,
+    users/groups, auth, json, templates, etc.
 
 This framework was written for use in a course I taught at Rice University.
 
@@ -21,7 +22,6 @@ This framework was written for use in a course I taught at Rice University.
   - Built-in MySQL support (w/ connection pooling, transactions)
   - Built-in distributed sessions (via MySQL or other driver)
   - Built-in authentication and users (via MySQL or other driver)
-  - Built-in support for CAS authentication
   - Built-in support for HTTP multipart request processing and file uploads
   - Built-in validator for POST/GET parameters
   - Powerful development (debug) mode

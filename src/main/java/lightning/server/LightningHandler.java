@@ -53,7 +53,8 @@ import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.inject.Resolver;
 import lightning.io.FileServer;
-import lightning.json.JsonFactory;
+import lightning.json.GsonJsonService;
+import lightning.json.JsonService;
 import lightning.mail.Mailer;
 import lightning.mvc.DefaultExceptionViewProducer;
 import lightning.mvc.HandlerContext;
@@ -113,6 +114,7 @@ public class LightningHandler extends AbstractHandler {
   private InjectorModule globalModule;
   private InjectorModule userModule;
   private Mailer mailer;
+  private JsonService jsonifier;
   
   public LightningHandler(Config config, MySQLDatabaseProvider dbp, InjectorModule globalModule, InjectorModule userModule) throws Exception {
     this.config = config;
@@ -132,6 +134,12 @@ public class LightningHandler extends AbstractHandler {
     if (userTemplateConfig == null) {
       // Use the default template engine.
       userTemplateConfig = new FreeMarkerTemplateEngine(config);
+    }
+    
+    jsonifier = userModule.getBindingForClass(JsonService.class);
+    if (jsonifier == null) {
+      // Use the default json engine.
+      jsonifier = new GsonJsonService();
     }
     
     this.exceptionHandlers = new ExceptionMapper<>();
@@ -227,7 +235,7 @@ public class LightningHandler extends AbstractHandler {
       }      
       
       // Create context.
-      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer);
+      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer, this.jsonifier);
       requestModule = requestSpecificInjectionModule(ctx);
       injector = new Injector(
           globalModule, requestModule, userModule);
@@ -361,10 +369,7 @@ public class LightningHandler extends AbstractHandler {
           if (output == null) {} // Assume the handler returned void or null because it did its work.
           else if (m.getAnnotation(Json.class) != null) {
             Json info = m.getAnnotation(Json.class);
-            response.status(HTTPStatus.OK);
-            response.type("application/json; charset=UTF-8");
-            response.raw().getWriter().print(info.prefix());
-            JsonFactory.newJsonParser(info.names()).toJson(output, response.raw().getWriter());
+            ctx.sendJson(output, info.prefix(), info.names());
           } else if (m.getAnnotation(Template.class) != null) {
             if (output instanceof ModelAndView) {
               ctx.render((ModelAndView) output);

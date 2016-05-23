@@ -17,6 +17,7 @@ import lightning.crypt.SecureCookieManager;
 import lightning.crypt.TokenSets;
 import lightning.db.MySQLDatabase;
 import lightning.enums.HTTPMethod;
+import lightning.enums.JsonFieldNamingPolicy;
 import lightning.exceptions.LightningException;
 import lightning.groups.Groups;
 import lightning.groups.Groups.GroupsException;
@@ -42,10 +43,6 @@ import lightning.templates.TemplateEngine;
 import lightning.users.User;
 import lightning.users.Users;
 import lightning.users.Users.UsersException;
-
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.JsonIOException;
-import com.google.gson.JsonSyntaxException;
 
 /**
  * Provides a thread-specific context for incoming requests.
@@ -328,51 +325,51 @@ public class Context {
     context().sendFile(file);
   }
   
-  public static final void sendJson(Object object) throws IOException {
+  public static final void sendJson(Object object) throws Exception {
     context().sendJson(object);
   }
   
-  public static final void sendJson(Object object, FieldNamingPolicy policy) throws IOException {
+  public static final void sendJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
     context().sendJson(object, policy);
   }
   
-  public static final void sendJson(Object object, String prefix) throws IOException {
+  public static final void sendJson(Object object, String prefix) throws Exception {
     context().sendJson(object, prefix);
   }
   
-  public static final void sendJson(Object object, String prefix, FieldNamingPolicy policy) throws IOException {
+  public static final void sendJson(Object object, String prefix, JsonFieldNamingPolicy policy) throws Exception {
     context().sendJson(object, prefix, policy);
   }
   
-  public static final String toJson(Object object) {
+  public static final String toJson(Object object) throws Exception {
     return context().toJson(object);
   }
   
-  public static final String toJson(Object object, FieldNamingPolicy policy) {
+  public static final String toJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
     return context().toJson(object, policy);
   }
   
-  public static final <T> T parseJson(String json, Class<T> clazz) {
+  public static final <T> T parseJson(String json, Class<T> clazz) throws Exception {
     return context().parseJson(json, clazz);
   }
   
-  public static final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
+  public static final <T> T parseJson(String json, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return context().parseJson(json, clazz, policy);
   }
   
-  public static final <T> T parseJson(Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException {
+  public static final <T> T parseJson(Class<T> clazz) throws Exception {
     return context().parseJson(clazz);
   }
    
-  public static final <T> T parseJson(Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException {
+  public static final <T> T parseJson(Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return context().parseJson(clazz, policy);
   }
    
-  public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
+  public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return context().parseJsonFromParam(queryParamName, clazz, policy);
   }
    
-  public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
+  public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws Exception {
     return context().parseJsonFromParam(queryParamName, clazz);
   }
   

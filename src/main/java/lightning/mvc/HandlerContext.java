@@ -2,7 +2,6 @@ package lightning.mvc;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -30,6 +29,7 @@ import lightning.enums.CacheControl;
 import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
+import lightning.enums.JsonFieldNamingPolicy;
 import lightning.exceptions.LightningException;
 import lightning.groups.Groups;
 import lightning.groups.Groups.GroupsException;
@@ -44,7 +44,7 @@ import lightning.http.NotImplementedException;
 import lightning.http.Request;
 import lightning.http.Response;
 import lightning.io.FileServer;
-import lightning.json.JsonFactory;
+import lightning.json.JsonService;
 import lightning.mail.Mailer;
 import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
@@ -57,14 +57,13 @@ import lightning.users.Users.UsersException;
 import lightning.users.drivers.MySQLUserDriver;
 import lightning.util.Time;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.ByteArrayOutputStream;
 import org.eclipse.jetty.util.resource.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.JsonIOException;
-import com.google.gson.JsonSyntaxException;
 
 /**
  * A controller is a class that is used to process a single HTTP request and should be sub-classed.
@@ -91,11 +90,12 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   private final Groups groups;
   private final Users users;
   private boolean isClosed;
+  private final JsonService jsonifier;
   
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
 
-  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, TemplateEngine te, FileServer fs, @Nullable Mailer mailer) {
+  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, TemplateEngine te, FileServer fs, @Nullable Mailer mailer, JsonService jsonifier) {
     isClosed = false;
     this.request = rq;
     this.response = re;
@@ -113,6 +113,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.groups = new Groups(new MySQLGroupDriver(this));
     this.users = new Users(new MySQLUserDriver(this, groups), groups);
     this.auth = Auth.forSession(session, new MySQLAuthDriver(this), users);
+    this.jsonifier = jsonifier;
   }
   
   @Override
@@ -691,63 +692,66 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     return queryParamsExcepting(ImmutableList.of());
   }
   
-  public final void sendJson(Object object) throws IOException {
-    sendJson(object, null, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  public final void sendJson(Object object) throws Exception {
+    sendJson(object, null, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
   
-  public final void sendJson(Object object, FieldNamingPolicy policy) throws IOException {
+  public final void sendJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
     sendJson(object, null, policy);
   }
   
-  public final void sendJson(Object object, String prefix) throws IOException {
-    sendJson(object, null, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  public final void sendJson(Object object, String prefix) throws Exception {
+    sendJson(object, null, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
   
-  public final void sendJson(Object object, String prefix, FieldNamingPolicy policy) throws IOException {
+  public final void sendJson(Object object, String prefix, JsonFieldNamingPolicy policy) throws Exception {
     response.status(HTTPStatus.OK);
     response.type("application/json; charset=UTF-8");
     
     if (prefix != null && prefix.length() > 0) {
       response.raw().getWriter().print(prefix);
     }
+   
+    jsonifier.writeJson(object, response.outputStream(), policy);
+  }
+  
+  public final String toJson(Object object) throws Exception {
+    return toJson(JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  }
+  
+  public final String toJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    jsonifier.writeJson(object, stream, policy);
+    return stream.toString("UTF-8");
+  }
+  
+  public final <T> T parseJson(String json, Class<T> clazz) throws Exception {
+    return parseJson(json, clazz, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  }
+  
+  public final <T> T parseJson(String json, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
+    return jsonifier.readJson(clazz, IOUtils.toInputStream(json, "UTF-8"), policy);
     
-    JsonFactory.newJsonParser(policy).toJson(object, response.raw().getWriter());
   }
   
-  public final String toJson(Object object) {
-    return toJson(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  public final <T> T parseJson(Class<T> clazz) throws Exception {
+   return parseJson(clazz, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES); 
   }
   
-  public final String toJson(Object object, FieldNamingPolicy policy) {
-    return JsonFactory.newJsonParser(policy).toJson(object);
+  public final <T> T parseJson(Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
+    return jsonifier.readJson(clazz, request.raw().getInputStream(), policy);
   }
   
-  public final <T> T parseJson(String json, Class<T> clazz) {
-    return parseJson(json, clazz, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
-  }
-  
-  public final <T> T parseJson(String json, Class<T> clazz, FieldNamingPolicy policy) {
-    return JsonFactory.newJsonParser(policy).fromJson(json, clazz);
-  }
-  
-  public final <T> T parseJson(Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException {
-   return parseJson(clazz, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES); 
-  }
-  
-  public final <T> T parseJson(Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException {
-    return JsonFactory.newJsonParser(policy).fromJson(request.raw().getReader(), clazz);
-  }
-  
-  public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, FieldNamingPolicy policy) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
+  public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     if (isMultipart()) {
-      return JsonFactory.newJsonParser(policy).fromJson(new InputStreamReader(request.raw().getPart(queryParamName).getInputStream()), clazz);
+      return jsonifier.readJson(clazz, request.getPart(queryParamName).getInputStream(), policy);
     } else {
-      return JsonFactory.newJsonParser(policy).fromJson(queryParam(queryParamName).stringValue(), clazz);
+      return jsonifier.readJson(clazz, IOUtils.toInputStream(queryParam(queryParamName).stringValue(), "UTF-8"), policy);
     }
   }
   
-  public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws JsonSyntaxException, JsonIOException, IOException, ServletException {
-    return parseJsonFromParam(queryParamName, clazz, FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+  public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws Exception {
+    return parseJsonFromParam(queryParamName, clazz, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
   
   /**
