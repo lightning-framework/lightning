@@ -5,12 +5,12 @@
 
   <groupId>edu.rice.mschurr</groupId>
   <artifactId>lightning</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <packaging>bundle</packaging>
 
   <name>lightning</name>
-  <description>A light-weight web framework for Java.</description>
-  <url>https://github.com/mschurr/lightning</url>
+  <description>A simple yet expressive web framework for Java.</description>
+  <url>https://github.com/lightning-framework/lightning</url>
 
   <licenses>
 	  <license>
@@ -20,9 +20,9 @@
 	</licenses>
 	
 	<scm>
-     <connection>scm:git:git@github.com:mschurr/lightning.git</connection>
-     <developerConnection>scm:git:git@github.com:mschurr/lightning.git</developerConnection>
-     <url>scm:git:git@github.com:mschurr/lightning.git</url>
+     <connection>scm:git:git@github.com:lightning-framework/lightning.git</connection>
+     <developerConnection>scm:git:git@github.com:lightning-framework/lightning.git</developerConnection>
+     <url>scm:git:git@github.com:lightning-framework/lightning.git</url>
   </scm>
 	
 	 <developers>
