@@ -616,6 +616,18 @@ If you wish to use a different template system, you must:
 Lightning currently ships with the following template engines:
   - `lightning.templates.FreeMarkerTemplateEngine` (DEFAULT)
 
+### Json Encoding/Decoding Service
+
+By default, Lightning will use Gson (via `lightning.json.GsonJsonService`).
+
+If you wish to use a different JSON service, you must:
+  1. Implement your own engine (`lightning.json.JsonService`) OR use an alternate engine provided by Lightning.
+  2. Pass your engine to `lightning.Lightning::launch` by configuring dependency-injection on an instance of your engine
+     for the class `JsonService.class`.
+
+Lightning currently ships with the following JSON engines:
+  - `lightning.json.GsonJsonService` (DEFAULT)
+
 ### Debug Mode
 
 Lightning features a powerful debug mode. Debug mode can be enabled by setting `lightning.config.Config`'s `enableDebugMode` property.
