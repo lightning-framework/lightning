@@ -6,6 +6,8 @@ Our design goals are...
 
   * To provide the convenience of PHP-style save-and-refresh development in Java
   * To make web development simple for beginners by having simple, expressive APIs
+  * To provide core HTTP functionality while giving developers complete freedom in choosing
+    how to manage sessions, users, groups, auth, and templating.
 
 This framework was written for use in a course I taught at Rice University.
 
@@ -13,7 +15,7 @@ This framework was written for use in a course I taught at Rice University.
 
   - Powerful type-safe HTTP abstractions
   - Built-in annotation-based request routing (w/ wildcards and parameters)
-  - Built-in templating with Freemarker
+  - Built-in templating (with Freemarker by default, but extendable to any engine)
   - Built-in email support (via SMTP)
   - Built-in SSL support (w/ option to redirect insecure requests)
   - Built-in MySQL support (w/ connection pooling, transactions)
@@ -601,6 +603,18 @@ Lightning ships with the following drivers:
 By default, Lightning will attempt to utilize the MySQL drivers if you have configured a `db` in `Config`. You will need to manually import the schema (contained in `src/main/resources/lightning/schema`) into your database.
 
 TODO: MORE FLEXIBLE OPTIONS COMING SOON!
+
+### Templates
+
+By default, Lightning will use FreeMarker templates (via `lightning.templates.FreeMarkerTemplateEngine`).
+
+If you wish to use a different template system, you must:
+  1. Implement your own engine (`lightning.templates.TemplateEngine`) OR use an alternate engine provided by Lightning.
+  2. Pass your engine to `lightning.Lightning::launch` by configuring dependency-injection on an instance of your engine
+     for the class `TemplateEngine.class`.
+
+Lightning currently ships with the following template engines:
+  - `lightning.templates.FreeMarkerTemplateEngine` (DEFAULT)
 
 ### Debug Mode
 

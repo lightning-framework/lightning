@@ -38,6 +38,7 @@ import lightning.mvc.Validator;
 import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
+import lightning.templates.TemplateEngine;
 import lightning.users.User;
 import lightning.users.Users;
 import lightning.users.Users.UsersException;
@@ -45,8 +46,6 @@ import lightning.users.Users.UsersException;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
-
-import freemarker.template.Configuration;
 
 /**
  * Provides a thread-specific context for incoming requests.
@@ -109,7 +108,7 @@ public class Context {
     return context().config;
   }
   
-  public static final Configuration templateEngine() {
+  public static final TemplateEngine templateEngine() {
     return context().templateEngine;
   }
   

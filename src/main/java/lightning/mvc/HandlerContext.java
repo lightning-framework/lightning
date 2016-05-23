@@ -50,6 +50,7 @@ import lightning.mvc.Validator.FieldValidator;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
 import lightning.sessions.drivers.MySQLSessionDriver;
+import lightning.templates.TemplateEngine;
 import lightning.users.User;
 import lightning.users.Users;
 import lightning.users.Users.UsersException;
@@ -65,8 +66,6 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 
-import freemarker.template.Configuration;
-
 /**
  * A controller is a class that is used to process a single HTTP request and should be sub-classed.
  * Each controller lives only on a single thread to service a single request. Instances are 
@@ -78,7 +77,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final Request request;
   public final Response response;
   public final Config config;
-  public final Configuration templateEngine;
+  public final TemplateEngine templateEngine;
   public final SecureCookieManager cookies;
   public final URLGenerator url;
   public final Validator validator;
@@ -96,7 +95,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
 
-  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, Configuration te, FileServer fs, @Nullable Mailer mailer) {
+  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, TemplateEngine te, FileServer fs, @Nullable Mailer mailer) {
     isClosed = false;
     this.request = rq;
     this.response = re;
@@ -767,7 +766,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    */
   public final String renderToString(String viewName, Object viewModel) throws Exception {
     StringWriter stringWriter = new StringWriter();
-    templateEngine.getTemplate(viewName).process(viewModel, stringWriter);
+    templateEngine.render(viewName, viewModel, stringWriter);
     return stringWriter.toString();
   }
   
@@ -786,7 +785,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @throws Exception
    */
   public final void render(String viewName, Object viewModel) throws Exception {
-    templateEngine.getTemplate(viewName).process(viewModel, response.raw().getWriter());
+    templateEngine.render(viewName, viewModel, response.raw().getWriter());
   }
   
   /**
@@ -795,7 +794,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    */
   public final void render(ModelAndView modelAndView) throws Exception {
     response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
-    templateEngine.getTemplate(modelAndView.viewName).process(modelAndView.viewModel, response.raw().getWriter());
+    templateEngine.render(modelAndView.viewName, modelAndView.viewModel, response.raw().getWriter());
   }
   
   /**

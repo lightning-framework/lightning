@@ -15,9 +15,9 @@ import javax.servlet.http.HttpServletResponse;
 import lightning.Lightning;
 import lightning.ann.Before;
 import lightning.ann.Befores;
+import lightning.ann.ExceptionHandler;
 import lightning.ann.Filter;
 import lightning.ann.Filters;
-import lightning.ann.ExceptionHandler;
 import lightning.ann.Json;
 import lightning.ann.Multipart;
 import lightning.ann.RequireAuth;
@@ -68,9 +68,10 @@ import lightning.routing.RouteMapper.Match;
 import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
 import lightning.sessions.Session;
+import lightning.templates.FreeMarkerTemplateEngine;
+import lightning.templates.TemplateEngine;
 import lightning.users.User;
 import lightning.users.Users;
-import lightning.util.Iterables;
 
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.util.MultiException;
@@ -81,7 +82,6 @@ import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import freemarker.template.Configuration;
@@ -99,7 +99,7 @@ public class LightningHandler extends AbstractHandler {
   
   private Config config;
   private MySQLDatabaseProvider dbp;
-  private Configuration userTemplateConfig;
+  private TemplateEngine userTemplateConfig;
   private Configuration internalTemplateConfig;
   private ExceptionMapper<Method> exceptionHandlers;
   private Scanner scanner;
@@ -128,23 +128,11 @@ public class LightningHandler extends AbstractHandler {
         TemplateExceptionHandler.HTML_DEBUG_HANDLER :*/
         TemplateExceptionHandler.RETHROW_HANDLER);
     
-    this.userTemplateConfig = new Configuration(FREEMARKER_VERSION);
-    this.userTemplateConfig.setSharedVariable("__LIGHTNING_DEV", config.enableDebugMode);
-    if (config.server.templateFilesPath != null) {
-      File templatePath = Iterables.firstOr(Iterables.filter(ImmutableList.of(
-          new File("./src/main/java/" + config.server.templateFilesPath),
-          new File("./src/main/resources/" + config.server.templateFilesPath)
-      ), f -> f.exists()), new File(config.server.templateFilesPath));
-      if (templatePath.exists() && config.enableDebugMode) {
-        this.userTemplateConfig.setDirectoryForTemplateLoading(templatePath);
-      } else {
-        this.userTemplateConfig.setClassForTemplateLoading(getClass(), "/" + config.server.templateFilesPath);
-      }
+    userTemplateConfig = userModule.getBindingForClass(TemplateEngine.class);
+    if (userTemplateConfig == null) {
+      // Use the default template engine.
+      userTemplateConfig = new FreeMarkerTemplateEngine(config);
     }
-    this.userTemplateConfig.setShowErrorTips(config.enableDebugMode);
-    this.userTemplateConfig.setTemplateExceptionHandler(/*config.enableDebugMode ?
-        TemplateExceptionHandler.HTML_DEBUG_HANDLER :*/
-        TemplateExceptionHandler.RETHROW_HANDLER);    
     
     this.exceptionHandlers = new ExceptionMapper<>();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
@@ -263,7 +251,6 @@ public class LightningHandler extends AbstractHandler {
       
       if (config.enableDebugMode) {
         rescan();
-        userTemplateConfig.clearTemplateCache();
         internalTemplateConfig.clearTemplateCache();
       }
       
