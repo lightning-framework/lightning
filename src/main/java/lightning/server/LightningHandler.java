@@ -26,6 +26,9 @@ import lightning.ann.Route;
 import lightning.ann.Routes;
 import lightning.ann.Template;
 import lightning.ann.WebSocketFactory;
+import lightning.cache.Cache;
+import lightning.cache.CacheDriver;
+import lightning.cache.driver.ExceptingCacheDriver;
 import lightning.config.Config;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
@@ -115,6 +118,7 @@ public class LightningHandler extends AbstractHandler {
   private InjectorModule userModule;
   private Mailer mailer;
   private JsonService jsonifier;
+  private Cache cache;
   
   public LightningHandler(Config config, MySQLDatabaseProvider dbp, InjectorModule globalModule, InjectorModule userModule) throws Exception {
     this.config = config;
@@ -141,6 +145,12 @@ public class LightningHandler extends AbstractHandler {
       // Use the default json engine.
       jsonifier = new GsonJsonService();
     }
+    
+    CacheDriver cacheDriver = userModule.getBindingForClass(CacheDriver.class);
+    if (cacheDriver == null) {
+      cacheDriver = new ExceptingCacheDriver();
+    }
+    cache = new Cache(cacheDriver);
     
     this.exceptionHandlers = new ExceptionMapper<>();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
@@ -235,7 +245,7 @@ public class LightningHandler extends AbstractHandler {
       }      
       
       // Create context.
-      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer, this.jsonifier);
+      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer, this.jsonifier, this.cache);
       requestModule = requestSpecificInjectionModule(ctx);
       injector = new Injector(
           globalModule, requestModule, userModule);

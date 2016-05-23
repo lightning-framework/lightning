@@ -11,6 +11,7 @@ import javax.servlet.ServletException;
 
 import lightning.auth.Auth;
 import lightning.auth.AuthException;
+import lightning.cache.Cache;
 import lightning.config.Config;
 import lightning.crypt.Hasher;
 import lightning.crypt.SecureCookieManager;
@@ -79,6 +80,10 @@ public class Context {
   public static final HandlerContext goAsync() {
     context().goAsync();
     return context();
+  }
+  
+  public static final Cache cache() {
+    return context().cache();
   }
   
   public static final Groups groups() {

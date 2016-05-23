@@ -445,12 +445,6 @@ A similar variant (`ObjectParam`) exists for reading values from type-unsafe ser
 List<String> data = session().get("data").listValue(String.class);
 ```
 
-### Cache
-
-TODO: COMING SOON!
-
-** NOTE ** Usage of these APIs is entirely optional. Requires you to have configured a cache driver.
-
 ### Validators
 
 No framework could be complete without built-in form validation - and lightning has it, too! The usage of a validator is as follows:
@@ -591,10 +585,9 @@ class MyController {
 
 ### Configuring Drivers
 
-You may need to manually configure drivers for Sessions, Groups, Users, Auth, and the Cache.
+You may need to manually configure drivers for Sessions, Groups, Users, Auth.
 
 Lightning ships with the following drivers:
-  * Cache: NONE
   * Sessions: MySQL
   * Groups: MySQL
   * Users: MySQL
@@ -603,6 +596,17 @@ Lightning ships with the following drivers:
 By default, Lightning will attempt to utilize the MySQL drivers if you have configured a `db` in `Config`. You will need to manually import the schema (contained in `src/main/resources/lightning/schema`) into your database.
 
 TODO: MORE FLEXIBLE OPTIONS COMING SOON!
+
+
+### Cache
+
+You may invoke `lightning.server.Context.cache()` to get an object for storing items in a transient cache. This API is
+inteded to provide convience methods for accessing services like Memcached.
+
+In order to use the cache APIs, you must implement a `lightning.server.cache.CacheDriver` and dependency inject
+an instance of your driver for `CacheDriver.class` before invoking `lightning.Lightning::launch`.
+
+** NOTE ** Usage of these APIs is entirely optional.
 
 ### Templates
 

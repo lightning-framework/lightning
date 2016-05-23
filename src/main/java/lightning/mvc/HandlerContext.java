@@ -18,6 +18,7 @@ import javax.servlet.http.Part;
 import lightning.auth.Auth;
 import lightning.auth.AuthException;
 import lightning.auth.drivers.MySQLAuthDriver;
+import lightning.cache.Cache;
 import lightning.config.Config;
 import lightning.crypt.Hasher;
 import lightning.crypt.SecureCookieManager;
@@ -91,11 +92,12 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   private final Users users;
   private boolean isClosed;
   private final JsonService jsonifier;
+  private final Cache cache;
   
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
 
-  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, TemplateEngine te, FileServer fs, @Nullable Mailer mailer, JsonService jsonifier) {
+  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, TemplateEngine te, FileServer fs, @Nullable Mailer mailer, JsonService jsonifier, Cache cache) {
     isClosed = false;
     this.request = rq;
     this.response = re;
@@ -114,6 +116,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.users = new Users(new MySQLUserDriver(this, groups), groups);
     this.auth = Auth.forSession(session, new MySQLAuthDriver(this), users);
     this.jsonifier = jsonifier;
+    this.cache = cache;
   }
   
   @Override
@@ -870,5 +873,9 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     response.header(HTTPHeader.LAST_MODIFIED, Time.formatForHttp(lastModifiedTime));
     response.header(HTTPHeader.ETAG, etag);
     response.header(HTTPHeader.EXPIRES, Time.formatForHttp(Time.now() + 3600));
+  }
+
+  public Cache cache() {
+    return cache;
   }
 }
