@@ -2,7 +2,9 @@ package lightning.http;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -156,6 +158,15 @@ public class Request {
    */
   public HttpServletRequest raw() {
     return request;
+  }
+  
+  public Set<String> headers() {
+    HashSet<String> headers = new HashSet<>();
+    
+    for (Enumeration<String> e = request.getHeaderNames(); e.hasMoreElements();)
+      headers.add(e.nextElement());
+    
+    return headers;
   }
 
   /**

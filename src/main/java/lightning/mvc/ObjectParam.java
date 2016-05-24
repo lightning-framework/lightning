@@ -275,4 +275,13 @@ public class ObjectParam {
     
     return Optional.absent();
   }
+  
+  @Override
+  public String toString() {
+    if (value == null) {
+      return "null";
+    }
+    
+    return value.toString();
+  }
 }

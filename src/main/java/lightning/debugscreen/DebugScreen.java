@@ -13,10 +13,10 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import lightning.http.Request;
+import lightning.mvc.HandlerContext;
 import lightning.util.Iterables;
+import lightning.util.NumberFormat;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -50,8 +50,8 @@ public class DebugScreen {
         this.sourceLocators = sourceLocators;
     }
     
-    public final void handle(Throwable throwable, HttpServletRequest request, HttpServletResponse response) throws IOException {
-        response.setStatus(500); // Internal Server Error
+    public final void handle(Throwable throwable, HandlerContext ctx) throws IOException {
+        ctx.response.raw().setStatus(500); // Internal Server Error
         
         // Find the original causing throwable; this will contain the most relevant information to 
         // display to the user. 
@@ -73,14 +73,14 @@ public class DebugScreen {
             model.put("type", throwable.getClass().getCanonicalName());
   
             LinkedHashMap<String, Map<String, ? extends Object>> tables = new LinkedHashMap<>();
-            installTables(tables, request, response);
+            installTables(tables, ctx);
             model.put("tables", tables);
-            response.setHeader("Content-Type", "text/html; charset=UTF-8");
-            templateConfig.getTemplate("debugscreen.ftl").process(model, response.getWriter());
+            ctx.response.raw().setHeader("Content-Type", "text/html; charset=UTF-8");
+            templateConfig.getTemplate("debugscreen.ftl").process(model, ctx.response.raw().getWriter());
         } catch (Exception e) {
             // In case we encounter any exceptions trying to render the error page itself,
             // have this simple fallback.
-            response.getWriter().println(
+            ctx.response.raw().getWriter().println(
                     "<html>"
                             + "  <head>"
                             + "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -101,41 +101,66 @@ public class DebugScreen {
      *
      * @param tables the map containing the tables to display on the debug screen
      */
-    protected void installTables(LinkedHashMap<String, Map<String, ? extends Object>> tables, HttpServletRequest request, HttpServletResponse response) {
-        // TODO: Add more tables here.
-        tables.put("Request", getRequestInfo(request));
-        tables.put("Environment", getEnvironmentInfo());
-        /*tables.put("Headers", setToLinkedHashMap(request.headers(), h -> h, request::headers));
-        tables.get("Headers").remove("Cookie");
-        tables.put("Route Parameters", request.params());
-        tables.put("Query Parameters", setToLinkedHashMap(request.queryParams(), p -> p, request::queryParams));
-        //tables.put("Session Attributes", setToLinkedHashMap(request.session().attributes(), a -> a, request.session()::attribute));
-        tables.put("Request Attributes", setToLinkedHashMap(request.attributes(), a -> a, request::attribute));
-        //tables.put("Cookies (Raw)", request.cookies());
+    protected void installTables(LinkedHashMap<String, Map<String, ? extends Object>> tables, HandlerContext ctx) {
+        tables.put("Environment", getEnvironmentInfo(ctx));
+
+        tables.put("Request", getRequestInfo(ctx));
         
+        tables.put("Request Headers", setToLinkedHashMap(ctx.request.headers(), h -> h, h -> ctx.request.header(h).stringOption().or("-")));
+        tables.get("Request Headers").remove("Cookie");
+
+        tables.put("Request Route Parameters", setToLinkedHashMap(ctx.request.routeParams(), k -> k, k -> ctx.request.routeParam(k).stringOption().or("-")));
         
-        tables.put("Cookies", context.cookies.asMap());
+        tables.put("Request Query Parameters", setToLinkedHashMap(ctx.request.queryParams(), k -> k, k -> ctx.request.queryParam(k).stringOption().or("-")));
+        
+        tables.put("Request Properties", setToLinkedHashMap(ctx.request.properties(), k -> k, k -> ctx.request.property(k).stringOption().or("-")));
+        
+        tables.put("Request Cookies", setToLinkedHashMap(ctx.request.cookies(), k -> k, k -> ctx.request.cookie(k).stringOption().or("-")));
         
         try {
-          tables.put("Session", context.session.asMap());
-          tables.put("Auth", context.auth.isLoggedIn() ? ImmutableMap.of("user", context.user().getId() + ":" + context.user().getUserName()) : ImmutableMap.of());
-        } catch (SessionException | AuthException e) {
+          tables.put("Session", ctx.session().asMap());
+          tables.put("Auth", 
+              ctx.auth().isLoggedIn() ? 
+                  ImmutableMap.of("user", ctx.user().getId() + ":" + ctx.user().getUserName()) : 
+                  ImmutableMap.of());
+        } catch (Exception e) {
           tables.put("Session", ImmutableMap.of());
           tables.put("Auth", ImmutableMap.of());
-        }*/
+        }
     }
 
-    @SuppressWarnings("unused")
+    private LinkedHashMap<String, Object> getEnvironmentInfo(HandlerContext ctx) {
+        LinkedHashMap<String, Object> environment = new LinkedHashMap<>();
+        environment.put("Thread ID", Thread.currentThread().getId());
+        environment.put("Debug Mode", Boolean.toString(ctx.config.enableDebugMode));
+        environment.put("Scan Prefixes", ctx.config.scanPrefixes.toString());
+        environment.put("Auto-Reload Prefixes", ctx.config.autoReloadPrefixes.toString());
+        environment.put("SSL Enabled", Boolean.toString(ctx.config.ssl.isEnabled()));
+        environment.put("HTTP2 Enabled", Boolean.toString(ctx.config.server.enableHttp2));
+        environment.put("Trust Load Balancer Headers", Boolean.toString(ctx.config.server.trustLoadBalancerHeaders));
+        environment.put("POST Request Limit", NumberFormat.formatFileSize(ctx.config.server.maxPostBytes));
+        environment.put("MULTIPART Request Limit", NumberFormat.formatFileSize(ctx.config.server.multipartRequestLimitBytes));
+        return environment;
+    }
+
+    private LinkedHashMap<String, Object> getRequestInfo(HandlerContext ctx) {
+        Request request = ctx.request;
+        LinkedHashMap<String, Object> req = new LinkedHashMap<>();
+        req.put("URL", Optional.fromNullable(request.url()).or("-"));
+        req.put("Scheme", request.scheme().toString());
+        req.put("Method", request.method().toString());
+        req.put("Remote IP", Optional.fromNullable(request.ip()).or("-"));
+        req.put("Path", Optional.fromNullable(request.path()).or("-"));
+        req.put("Host", Optional.fromNullable(request.host()).or("-"));
+        req.put("Port", Optional.fromNullable(Integer.toString(ctx.config.server.port)).or("-"));
+        req.put("URI", Optional.fromNullable(request.uri()).or("-"));
+        return req;
+    }
+    
     private LinkedHashMap<String, String> setToLinkedHashMap(Set<String> set,
                                                              Function<String, String> keyMapper,
                                                              Function<String, String> valueMapper) {
         return set.stream().collect(Collectors.toMap(keyMapper, valueMapper, (k, v) -> k, LinkedHashMap::new));
-    }
-
-    private LinkedHashMap<String, Object> getEnvironmentInfo() {
-        LinkedHashMap<String, Object> environment = new LinkedHashMap<>();
-        environment.put("Thread ID", Thread.currentThread().getId());
-        return environment;
     }
     
     private String traceToString(Throwable t) {
@@ -148,26 +173,6 @@ public class DebugScreen {
       }
       pw.close();
       return sw.toString();
-    }
-
-    private LinkedHashMap<String, Object> getRequestInfo(HttpServletRequest request) {
-        LinkedHashMap<String, Object> req = new LinkedHashMap<>();
-        //req.put("URL", Optional.fromNullable(request.url()).or("-"));
-        //req.put("Scheme", Optional.fromNullable(request.scheme()).or("-"));
-        //req.put("Method", Optional.fromNullable(request.requestMethod()).or("-"));
-        //req.put("Protocol", Optional.fromNullable(request.protocol()).or("-"));
-        //req.put("Remote IP", Optional.fromNullable(request.ip()).or("-"));
-        //req.put("Path Info", Optional.fromNullable(request.pathInfo()).or("-"));
-        //req.put("Query String", Optional.fromNullable(request.queryString()).or("-"));
-        //req.put("Host", Optional.fromNullable(request.host()).or("-"));
-        //req.put("Port", Optional.fromNullable(Integer.toString(request.port())).or("-"));
-        //req.put("URI", Optional.fromNullable(request.uri()).or("-"));
-        //req.put("Content Type", Optional.fromNullable(request.contentType()).or("-"));
-        //req.put("Content Length", request.contentLength() == -1 ? "-" : Integer.toString(request.contentLength()));
-        //req.put("Context Path", Optional.fromNullable(request.contextPath()).or("-"));
-        //req.put("Body", Optional.fromNullable(request.body()).or("-"));
-        //req.put("User-Agent", Optional.fromNullable(request.userAgent()).or("-"));
-        return req;
     }
 
     /**

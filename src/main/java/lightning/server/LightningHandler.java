@@ -450,10 +450,10 @@ public class LightningHandler extends AbstractHandler {
           return;
         }
         
-        sendCriticalErrorPage(request, response, e);
+        sendCriticalErrorPage(ctx, e);
       } catch (Throwable e2) {
         logger.warn("Exception handler returned exception:", e2);
-        sendCriticalErrorPage(request, response, e);
+        sendCriticalErrorPage(ctx, e);
       }
     } finally {
       try {
@@ -548,28 +548,28 @@ public class LightningHandler extends AbstractHandler {
     }
   }
   
-  protected void sendCriticalErrorPage(Request request, Response response, Throwable e) throws IOException {
+  protected void sendCriticalErrorPage(HandlerContext ctx, Throwable e) throws IOException {
     try {
-      ModelAndView mv = exceptionViewProducer.produce(e.getClass(), e, request.raw(), response.raw());
+      ModelAndView mv = exceptionViewProducer.produce(e.getClass(), e, ctx.request.raw(), ctx.response.raw());
       if (mv != null) {
-        response.status(HTTPStatus.fromException(e));
-        renderInternalTemplate(response, mv);
+        ctx.response.status(HTTPStatus.fromException(e));
+        renderInternalTemplate(ctx.response, mv);
         return;
       }
       
       if (config.enableDebugMode) {
-        debugScreen.handle(e, request.raw(), response.raw());
+        debugScreen.handle(e, ctx);
         return;
       }
       
-      response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
-      renderInternalTemplate(response, exceptionViewProducer.produce(
-          InternalServerErrorException.class, e, request.raw(), response.raw()));
+      ctx.response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
+      renderInternalTemplate(ctx.response, exceptionViewProducer.produce(
+          InternalServerErrorException.class, e, ctx.request.raw(), ctx.response.raw()));
     } catch (Throwable e2) {
       // This should basically never happen, but just in case everything that can go wrong goes wrong.
       logger.warn("Failed to render critical error page with exception: ", e2);
-      response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
-      response.raw().getWriter().println("500 INTERNAL SERVER ERROR");
+      ctx.response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
+      ctx.response.raw().getWriter().println("500 INTERNAL SERVER ERROR");
     }
   }
   
