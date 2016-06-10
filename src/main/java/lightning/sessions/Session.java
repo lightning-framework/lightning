@@ -35,7 +35,6 @@ import com.google.common.hash.Hashing;
  * session is saved (since after content is sent the session manager is not able to write the session
  * ID cookie). Happens because HandlerContext is closed (which invokes session save) after the user
  * handler is invoked. Could be fixed by output buffering.
- * 
  * TODO: People that don't have cookies enabled will create tons of rows, need way to purge these first.
  *       Maybe by having a committed flag and dropping sessions not committed within X seconds?
  */
@@ -133,7 +132,7 @@ public final class Session {
     
     /**
      * Invalidates a session.
-     * @param hashedId Hashed session idenfitifer.
+     * @param hashedId Hashed session identifier.
      * @throws SeessionDriverException On failure.
      */
     public void invalidate(String hashedId) throws SessionDriverException;
@@ -332,6 +331,10 @@ public final class Session {
     }
     
     return (String) data.get(XSRF_KEY);
+  }
+  
+  public String xsrfToken() throws Exception {
+    return getXSRFToken();
   }
   
   /**

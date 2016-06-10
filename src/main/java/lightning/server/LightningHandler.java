@@ -54,7 +54,6 @@ import lightning.http.Request;
 import lightning.http.Response;
 import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
-import lightning.inject.Resolver;
 import lightning.io.FileServer;
 import lightning.json.GsonJsonService;
 import lightning.json.JsonService;
@@ -598,17 +597,11 @@ public class LightningHandler extends AbstractHandler {
     m.bindClassToInstance(URLGenerator.class, context.url);
     m.bindClassToInstance(Groups.class, context.groups());
     m.bindClassToInstance(Users.class, context.users());
-    m.bindClassToResolver(User.class, new Resolver<User>() {
-      @Override
-      public User resolve() throws Exception {
-        return context.user();
-      }
+    m.bindClassToResolver(User.class, () -> {
+      return context.user();
     });
-    m.bindClassToResolver(MySQLDatabase.class, new Resolver<MySQLDatabase>() {
-      @Override
-      public MySQLDatabase resolve() throws Exception {
-        return context.db();
-      }
+    m.bindClassToResolver(MySQLDatabase.class, () -> {
+      return context.db();
     });
     return m;
   }

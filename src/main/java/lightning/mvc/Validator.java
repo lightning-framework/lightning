@@ -67,7 +67,7 @@ public class Validator {
   
   @FunctionalInterface
   public static interface CustomValidator {
-    public String check(Param value);
+    public boolean check(Param value);
   }
   
   public final class FieldValidator {
@@ -210,16 +210,14 @@ public class Validator {
       return this;
     }
     
-    public FieldValidator matches(CustomValidator validator) {
+    public FieldValidator matches(CustomValidator validator, String errorMessage) {
       if (field.isEmpty()) {
         addError("You must provide a non-empty value.");
         return this;
       }
       
-      String error = validator.check(field);
-      
-      if (error != null) {
-        addError(error);
+      if(!validator.check(field)) {
+        addError(errorMessage);
       }
       
       return this;

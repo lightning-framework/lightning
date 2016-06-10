@@ -16,6 +16,8 @@ import lightning.enums.HTTPMethod;
  * 
  * Before filters may defined within any class in the scan prefixes defined in your config.
  * 
+ * Before (path-based) filters execute before @Filter (annotation-based) filters.
+ * 
  * A method may be annotated by multiple @Before annotations.
  * 
  * You may control the order in which filters execute by changing the priority in the annotation. Filters

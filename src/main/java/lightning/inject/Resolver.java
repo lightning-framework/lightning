@@ -5,6 +5,7 @@ package lightning.inject;
  * Allows for lazy instantiation of injected values.
  * @param <T> The type of injected value.
  */
+@FunctionalInterface
 public interface Resolver<T> {
   public T resolve() throws Exception;
 }

@@ -274,13 +274,13 @@ public class Request {
   /**
    * @return A map of all cookie names to cookie values. Prefer using cookies().
    */
-  public Map<String, Param> unencryptedCookies() {
-    Map<String, Param> result = new HashMap<>();
+  public Set<String> rawCookies() {
+    Set<String> result = new HashSet<>();
     Cookie[] cookies = request.getCookies();
     
     if (cookies != null) {
       for (Cookie cookie : cookies) {
-        result.put(cookie.getName(), Param.wrap(cookie.getName(), cookie.getValue()));
+        result.add(cookie.getName());
       }
     }
     
@@ -292,7 +292,7 @@ public class Request {
    * @return The raw value of the cookie with given name, or null if it doesn't exist. Prefer using
    *         cookie(...).
    */
-  public Param unencryptedCookie(String name) {
+  public Param rawCookie(String name) {
     Cookie[] cookies = request.getCookies();
     
     if (cookies != null) {
@@ -389,5 +389,36 @@ public class Request {
     }
 
     return p;
+  }
+  
+  /**
+   * @param name A part name.
+   * @return The part with the given name in a multipart-request.
+   * @throws BadRequestException If incoming request is not multipart or part is missing.
+   * @throws IOException
+   * @throws ServletException
+   */
+  public Part part(String name) throws BadRequestException, IOException, ServletException {
+    return getPart(name);
+  }
+  
+  /**
+   * @return All parts attached to the multipart request.
+   * @throws BadRequestException If incoming request is not multipart.
+   * @throws IOException
+   * @throws ServletException
+   */
+  public Set<String> parts() throws BadRequestException, IOException, ServletException {
+    if (!isMultipart()) {
+      throw new BadRequestException("Expected a multipart request.");
+    }
+    
+    Set<String> parts = new HashSet<>();
+    
+    for (Part p : request.getParts()) {
+      parts.add(p.getName());
+    }
+    
+    return parts;
   }
 }

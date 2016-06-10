@@ -99,6 +99,19 @@ public class Response {
     redirect(url, HTTPStatus.FOUND);
   }
   
+  public void rawCookie(String name, String value, String path, int maxAgeSec, boolean httpOnly, boolean secureOnly) throws HeadersAlreadySentException {
+    if (hasSentHeaders()) {
+      throw new HeadersAlreadySentException();
+    }
+    
+    Cookie cookie = new Cookie(name, value);
+    cookie.setPath(path);
+    cookie.setMaxAge(maxAgeSec);
+    cookie.setHttpOnly(httpOnly);
+    cookie.setSecure(secureOnly);
+    response.addCookie(cookie);
+  }
+  
   /**
    * Removes an HTTP cookie (by overwriting it with a new blank cookie that expires immediately).
    * Be aware that all clients may not support cookies, or may not have them enabled.
@@ -128,22 +141,22 @@ public class Response {
    * @param maxAgeSec
    * @param httpOnly
    */
-  public void setCookie(String name, String value, String path, int maxAgeSec, boolean httpOnly) throws HeadersAlreadySentException {
+  public void cookie(String name, String value, String path, int maxAgeSec, boolean httpOnly) throws HeadersAlreadySentException {
     cookies.set(name, value, path, maxAgeSec, httpOnly);
   }
   
   /**
    * See above.
    */
-  public void setCookie(String name, String value) throws HeadersAlreadySentException {
+  public void cookie(String name, String value) throws HeadersAlreadySentException {
     cookies.set(name, value);
   }
   
   /**
    * See above.
    */
-  public void setCookie(String name, String value, int maxAgeSec) throws HeadersAlreadySentException {
-    setCookie(name, value, "/", maxAgeSec, true);
+  public void cookie(String name, String value, int maxAgeSec) throws HeadersAlreadySentException {
+    cookie(name, value, "/", maxAgeSec, true);
   }
 
   /**
@@ -224,6 +237,14 @@ public class Response {
   public Writer getWriter() throws IOException {
     return response.getWriter();
   }  
+  
+  /**
+   * @return A writer which wraps the output stream to the response body.
+   * @throws IOException
+   */
+  public Writer writer() throws IOException {
+    return getWriter();
+  }
   
   /**
    * @return An output stream to write to the response body.

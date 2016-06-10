@@ -126,7 +126,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
 
   @Override
   public Connection getConnection() throws SQLException {
-    return db().getConnection();
+    return db().raw();
   }
   
   public Hasher hasher() {

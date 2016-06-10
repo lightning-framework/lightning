@@ -129,6 +129,29 @@ public class SecureCookieManager {
    * @param value
    * @param path
    * @param maxAgeSec
+   * @throws HeadersAlreadySentException
+   */
+  public void set(String name, String value, String path, int maxAgeSec) throws HeadersAlreadySentException {
+    set(name, value, path, maxAgeSec, true);
+  }
+  
+  /**
+   * Creates and sets a cookie with the given name and value.
+   * @param name
+   * @param value
+   * @param maxAgeSec
+   * @throws HeadersAlreadySentException
+   */
+  public void set(String name, String value, int maxAgeSec) throws HeadersAlreadySentException {
+    set(name, value, maxAgeSec);
+  }
+  
+  /**
+   * Creates and sets a cookie with the given name and value.
+   * @param name
+   * @param value
+   * @param path
+   * @param maxAgeSec
    * @param httpOnly
    */
   public void set(String name, String value, String path, int maxAgeSec, boolean httpOnly) throws HeadersAlreadySentException {
@@ -169,7 +192,7 @@ public class SecureCookieManager {
    * @throws InsecureCookieException On failure to find and validate the cookie.
    */
   public String get(String name) throws InsecureCookieException {
-    Param value = request.unencryptedCookie(name);
+    Param value = request.rawCookie(name);
     
     // Ensure the cookie was set.
     if (!value.exists()) {
@@ -200,7 +223,7 @@ public class SecureCookieManager {
   public Map<String, String> asMap() {
     Map<String, String> cookies = new HashMap<>();
     
-    for (String cookie : request.unencryptedCookies().keySet()) {
+    for (String cookie : request.rawCookies()) {
       try {
         cookies.put(cookie, get(cookie));
       } catch (InsecureCookieException e) {

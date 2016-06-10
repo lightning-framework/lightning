@@ -59,7 +59,9 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
    * @return The value returned by the given closure (if any).
    * @throws Exception If the transaction (or any enclosed transaction) fails.
    */
-  public <T> T transaction(Transaction<T> transaction) throws Exception {
+  public <T> T transaction(Transaction<T> transaction, TransactionLevel level) throws Exception {
+    int oldLevel = connection.getTransactionIsolation();
+    
     try {
       transactionLock.lock();
       //logger.debug("Transaction Starts");
@@ -97,7 +99,14 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
       //logger.debug("Transaction Ends (Exception)");
       
       throw e;
+    } finally {
+      connection.setTransactionIsolation(oldLevel);
     }
+  }
+  
+  @Override
+  public <T> T transaction(Transaction<T> transaction) throws Exception {
+    return transaction(transaction, TransactionLevel.fromDriverCode(connection.getTransactionIsolation()));
   }
 
   /**
@@ -109,6 +118,17 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
       transaction.execute();
       return null;
     });
+  }
+  
+  /**
+   * Executes a database transaction which does not return a value.
+   * @see {@link #transaction(Transaction)}
+   */
+  public void transaction(VoidTransaction transaction, TransactionLevel level) throws Exception {
+    transaction(() -> {
+      transaction.execute();
+      return null;
+    }, level);
   }
 
   /**
@@ -125,7 +145,7 @@ public class MySQLDatabaseImpl implements MySQLDatabase {
   /**
    * @return The underlying database connection for direct usage.
    */
-  public Connection getConnection() {
+  public Connection raw() {
     return connection;
   }
 

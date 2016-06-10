@@ -211,6 +211,10 @@ public final class Auth {
     return user;
   }
   
+  public User user() throws SessionException, AuthException {
+    return getUser();
+  }
+  
   /**
    * Tries to authenticate the given session to some user.
    * Only tries the first time called.

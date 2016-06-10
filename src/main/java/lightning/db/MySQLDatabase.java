@@ -24,10 +24,12 @@ public interface MySQLDatabase extends AutoCloseable {
     public void saveTo(MySQLDatabase db) throws SQLException;
   }
 
+  public <T> T transaction(Transaction<T> transaction, TransactionLevel level) throws Exception;
+  public void transaction(VoidTransaction transaction, TransactionLevel level) throws Exception;
   public <T> T transaction(Transaction<T> transaction) throws Exception;
   public void transaction(VoidTransaction transaction) throws Exception;
   public void close() throws SQLException;
-  public Connection getConnection() throws SQLException;
+  public Connection raw() throws SQLException;
   public NamedPreparedStatement prepare(String query) throws SQLException;
   public NamedPreparedStatement prepare(String query, Map<String, ?> data) throws SQLException;
   public NamedPreparedStatement prepareInsert(String table, Map<String, ?> data) throws SQLException;

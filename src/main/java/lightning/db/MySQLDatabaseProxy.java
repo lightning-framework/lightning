@@ -30,6 +30,18 @@ public class MySQLDatabaseProxy implements MySQLDatabase {
   }
 
   @Override
+  public <T> T transaction(Transaction<T> transaction, TransactionLevel level) throws Exception {
+    lazyLoad();
+    return delegate.transaction(transaction, level);
+  }
+
+  @Override
+  public void transaction(VoidTransaction transaction, TransactionLevel level) throws Exception {
+    lazyLoad();
+    delegate.transaction(transaction, level);
+  }
+  
+  @Override
   public <T> T transaction(Transaction<T> transaction) throws Exception {
     lazyLoad();
     return delegate.transaction(transaction);
@@ -53,9 +65,9 @@ public class MySQLDatabaseProxy implements MySQLDatabase {
   }
 
   @Override
-  public Connection getConnection() throws SQLException {
+  public Connection raw() throws SQLException {
     lazyLoad();
-    return delegate.getConnection();
+    return delegate.raw();
   }
 
   @Override
