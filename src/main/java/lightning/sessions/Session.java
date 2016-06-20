@@ -11,6 +11,7 @@ import java.util.TreeSet;
 import lightning.config.Config;
 import lightning.crypt.SecureCookieManager;
 import lightning.crypt.SecureCookieManager.InsecureCookieException;
+import lightning.http.HeadersAlreadySentException;
 import lightning.http.Request;
 import lightning.http.Response;
 import lightning.mvc.ObjectParam;
@@ -378,7 +379,11 @@ public final class Session {
         cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
       }
     } catch (InsecureCookieException e) {
-      cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+      try {
+        cookies.set(SESSION_COOKIE_NAME, rawIdentifier);
+      } catch (HeadersAlreadySentException e2) {
+        logger.warn("Couldn't save session: HTTP headers already committed.");
+      }
     }
     logger.debug("Wrote session to storage: {}", rawIdentifier);
     logger.debug("Session data was: {}", data);
