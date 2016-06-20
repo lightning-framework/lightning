@@ -13,13 +13,17 @@ public class GsonJsonService implements JsonService {
   @Override
   public void writeJson(Object object, OutputStream outputStream, JsonFieldNamingPolicy policy)
       throws Exception {
-    GsonFactory.newJsonParser(convertPolicy(policy)).toJson(object, new OutputStreamWriter(outputStream));
+    try (OutputStreamWriter writer = new OutputStreamWriter(outputStream)) {
+      GsonFactory.newJsonParser(convertPolicy(policy)).toJson(object, writer);
+    }
   }
 
   @Override
   public <T> T readJson(Class<T> type, InputStream inputStream, JsonFieldNamingPolicy policy)
       throws Exception {
-    return GsonFactory.newJsonParser(convertPolicy(policy)).fromJson(new InputStreamReader(inputStream), type);
+    try (InputStreamReader reader = new InputStreamReader(inputStream)) {
+      return GsonFactory.newJsonParser(convertPolicy(policy)).fromJson(reader, type);
+    }
   }
   
   private FieldNamingPolicy convertPolicy(JsonFieldNamingPolicy policy) {

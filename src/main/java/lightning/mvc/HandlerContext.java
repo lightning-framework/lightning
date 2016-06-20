@@ -704,7 +704,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   }
   
   public final void sendJson(Object object, String prefix) throws Exception {
-    sendJson(object, null, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+    sendJson(object, prefix, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
   
   public final void sendJson(Object object, String prefix, JsonFieldNamingPolicy policy) throws Exception {
@@ -712,7 +712,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     response.type("application/json; charset=UTF-8");
     
     if (prefix != null && prefix.length() > 0) {
-      response.raw().getWriter().print(prefix);
+      response.outputStream().print(prefix);
     }
    
     jsonifier.writeJson(object, response.outputStream(), policy);
