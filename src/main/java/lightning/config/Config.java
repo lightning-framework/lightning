@@ -9,68 +9,89 @@ import lightning.mail.MailerConfig;
 
 import com.google.common.collect.ImmutableList;
 
+/**
+ * Provides configuration options for most areas of Lightning.
+ * See the official web documentation for more information.
+ */
 public class Config {
-  @Override
-  public String toString() {
-    return "Config [autoReloadPrefixes=" + autoReloadPrefixes + ", scanPrefixes=" + scanPrefixes
-        + ", ssl=" + ssl + ", server=" + server + ", mail=" + mail + ", db=" + db
-        + ", enableDebugMode=" + enableDebugMode + "]";
-  }
-  
-  // Whether or not to enable debug mode.
-  // Recommended for development, **DO NOT LEAVE ON IN PRODUCTION AS IT EXPOSES SYSTEM INTERNALS**!
-  // Enables automatic hot swapping (reloading) of handler classes, exception stack traces in
-  // the browser, template errors in browser, and disables HTTP caching of static files. 
-  // Ensures templates and static files will always be reloaded from disk on each request. 
-  // Essentially: quick and easy save and refresh development.
-  // NOTE: Websockets are currently not automatically reloaded due to limitations in Jetty. You'll
-  //       need to restart to server to see changes to websocket handler code.
-  // Debug mode does not work when deployed to a JAR and assumes the current working directory is set
-  // to the root of your project folder (where pom.xml is located).
+  /**
+   * Specifies whether or not debug (development) mode should be enabled.
+   * Recommended during development.
+   * 
+   * Assumes the current working directory is set to the root of your project folder (where pom.xml is) and
+   * that you are following the Maven directory structure conventions.
+   * 
+   * WARNING:
+   *   DO NOT ENABLE DEBUG MODE IN PRODUCTION! IT MAY EXPOSE SYSTEM INTERNALS!
+   *   DEBUG MODE WILL NOT WORK WHEN DEPLOYED TO A JAR!
+   * 
+   * NOTE:
+   *   Debug Mode enables automatic code reloading without restarting the server, adds in-browser exception
+   *   stack traces and template errors, disables caching of static files and template files, disables HTTP
+   *   caching of static files, etc.
+   *   
+   * LIMITATIONS:
+   *   Web sockets are not automatically reloadable (due to limitations in Jetty which underlies our built-in
+   *   web server) but may be in future releases. For now, you will need to restart the server to see changes
+   *   reflected to web socket code.
+   */
   public @Optional boolean enableDebugMode = false;
 
-  // A list of package prefixes on which classes should be automatically reloaded on each incoming
-  // request in DEBUG MODE ONLY.
-  // You should ONLY put code that can be safely reloaded by the classloader within the packages 
-  // indicated in these prefixes or you're going to see some strange behavior.
-  // Dependencies that involve classes within these prefixes will not be properly injectable in debug mode,
-  // so do net try to inject dependencies that are located within these prefixes.
+  /**
+   * Specifies a list of Java package prefixes in which code can be safely reloaded on each incoming request.
+   * Code reloading will ONLY OCCUR WHEN DEBUG MODE IS ENABLED.
+   * 
+   * WARNING:
+   *   Keep in mind that NOT ALL CODE CAN BE SAFELY RELOADED. If you incorrectly configure this option, you may
+   *   experience some strange or undefined behavior when running the server.
+   *   Keep in mind that you MAY NOT dependency inject any classes which are located within these prefixes.
+   *   Keep in mind that you MAY NOT dependency inject classes with static state.
+   */
   public @Optional List<String> autoReloadPrefixes = ImmutableList.of();
   
-  // A list of package prefixes in which to search for routes, websockets, exception handlers.
-  // e.g. ["path.to.my.app"]
+  /**
+   * Specifies a list of Java package prefixes in which to search for routes, web sockets, exception handlers.
+   * Example: ImmutableList.of("path.to.my.app")
+   */
   public @Required List<String> scanPrefixes;
   
-  public @Required SSLConfig ssl = new SSLConfig();
-  public @Required ServerConfig server = new ServerConfig();
-  public @Required MailConfig mail = new MailConfig();
-  public @Required DBConfig db = new DBConfig();
-  
-  // TODO: Add options for FreeMarker config.
   // TODO: Add options for Whoops (debug screen) code search paths.
   // TODO: Add options for Sessions and Auth.
   
+  /**
+   * Provides options for enabling SSL with the built-in server.
+   */
+  public @Required SSLConfig ssl = new SSLConfig();
   public static final class SSLConfig {
-    @Override
-    public String toString() {
-      return "SSLConfig [keyStoreFile=" + keyStoreFile + ", keyStorePassword=" + keyStorePassword
-          + ", trustStoreFile=" + trustStoreFile + ", trustStorePassword=" + trustStorePassword
-          + "]";
-    }
-
-    // For the Java Key Store (JKS):
+    /************************************
+     * Java Key Store Options
+     ************************************
+     *
+     * SSL will be enabled if you provide a keystore file and keystore password.
+     * The specified keystore (.jks) should contain the server's SSL certificate.
+     * You may wish to read more Java Key Store (JKS) format.
+     */
+    
     public @Optional String keyStoreFile;       // Required to enable SSL.
     public @Optional String keyStorePassword;   // Required to enable SSL.
     public @Optional String trustStoreFile;     // Optional.
     public @Optional String trustStorePassword; // Optional.
     public @Optional String keyManagerPassword; // Optional.
     
-    // Whether to redirect HTTP requests to their HTTPS equivalents.
-    // If false, will only install an HTTPs server (on ssl.port).
-    // If true, will also install an HTTP server (on server.port) that redirects insecure requests.
+    /************************************
+     * Server Options
+     ***********************************/
+    
+    /**
+     * Whether to redirect HTTP requests to their HTTPS equivalents.
+     * If false, will only install an HTTPs server (on ssl.port).
+     * If true, will also install an HTTP server (on server.port) that redirects insecure requests.
+     */
     public @Optional boolean redirectInsecureRequests = true;
     
-    // If SSL is enabled, the server will listen for HTTPS connections on this port.
+    /**
+     * Specifies the port on which to listen for HTTPS connections.
+     */
     public @Optional int port = 443;
     
     public boolean isEnabled() {
@@ -78,146 +99,239 @@ public class Config {
     }
   }
   
-  public static final class ServerConfig {
-    @Override
-    public String toString() {
-      return "ServerConfig [hmacKey=" + hmacKey + ", port=" + port + ", minThreads=" + minThreads
-          + ", maxThreads=" + maxThreads + ", threadTimeoutMs=" + threadTimeoutMs
-          + ", websocketTimeoutMs=" + websocketTimeoutMs + ", staticFilesPath=" + staticFilesPath
-          + ", templateFilesPath=" + templateFilesPath + ", trustLoadBalancerHeaders="
-          + trustLoadBalancerHeaders + "]";
-    }
-    
-    // Enable HTTP/2 support.
-    // Clients that do not support HTTP/2 will fall back to HTTP/1.1 (which, by definition, supports HTTP/1.0).
-    // Remember that HTTP/2 is not supported over non-encrypted connections and should be used in combination with SSL.
-    // IMPORTANT:
-    //  HTTP/2 support requires ALPN to be placed in the JVM boot path for JDK <= 8. JDK9 should have built-in support for ALPN.
-    //  To add ALPN for JDK <= 8:
-    //    1) A specific version of ALPN is required based on your JVM. The ALPN version must match the version of your JVM.
-    //       See https://www.eclipse.org/jetty/documentation/current/alpn-chapter.html#alpn-versions
-    //    2) You can download the ALPN jar from Maven at:
-    //       http://mvnrepository.com/artifact/org.mortbay.jetty.alpn/alpn-boot
+  /**
+   * Provides options for configuring the built-in HTTP server.
+   * 
+   * NOTE:
+   *   For custom HTTP error pages, see the documentation for lightning.ann.ExceptionHandler.
+   */
+  public @Required ServerConfig server = new ServerConfig();
+  public static final class ServerConfig {    
+
     //    3) You must start your JVM with the following argument to enable ALPN:
     //       -Xbootclasspath/p:/path/to/alpn-boot-${alpn-version}.jar
+    
+    /**
+     * Enables server-side HTTP/2 support.
+     * Clients that do not support HTTP/2 will fall back to HTTP/1.1 or HTTP/1.0.
+     * 
+     * NOTE:
+     *   No clients currently support HTTP/2 over unencrypted connections. HTTP/2 must be used in combination with SSL.
+     * 
+     * IMPORTANT:
+     *   Due to changes to SSL protocol negotiation in HTTP/2 (via ALPN), you must replace your JDK's implementation of
+     *   SSL with an implementation that adds support for ALPN (Application-Layer Protocol Negotiation).
+     *   
+     *   This is MANDATORY for enabling HTTP/2 with JRE <= 8. JRE 9+ should have built-in support for ALPN.
+     *   
+     *   You may add ALPN support by placing the ALPN library in your JVM boot path as follows:
+     *   1) Determine the SPECIFIC VERSION of ALPN required for YOUR JVM VERSION.
+     *      The ALPN version MUST MATCH the version of your JVM.
+     *      SEE: https://www.eclipse.org/jetty/documentation/current/alpn-chapter.html#alpn-versions
+     *   2) Download the SPECIFIC VERSION of ALPN for YOUR JVM version as a JAR.
+     *      SEE: http://mvnrepository.com/artifact/org.mortbay.jetty.alpn/alpn-boot
+     *   3) You must launch your JVM with the following command line arguments to add ALPN to your JVM boot path:
+     *      -Xbootclasspath/p:/path/to/alpn-boot-${alpn-version}.jar
+     */
     public @Optional boolean enableHttp2 = false;
     
-    // Encryption key for verifying integrity of hashes generated by the server.
-    // Should be something long, random, secret, and unique to your app.
+    /**
+     * Sets the private encryption key used for verifying the integrity of hashes
+     * generated by the server (for example, cookie signatures).
+     * 
+     * NOTE:
+     *   Must be something long, random, secret, and unique to your app.
+     *   In clustered environments, all app servers must use the same key.
+     */
     public @Required String hmacKey;
     
-    // Port on which to listen for incoming HTTP connections.
+    /**
+     * Sets the port on which the server will listen for incoming HTTP connections.
+     */
     public @Optional int port = 80;
     
-    // Minimum number of handler threads.
+    /**
+     * Sets the minimum size of the server request processing thread pool.
+     */
     public @Optional int minThreads = 40;
     
-    // Maximmum number of handler threads.
+    /**
+     * Sets the maximum size of the server request processing thread pool.
+     */
     public @Optional int maxThreads = 250;
     
-    // Jetty handler thread timeout.
+    /**
+     * Sets the maximum amount of time that server thread may be idle before
+     * being removed from the server request processing thread pool.
+     */
     public @Optional int threadTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60);
     
-    // Jetty websocket timeout.
-    public @Optional int websocketTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60); // For websockets.
+    /**
+     * Sets the maximum amount of time that a websocket connection may be idle
+     * before the server forcibly closes the connection.
+     */
+    public @Optional int websocketTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60);
     
-    // Maximum incoming request size (in bytes).
+    /**
+     * Sets the maximum size of an incoming non-multipart request.
+     * Requests in excess of this limit will be dropped.
+     */
     public @Optional int maxPostBytes = 1024 * 1024 * 20; // 20 MB
     
-    // Maxmimum number of query parameters on an incoming request (in #).
+    /**
+     * Sets the maximum number of query parameters that a request may contain.
+     * Requests in excess of this limit will be dropped.
+     */
     public @Optional int maxQueryParams = 100; // In number of params.
     
-    // Maximum amount of time allowed before closing an idle HTTP connection.
+    /**
+     * Sets the maximum amount of time that an HTTP connection may be idle before the
+     * server forcibly closes it.
+     */
     public @Optional int connectionIdleTimeoutMs = (int) TimeUnit.MINUTES.toMillis(3);
     
     /**
-     * Path from which to serve static files.
+     * Specifies the path containing static files that should be served.
+     * This path is relative to ${project}/src/main/resources.
      * 
-     * Static files will be served directly on their path within this folder (e.g. if style.css exists in here, it will
-     * be accessible on /style.css).
+     * Static files will be served on their path relative to their location within the specified folder.
+     * For example, "style.css" in the specified folder will be served on "/style.css".
      * 
-     * Static files will be served optimally (memory caching, http caching) and with full support for the HTTP specification
-     * (including ranges).
+     * Static files are served optimally (memory caching, HTTP caching) and support the entire HTTP spec,
+     * including range requests.
      * 
-     * Static files will be served gzipped if a .gz version exists (e.g. styles.css.gz). 
+     * Static files will be served gzipped if the client supports it and a pre-gzipped version of the file
+     * exists (e.g. styles.css.gz).
      */
-    public @Optional String staticFilesPath; // Relative to src/main|resources/java in your eclipse project folder.
+    public @Optional String staticFilesPath; 
     
-    // Path in which freemarker templates are located.
-    public @Optional String templateFilesPath; // Relative to src/main|resources/java in your eclipse project folder.
+    /**
+     * Specifies the path in which template files are located.
+     * This path is relative to ${project}/src/main/resources.
+     */
+    public @Optional String templateFilesPath; 
     
-    // Host on which to listen.
+    /**
+     * Sets the host on which the server should listen.
+     * NOTE: "0.0.0.0" matches any host.
+     */
     public @Optional String host = "0.0.0.0";
     
-    // Whether or not to trust load balancer headers (X-Forwarded-For, X-Forwarded-Proto).
-    // Will cause things like request.scheme() and request.method() to utilize the header information.
-    // Enable only if your app is firewalled behind a load balancer.
+    /**
+     * Whether or not to trust load balancer headers (X-Forwarded-For, X-Forwarded-Proto).
+     * 
+     * NOTE:
+     *   Enabling this option will cause Lightning APIs (e.g. request.scheme() and request.method()) 
+     *   to utilize this header information. This option should be enabled only if your app servers 
+     *   are safely firewalled behind a load balancer (such as Amazon ELB).
+     */
     public @Optional boolean trustLoadBalancerHeaders = false;
     
-    // Maximum size of a cached static file in bytes.
+    /**
+     * Sets the maximum size at which an individual static file may be RAM-cached.
+     */
     public @Optional int maxCachedStaticFileSizeBytes = 1024 * 50; // 50KB
     
-    // Maxmimum size of the static file cache in bytes.
+    /**
+     * Sets the maximum size of the RAM-cache for static files.
+     */
     public @Optional int maxStaticFileCacheSizeBytes = 1024 * 1024 * 30; // 30MB
     
-    // Maximum number of cached static files.
+    /**
+     * Sets the maximum number of static files that may be RAM-cached.
+     */
     public @Optional int maxCachedStaticFiles = 500;
     
-    // Place in which multipart pieces that are flushed to disk will be saved.
+    /**
+     * Whether or not to enable server support for HTTP multipart requests.
+     * If not enabled, multipart requests will be dropped.
+     */
+    public @Optional boolean multipartEnabled = true;
+    
+    /**
+     * A temporary directory in which multipart pieces that exceed the flush size may
+     * be written to disk in order to avoid consuming significant RAM.
+     */
     public @Optional String multipartSaveLocation = System.getProperty("java.io.tmpdir");
     
-    // Size at which a multipart piece will be flushed to disk.
-    public @Optional int multipartFlushSizeBytes = 1024 * 1024 * 10; // 10 MB
+    /**
+     * Size at which a multipart piece will be flushed to disk.
+     * Pieces less than this size will be stored in RAM.
+     */
+    public @Optional int multipartFlushSizeBytes = 1024 * 1024 * 1; // 1 MB
     
-    // Maximum size of a multipart piece.
+    /**
+     * Maximum allowed size of a individual multipart piece.
+     * Requests containing pieces larger than this size will be dropped.
+     * NOTE: This will limit the maximum file upload size.
+     */
     public @Optional int multipartPieceLimitBytes = 1024 * 1024 * 100; // 100 MB
     
-    // Maximum size of a multipart request.
+    /**
+     * Maximum allowed size of an entire multipart request.
+     * Requests in excess of this size will be dropped.
+     * NOTE: This will limit the maximum file upload size.
+     */
     public @Optional int multipartRequestLimitBytes = 1024 * 1024 * 100; // 100 MB
-    
-    // Whether or not to accept multipart requests.
-    // If false, all multipart requests will be dropped.
-    public @Optional boolean multipartEnabled = true;
 
-    // Maximum number of queued requests.
+    /**
+     * Sets the maximum number of queued requests.
+     * Requests past this limit will be dropped.
+     */
     public @Optional int maxQueuedRequests = 10000;
 
-    // Maximum number of queued unaccepted connections.
+    /**
+     * Sets the maximum number of queued unaccepted connections.
+     * Connection attempts past this limit will be dropped.
+     */
     public @Optional int maxAcceptQueueSize = 0;
     
-    // Enable HTTP/1.1 persistent connections.
+    /**
+     * Whether or not to enable server support for HTTP persistent connections.
+     */
     public @Optional boolean enablePersistentConnections = true;
-    
-    // NOTE: Want custom error pages (e.g. for 404 and 500 errors)? Install an @ExceptionHandler
-    // for the exceptions in lightning.http.
   }
   
+  /**
+   * Provides options for configuring the sending of emails over SMTP.
+   */
+  public @Required MailConfig mail = new MailConfig();
   public static final class MailConfig implements MailerConfig {
-    @Override
-    public String toString() {
-      return "MailConfig [useSSL=" + useSsl + ", address=" + address + ", username=" + username
-          + ", password=" + password + ", host=" + host + ", port=" + port + "]";
-    }
-    
-    // Doesn't send messages over SMTP, instead logs them.
+    /**
+     * Forces messages to be logged (via the SLF4J facade) instead of attempting
+     * to deliver them over the network. Useful for development.
+     */
     public @Optional boolean useLogDriver = false;
 
-    // Whether or not to use SMTP over SSL.
+    /**
+     * Whether or not to use SMTP+SSL.
+     */
     public @Optional boolean useSsl = true;
     
-    // Email address
+    /**
+     * The email address from which the server will deliver messages.
+     */
     public @Optional String address;
     
-    // SMTP login
+    /**
+     * The username required to authenticate with the SMTP server.
+     */
     public @Optional String username;
     
-    // SMTP password
+    /**
+     * The password required to authenticate with the SMTP server.
+     * Set to NULL if no password is required.
+     */
     public @Optional String password;
     
-    // SMTP host
+    /**
+     * The host of the SMTP server.
+     */
     public @Optional String host;
     
-    // SMTP port
+    /**
+     * The port of the SMTP server.
+     */
     public @Optional int port = 465;
     
     public boolean isEnabled() {
@@ -260,29 +374,42 @@ public class Config {
     }
   }
   
+  /**
+   * Provides options for configuring a connection pool to an SQL database.
+   */
+  public @Required DBConfig db = new DBConfig();
   public static final class DBConfig {
-    @Override
-    public String toString() {
-      return "DBConfig [host=" + host + ", port=" + port + ", username=" + username + ", password="
-          + password + ", name=" + name + "]";
-    }
+    /*********************************************
+     * Database Information
+     *********************************************/
     
-    // MySQL database host
     public @Optional String host = "localhost";
-    
-    // MySQL database port
     public @Optional int port = 3306;
-    
-    // MySQL database username
     public @Optional String username = "httpd";
     
-    // MySQL database password
+    /**
+     * NOTE: Leave NULL if no password is required (not recommended).
+     */
     public @Optional String password = "httpd";
     
-    // MySQL database name
+    /**
+     * The name of the default database to use.
+     */
     public @Optional String name;
     
-    // Connection pooling options:
+    /**
+     * Whether to connect to the database using SSL.
+     * 
+     * NOTE: 
+     *   The server certificate must be trusted by your JVM by default or explicitly placed
+     *   in your JVM trust store.
+     */
+    public @Optional boolean useSsl = false;
+    
+    /*********************************************
+     * Connection Pool Options
+     *********************************************/
+    
     public @Optional int minPoolSize = 5;
     public @Optional int maxPoolSize = 100;
     public @Optional int acquireIncrement = 5;
@@ -295,6 +422,5 @@ public class Config {
     public @Optional int unreturnedConnectionTimeoutS = 50000;
     public @Optional int idleConnectionTestPeriodS = 600;
     public @Optional int maxStatementsCached = 500;
-    public @Optional boolean useSsl = false; // Must have cert for server in your trust store.
   }
 }

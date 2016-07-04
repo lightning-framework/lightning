@@ -4,7 +4,7 @@ import java.io.File;
 
 import lightning.config.Config;
 import lightning.inject.InjectorModule;
-import lightning.server.LightningInstance;
+import lightning.server.LightningFactory;
 import lightning.server.LightningServer;
 
 /**
@@ -17,7 +17,7 @@ public final class Lightning {
    * @throws Exception On failure to initialize sever.
    */
   public static LightningServer launch(Config config) throws Exception {
-    return LightningInstance.start(config).join();
+    return LightningFactory.start(config).join();
   }
   
   /**
@@ -26,7 +26,7 @@ public final class Lightning {
    * @throws Exception
    */
   public static LightningServer launch(File file) throws Exception {
-    return LightningInstance.start(file).join();
+    return LightningFactory.start(file).join();
   }
   
   /**
@@ -37,7 +37,7 @@ public final class Lightning {
    * @throws Exception
    */
   public static LightningServer launch(File file, Class<? extends Config> clazz) throws Exception {
-    return LightningInstance.start(file, clazz).join();
+    return LightningFactory.start(file, clazz).join();
   }
   
   /**
@@ -48,7 +48,7 @@ public final class Lightning {
    * @throws Exception
    */
   public static LightningServer launch(Config config, InjectorModule injector) throws Exception {
-    return LightningInstance.start(config, injector).join();
+    return LightningFactory.start(config, injector).join();
   }
   
   /**
@@ -60,7 +60,7 @@ public final class Lightning {
    * @throws Exception
    */
   public static LightningServer launch(File file, InjectorModule injector) throws Exception {
-    return LightningInstance.start(file, injector).join();
+    return LightningFactory.start(file, injector).join();
   }
   
   /**
@@ -73,6 +73,6 @@ public final class Lightning {
    * @throws Exception On failure.
    */
   public static LightningServer launch(File file, Class<? extends Config> clazz, InjectorModule injector) throws Exception {
-    return LightningInstance.start(file, clazz, injector).join();
+    return LightningFactory.start(file, clazz, injector).join();
   }
 }

@@ -7,6 +7,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import lightning.ann.WebSocketFactory;
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
+import lightning.db.MySQLDatabaseProviderImpl;
 import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.scanner.ScanResult;
@@ -25,6 +26,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.websocket.server.WebSocketUpgradeFilter;
@@ -40,9 +42,10 @@ public class LightningServer {
   private Server server;
   private MySQLDatabaseProvider dbp;
     
-  public LightningServer(Config config, MySQLDatabaseProvider dbp, InjectorModule userModule) throws Exception {
+  public LightningServer(Config config, InjectorModule userModule) throws Exception {
+    Log.setLog(null);  
     server = createServer(config);
-    this.dbp = dbp;
+    this.dbp = new MySQLDatabaseProviderImpl(config.db);
         
     ServletContextHandler websocketHandler = new ServletContextHandler(null, "/", false, false);
     WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
