@@ -290,6 +290,8 @@ public class Config {
      * Whether or not to enable server support for HTTP persistent connections.
      */
     public @Optional boolean enablePersistentConnections = true;
+    
+    // TODO: Add options for configuring HTTP buffer sizes.
   }
   
   /**

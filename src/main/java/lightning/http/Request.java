@@ -1,6 +1,7 @@
 package lightning.http;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -124,6 +125,19 @@ public class Request {
     }
     
     return Collections.unmodifiableSet(properties.keySet());
+  }
+  
+  /**
+   * Removes a property attached to the request.
+   * @param name
+   * @return Whether or not anything was removed.
+   */
+  public boolean removeProperty(String name) {
+    if (properties == null) {
+      return false;
+    }
+    
+    return properties.remove(name) != null;
   }
 
   /**
@@ -337,6 +351,40 @@ public class Request {
    */
   public Set<String> queryParams() {
     return Collections.unmodifiableSet(request.getParameterMap().keySet());
+  }
+  
+  /**
+   * @param names A list of query parameter names to exclude.
+   * @return The set of all query parameter names attached to the request less
+   *         the provided names.
+   */
+  public final Set<String> queryParamsExcepting(Collection<String> names) {
+    Set<String> result = new HashSet<>();
+    
+    for (String s : queryParams()) {
+      if (names.contains(s)) {
+        continue;
+      }
+
+      result.add(s);
+    }
+
+    return result;
+  }
+  
+  /**
+   * @param names A list of query parameter names to exclude.
+   * @return The set of all query parameter names attached to the request less
+   *         the provided names.
+   */
+  public final Set<String> queryParamsExcepting(String... names) {
+    Set<String> namesSet = new HashSet<>();
+    
+    for (String s : names) {
+      namesSet.add(s);
+    }
+    
+    return queryParamsExcepting(namesSet);
   }
 
   /**

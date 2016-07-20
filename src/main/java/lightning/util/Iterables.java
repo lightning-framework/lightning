@@ -1,8 +1,13 @@
 package lightning.util;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -213,5 +218,17 @@ public class Iterables {
     }
     
     return i;
+  }
+  
+  /**
+   * Given a collection of unique keys and a mapper of keys to values, produces a new map
+   * containing all of the keys in the input collection with values produced by invoking
+   * the mapper on each key.
+   * @param set
+   * @param valueMapper
+   * @return
+   */
+  public static <K, V> Map<K, V> collect(Collection<K> collection, Function<K, V> mapper) {
+    return collection.stream().collect(Collectors.toMap(k -> k, mapper, (k, v) -> k, HashMap::new));
   }
 }
