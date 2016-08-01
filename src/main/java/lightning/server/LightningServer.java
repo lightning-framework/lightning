@@ -1,3 +1,5 @@
+
+
 package lightning.server;
 
 import java.lang.reflect.Method;
@@ -50,6 +52,14 @@ public class LightningServer {
     ServletContextHandler websocketHandler = new ServletContextHandler(null, "/", false, false);
     WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
     websocketFilter.getFactory().getPolicy().setIdleTimeout(config.server.websocketTimeoutMs);
+    websocketFilter.getFactory().getPolicy().setMaxBinaryMessageSize(config.server.websocketMaxBinaryMessageSizeBytes);
+    websocketFilter.getFactory().getPolicy().setMaxTextMessageSize(config.server.websocketMaxTextMessageSizeBytes);
+    websocketFilter.getFactory().getPolicy().setAsyncWriteTimeout(config.server.websocketAsyncWriteTimeoutMs);
+    
+    if(!config.server.websocketEnableCompression) {
+      websocketFilter.getFactory().getExtensionFactory().unregister("permessage-deflate");
+      websocketFilter.getFactory().getExtensionFactory().unregister("deflate-frame");
+    }
     
     Scanner scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
     ScanResult result = scanner.scan();

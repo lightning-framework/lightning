@@ -173,6 +173,29 @@ public class Config {
     public @Optional int websocketTimeoutMs = (int) TimeUnit.SECONDS.toMillis(60);
     
     /**
+     * Sets the maximum binary message siez that the server will accept over websocket
+     * connections.
+     */
+    public @Optional int websocketMaxBinaryMessageSizeBytes = 65535;
+    
+    /**
+     * Sets the maximum text message size that the server will accept over websocket
+     * connections.
+     */
+    public @Optional int websocketMaxTextMessageSizeBytes = 65535;
+    
+    /**
+     * Whether or not to enable message compression (via permessage-deflate) on websocket
+     * connections.
+     */
+    public @Optional boolean websocketEnableCompression = true;
+    
+    /**
+     * Sets the default timeout of async write operations on websocket connections.
+     */
+    public @Optional long websocketAsyncWriteTimeoutMs = TimeUnit.SECONDS.toMillis(60);
+    
+    /**
      * Sets the maximum size of an incoming non-multipart request.
      * Requests in excess of this limit will be dropped.
      */
