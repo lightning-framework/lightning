@@ -878,4 +878,14 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public Cache cache() {
     return cache;
   }
+
+  public void maybeSaveSession() throws SessionException {
+    if (isClosed) {
+      return;
+    }
+    
+    if (session != null && session.isDirty()) {
+      session.save();
+    }
+  }
 }

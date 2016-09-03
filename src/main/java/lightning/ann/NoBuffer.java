@@ -10,7 +10,8 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 /**
- * Provides the framework with a hint that you would like the output of
- * a route handler to be compressed (via gzip/deflate).
+ * Provides the framework with a hint that you would not like the
+ * output of a handler to be buffered when output buffering is
+ * enabled.
  */
-public @interface Compress {}
+public @interface NoBuffer {}

@@ -1,5 +1,3 @@
-
-
 package lightning.server;
 
 import java.lang.reflect.Method;
@@ -10,6 +8,7 @@ import lightning.ann.WebSocketFactory;
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProviderImpl;
+import lightning.exceptions.LightningException;
 import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.scanner.ScanResult;
@@ -43,9 +42,12 @@ public class LightningServer {
   private static final Logger logger = LoggerFactory.getLogger(LightningServer.class);
   private Server server;
   private MySQLDatabaseProvider dbp;
+  
+  static {
+    Log.setLog(null);  
+  }
     
   public LightningServer(Config config, InjectorModule userModule) throws Exception {
-    Log.setLog(null);  
     server = createServer(config);
     this.dbp = new MySQLDatabaseProviderImpl(config.db);
         
@@ -55,10 +57,12 @@ public class LightningServer {
     websocketFilter.getFactory().getPolicy().setMaxBinaryMessageSize(config.server.websocketMaxBinaryMessageSizeBytes);
     websocketFilter.getFactory().getPolicy().setMaxTextMessageSize(config.server.websocketMaxTextMessageSizeBytes);
     websocketFilter.getFactory().getPolicy().setAsyncWriteTimeout(config.server.websocketAsyncWriteTimeoutMs);
+    websocketFilter.getFactory().getPolicy().setInputBufferSize(config.server.inputBufferSizeBytes);
     
     if(!config.server.websocketEnableCompression) {
       websocketFilter.getFactory().getExtensionFactory().unregister("permessage-deflate");
       websocketFilter.getFactory().getExtensionFactory().unregister("deflate-frame");
+      websocketFilter.getFactory().getExtensionFactory().unregister("x-webkit-deflate-frame");
     }
     
     Scanner scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
@@ -73,7 +77,11 @@ public class LightningServer {
     for (Class<?> clazz : result.websocketFactories.keySet()) {
       for (Method m : result.websocketFactories.get(clazz)) {
         WebSocketFactory info = m.getAnnotation(WebSocketFactory.class);
-        // TODO: Should verify path contains no wildcards, parameters.
+        
+        if (info.path().contains(":") || info.path().contains("*")) {
+          throw new LightningException("WebSocket path '" + info.path() + "' is invalid (may not contain wildcards or parameters).");
+        }
+        
         logger.info("Lightning Framework :: Registered Web Socket @ {} -> {}", info.path(), m);
         hasWebSockets = true;
         WebSocketCreator creator = new WebSocketCreator() {
@@ -104,7 +112,8 @@ public class LightningServer {
     }
     
     HandlerCollection handlers = new HandlerCollection();
-    handlers.addHandler(new LightningHandler(config, dbp, globalModule, userModule));
+    LightningHandler lightningHandler = new LightningHandler(config, dbp, globalModule, userModule);
+    handlers.addHandler(lightningHandler);
     handlers.addHandler(websocketHandler);
     server.setHandler(handlers);
   }
@@ -150,10 +159,9 @@ public class LightningServer {
       makeConnector(config, server, config.server.port, false);
     }
     
-    // TODO(mschurr): Expose additional Jetty options if needed.
     server.setAttribute("org.eclipse.jetty.server.Request.maxFormContentSize", config.server.maxPostBytes);
     server.setAttribute("org.eclipse.jetty.server.Request.maxFormKeys", config.server.maxQueryParams);
-
+    
     return server;
   }
   
@@ -164,14 +172,21 @@ public class LightningServer {
     HTTP2CServerConnectionFactory http2c = null;
     ALPNServerConnectionFactory alpn = null;
     
+    http1.setInputBufferSize(config.server.inputBufferSizeBytes);
+    
     if (config.server.enableHttp2) {
       http2 = new HTTP2ServerConnectionFactory(httpConfig);
       http2c = new HTTP2CServerConnectionFactory(httpConfig);
       NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
       alpn = new ALPNServerConnectionFactory();
       alpn.setDefaultProtocol(http1.getProtocol());
-      // TODO: set jetty.http2.maxConcurrentStreams (default 1024)
-      // TODO: set jetty.http2.initialStreamSendWindow (default 65535)
+      alpn.setInputBufferSize(config.server.inputBufferSizeBytes);
+      http2.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
+      http2.setInputBufferSize(config.server.inputBufferSizeBytes);
+      http2.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
+      http2c.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
+      http2c.setInputBufferSize(config.server.inputBufferSizeBytes);
+      http2c.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
     }
     
     final SslContextFactory ssl = makeSslFactory(config, config.server.enableHttp2 ? alpn.getProtocol() : null);
@@ -196,8 +211,7 @@ public class LightningServer {
     connector.setPort(port);
     connector.setAcceptQueueSize(config.server.maxAcceptQueueSize);
     
-    server.addConnector(connector);
-    
+    server.addConnector(connector);    
     return connector;
   }
   
@@ -231,7 +245,7 @@ public class LightningServer {
     if (config.server.enableHttp2) {
       ssl.setCipherComparator(HTTP2Cipher.COMPARATOR);
       ssl.setUseCipherSuitesOrder(true);
-      //ssl.setProtocol(protocol);
+      // ssl.setProtocol(protocol);
     }
     
     return ssl;
@@ -251,6 +265,10 @@ public class LightningServer {
     hc.setSendXPoweredBy(false);
     hc.setSendDateHeader(true);
     hc.setPersistentConnectionsEnabled(config.server.enablePersistentConnections);
+    hc.setOutputAggregationSize(config.server.outputAggregationSizeBytes);
+    hc.setOutputBufferSize(config.server.outputBufferSizeBytes);
+    hc.setRequestHeaderSize(config.server.maxRequestHeaderSizeBytes);
+    hc.setResponseHeaderSize(config.server.maxResponseHeaderSizeBytes);
     return hc;
   }
 }

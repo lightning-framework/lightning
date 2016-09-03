@@ -46,6 +46,7 @@ import lightning.http.HaltException;
 import lightning.http.InternalRequest;
 import lightning.http.InternalResponse;
 import lightning.http.InternalServerErrorException;
+import lightning.http.LightningHttpServletResponse;
 import lightning.http.MethodNotAllowedException;
 import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
@@ -75,6 +76,7 @@ import lightning.templates.FreeMarkerTemplateEngine;
 import lightning.templates.TemplateEngine;
 import lightning.users.User;
 import lightning.users.Users;
+import lightning.util.MimeMatcher;
 
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.util.MultiException;
@@ -118,6 +120,7 @@ public class LightningHandler extends AbstractHandler {
   private Mailer mailer;
   private JsonService jsonifier;
   private Cache cache;
+  private MimeMatcher bufferingMatcher;
   
   public LightningHandler(Config config, MySQLDatabaseProvider dbp, InjectorModule globalModule, InjectorModule userModule) throws Exception {
     this.config = config;
@@ -181,6 +184,8 @@ public class LightningHandler extends AbstractHandler {
       globalModule.bindClassToInstance(Mailer.class, this.mailer);
     }
     
+    this.bufferingMatcher = new MimeMatcher(config.server.outputBufferingTypes);
+    
     rescan();
   }
   
@@ -209,12 +214,13 @@ public class LightningHandler extends AbstractHandler {
       NotImplementedException.class);
 
 
+  @SuppressWarnings("resource")
   @Override
   public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest _request,
       HttpServletResponse _response) throws IOException, ServletException {
     baseRequest.setHandled(true);
     InternalRequest request = InternalRequest.makeRequest(_request, config.server.trustLoadBalancerHeaders);
-    InternalResponse response = InternalResponse.makeResponse(_response);
+    InternalResponse response = InternalResponse.makeResponse(new LightningHttpServletResponse(_response, config, bufferingMatcher));
     HandlerContext ctx = null;    
     Injector injector = null;
     InjectorModule requestModule = null;
@@ -279,6 +285,9 @@ public class LightningHandler extends AbstractHandler {
         Object controller = null;
         Method m = match.getData();
         
+        // Set the default content type.
+        response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
+        
         try {
           // TODO: Not sure how bad the performance is going to be with reflection here.
           
@@ -306,8 +315,10 @@ public class LightningHandler extends AbstractHandler {
             try {
               filter.handler.invoke(null, injector.getInjectedArguments(filter.handler));
             } catch (InvocationTargetException e) {
-              if (e.getCause() != null)
+              if (e.getCause() != null) {
                 throw e.getCause();
+              }
+              
               throw e;
             }
           }
@@ -373,6 +384,9 @@ public class LightningHandler extends AbstractHandler {
               throw e.getCause();
             throw e;
           }
+          
+          // Save session before response commit.
+          ctx.maybeSaveSession();
                     
           // Perform post-processing.
           if (output == null) {} // Assume the handler returned void or null because it did its work.
@@ -391,11 +405,7 @@ public class LightningHandler extends AbstractHandler {
             }
             
             ctx.render(new ModelAndView(info.value(), output));
-          } else if (output instanceof String) {
-            if (response.raw().getHeader(HTTPHeader.CONTENT_TYPE.getHeaderName()) == null) {
-              response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
-            }
-            
+          } else if (output instanceof String) {            
             response.raw().getWriter().print(output);
           } else if (output instanceof File) {
             ctx.sendFile((File) output);
@@ -441,18 +451,24 @@ public class LightningHandler extends AbstractHandler {
         logger.warn("Request handler returned exception:", e);
       }
       
-      try {
-        Method handler = exceptionHandlers.getHandler(e);
-        requestModule.bindToClass(e);
-        if (handler != null) {
-          handler.invoke(null, injector.getInjectedArguments(handler));
-          return;
+
+      if (!response.raw().isCommitted()) {
+        response.raw().reset();
+        try {
+          Method handler = exceptionHandlers.getHandler(e);
+          requestModule.bindToClass(e);
+          if (handler != null) {
+            handler.invoke(null, injector.getInjectedArguments(handler));
+            return;
+          }
+          
+          sendCriticalErrorPage(ctx, e);
+        } catch (Throwable e2) {
+          logger.warn("Exception handler returned exception:", e2);
+          sendCriticalErrorPage(ctx, e);
         }
-        
-        sendCriticalErrorPage(ctx, e);
-      } catch (Throwable e2) {
-        logger.warn("Exception handler returned exception:", e2);
-        sendCriticalErrorPage(ctx, e);
+      } else {
+        logger.warn("Couldn't render error page (already committed): " + request.path());
       }
     } finally {
       try {

@@ -9,8 +9,9 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
+@Deprecated // TODO: NOT YET IMPLEMENTED
 /**
- * Provides the framework with a hint that you would like the output of
- * a route handler to be compressed (via gzip/deflate).
+ * Provides the framework with a hint that you would not like the
+ * output of a handler to be compressed.
  */
-public @interface Compress {}
+public @interface NoCompress {}
