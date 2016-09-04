@@ -1,22 +1,16 @@
 package lightning.debugscreen;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import lightning.http.Request;
-import lightning.mvc.HandlerContext;
-import lightning.util.Iterables;
-import lightning.util.NumberFormat;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -29,6 +23,12 @@ import com.google.common.collect.ImmutableMap;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 import freemarker.template.Version;
+import lightning.enums.HTTPHeader;
+import lightning.http.Request;
+import lightning.mvc.HandlerContext;
+import lightning.routing.RouteMapper.Match;
+import lightning.util.Iterables;
+import lightning.util.NumberFormat;
 
 /**
  * Displays a stack trace in-browser to users.
@@ -39,8 +39,8 @@ public class DebugScreen {
 
     public DebugScreen() {
         this(
-                new FileSearchSourceLocator("./src/main/java"),
-                new FileSearchSourceLocator("./src/test/java")
+                new LocalSourceLocator("./src/main/java"),
+                new LocalSourceLocator("./src/test/java")
         );
     }
 
@@ -50,38 +50,47 @@ public class DebugScreen {
         this.sourceLocators = sourceLocators;
     }
     
-    public final void handle(Throwable throwable, HandlerContext ctx) throws IOException {
+    public final void handle(Throwable throwable, HandlerContext ctx, Match<Method> match) throws IOException {
         ctx.response.raw().setStatus(500); // Internal Server Error
         
-        // Find the original causing throwable; this will contain the most relevant information to 
-        // display to the user. 
-        while (throwable.getCause() != null) {
-            throwable = throwable.getCause();
-        }
-        
         try {
-            List<Map<String, Object>> frames = parseFrames(throwable);
-  
             LinkedHashMap<String, Object> model = new LinkedHashMap<>();
-            model.put("short_message", Optional.fromNullable(StringUtils.abbreviate(throwable.getMessage(), 100)).or(""));
-            model.put("full_trace", traceToString(throwable));
-            model.put("message", Optional.fromNullable(throwable.getMessage()).or(""));
-            model.put("plain_exception", ExceptionUtils.getStackTrace(throwable));
-            model.put("frames", frames);
-            model.put("name", throwable.getClass().getCanonicalName().split("\\."));
-            model.put("basic_type", throwable.getClass().getSimpleName());
-            model.put("type", throwable.getClass().getCanonicalName());
-  
+            ArrayList<LinkedHashMap<String, Object>> exceptionChain = new ArrayList<>();
+            
+            while (true) {
+                LinkedHashMap<String, Object> exceptionInfo = new LinkedHashMap<>();
+                exceptionInfo.put("frames", parseFrames(throwable));
+                exceptionInfo.put("short_message", Optional.fromNullable(StringUtils.abbreviate(throwable.getMessage(), 100)).or(""));
+                exceptionInfo.put("full_trace", traceToString(throwable));
+                exceptionInfo.put("message", Optional.fromNullable(throwable.getMessage()).or(""));
+                exceptionInfo.put("plain_exception", ExceptionUtils.getStackTrace(throwable));
+                exceptionInfo.put("name", throwable.getClass().getCanonicalName().split("\\."));
+                exceptionInfo.put("basic_type", throwable.getClass().getSimpleName());
+                exceptionInfo.put("type", throwable.getClass().getCanonicalName());
+                exceptionChain.add(exceptionInfo);
+                
+                // Process the next extension in the chain.
+                if (throwable.getCause() == null) {
+                    break;
+                } else {
+                    throwable = throwable.getCause();
+                }
+            }
+            
+            model.put("exceptions", exceptionChain);
+          
             LinkedHashMap<String, Map<String, ? extends Object>> tables = new LinkedHashMap<>();
+            tables.put("Active Handler", getHandlerInfo(ctx, match));
             installTables(tables, ctx);
             model.put("tables", tables);
-            ctx.response.raw().setHeader("Content-Type", "text/html; charset=UTF-8");
+            
+            ctx.response.raw().setHeader(HTTPHeader.CONTENT_TYPE.httpName(), "text/html; charset=UTF-8");
             templateConfig.getTemplate("debugscreen.ftl").process(model, ctx.response.raw().getWriter());
         } catch (Exception e) {
             // In case we encounter any exceptions trying to render the error page itself,
             // have this simple fallback.
             ctx.response.raw().getWriter().println(
-                    "<html>"
+                              "<html>"
                             + "  <head>"
                             + "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                             + "  </head>"
@@ -127,6 +136,13 @@ public class DebugScreen {
           tables.put("Session", ImmutableMap.of());
           tables.put("Auth", ImmutableMap.of());
         }
+    }
+
+    private LinkedHashMap<String, Object> getHandlerInfo(HandlerContext ctx, Match<Method> match) {
+      LinkedHashMap<String, Object> data = new LinkedHashMap<>();
+      data.put("Controller", (match.getData() != null ? match.getData().getDeclaringClass().getCanonicalName() : "N/A"));
+      data.put("Method", (match.getData() != null ? match.getData().getName() : "N/A"));
+      return data;
     }
 
     private LinkedHashMap<String, Object> getEnvironmentInfo(HandlerContext ctx) {
@@ -177,7 +193,6 @@ public class DebugScreen {
 
     /**
      * Parses all stack frames for an exception into a view model.
-     *
      * @param e An exception.
      * @return A view model for the frames in the exception.
      */
@@ -193,7 +208,6 @@ public class DebugScreen {
 
     /**
      * Parses a stack frame into a view model.
-     *
      * @param sframe A stack trace frame.
      * @return A view model for the given frame in the template.
      */
@@ -207,7 +221,7 @@ public class DebugScreen {
 
         // Try to find the source file corresponding to this exception stack frame.
         // Go through the locators in order until the source file is found.
-        Optional<File> file = Optional.absent();
+        Optional<SourceFile> file = Optional.absent();
         for (SourceLocator locator : sourceLocators) {
             file = locator.findFileForFrame(sframe);
 
@@ -216,69 +230,28 @@ public class DebugScreen {
             }
         }
 
-        // Fetch +-10 lines from the triggering line.
-        Optional<Map<Integer, String>> codeLines = fetchFileLines(file, sframe);
-
-        if (codeLines.isPresent()) {
-            // Write the starting line number (1-indexed).
-            frame.put("code_start", Iterables.reduce(codeLines.get().keySet(), Integer.MAX_VALUE, Math::min) + 1);
-
-            // Write the code as a single string, replacing empty lines with a " ".
-            frame.put("code", Joiner.on("\n").join(
-                    Iterables.map(codeLines.get().values(), (x) -> x.length() == 0 ? " " : x))
-            );
-
-            // Write the canonical path.
-            try {
-                frame.put("canonical_path", file.get().getPath());
-            } catch (Exception e) {
-                // Not much we can do, so ignore and just don't have the canonical path.
+        if (file.isPresent()) {
+            // Fetch +-10 lines from the triggering line.
+            Optional<Map<Integer, String>> codeLines = file.get().getLines(sframe);
+  
+            if (codeLines.isPresent()) {
+                // Write the starting line number (1-indexed).
+                frame.put("code_start", Iterables.reduce(codeLines.get().keySet(), Integer.MAX_VALUE, Math::min) + 1);
+    
+                // Write the code as a single string, replacing empty lines with a " ".
+                frame.put("code", Joiner.on("\n").join(
+                        Iterables.map(codeLines.get().values(), (x) -> x.length() == 0 ? " " : x))
+                );
+    
+                // Write the canonical path.
+                try {
+                    frame.put("canonical_path", file.get().getPath());
+                } catch (Exception e) {
+                    // Not much we can do, so ignore and just don't have the canonical path.
+                }
             }
         }
 
         return frame.build();
-    }
-
-    /**
-     * Fetches the lines of the source file corresponding to a StackTraceElement (fetches 20 lines total
-     * centered on the line number given in the trace).
-     *
-     * @param file  An optional text file.
-     * @param frame A stack trace frame.
-     * @return An optional map of line numbers to the content of the lines (not terminated with \n).
-     */
-    private Optional<Map<Integer, String>> fetchFileLines(Optional<File> file, StackTraceElement frame) {
-        // If no line number is given or no file exists, we can't fetch lines.
-        if (!file.isPresent() || frame.getLineNumber() == -1) {
-            return Optional.absent();
-        }
-
-        // Otherwise, fetch 20 lines centered on the number provided in the trace.
-        ImmutableMap.Builder<Integer, String> lines = ImmutableMap.builder();
-        int start = Math.max(frame.getLineNumber() - 10, 0);
-        int end = start + 20;
-        int current = 0;
-
-        try (BufferedReader br = new BufferedReader(new FileReader(file.get()))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (current < start) {
-                    current += 1;
-                    continue;
-                }
-
-                if (current > end) {
-                    break;
-                }
-
-                lines.put(current, line);
-                current += 1;
-            }
-        } catch (Exception e) {
-            // If we get an IOException, not much we can do... just ignore it and move on.
-            return Optional.absent();
-        }
-
-        return Optional.of(lines.build());
     }
 }

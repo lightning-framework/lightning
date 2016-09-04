@@ -15,21 +15,26 @@ import com.google.common.base.Optional;
 /**
  * Locates source files by searching exhaustively within a base directory.
  * The base directory should contain all of the code for your app (e.g. src/main/java).
- *
- * @author mschurr
  */
-public class FileSearchSourceLocator implements SourceLocator {
+public class LocalSourceLocator implements SourceLocator {
     private final File basePathFile;
 
     /**
      * @param basePath The path of the directory to search for source files within (e.g. src/main/java).
      */
-    public FileSearchSourceLocator(String basePath) {
+    public LocalSourceLocator(String basePath) {
         this.basePathFile = new File(basePath);
+    }
+    
+    /**
+     * @param basePath The directory to search for source files within.
+     */
+    public LocalSourceLocator(File basePath) {
+      this.basePathFile = basePath;
     }
 
     @Override
-    public Optional<File> findFileForFrame(StackTraceElement frame) {
+    public Optional<SourceFile> findFileForFrame(StackTraceElement frame) {
         // If the frame has no file attached, we can't find a source file (obviously).
         if (frame.getFileName() == null) {
             return Optional.absent();
@@ -62,7 +67,7 @@ public class FileSearchSourceLocator implements SourceLocator {
         if (possibilities.size() == 1) {
             // If there's only one possibility, assume it is the correct source file.
             File file = Iterables.first(possibilities);
-            return Optional.of(file);
+            return Optional.of(new LocalSourceFile(file));
         } else if (possibilities.size() > 1) {
             // If there are multiple possibilities, use the class name to further filter down.
             // Assumes the directory structures matches the package name of the class.
@@ -83,7 +88,7 @@ public class FileSearchSourceLocator implements SourceLocator {
             try {
                 for (File file : possibilities) {
                     if (file.getCanonicalPath().endsWith(path)) {
-                        return Optional.of(file);
+                        return Optional.of(new LocalSourceFile(file));
                     }
                 }
             } catch (IOException e) {

@@ -26,6 +26,8 @@ public class BufferingLightningServletOutputStream extends LightningServletOutpu
         throw new LightningRuntimeException(e);
       }
     } else {
+      // TODO: We should use a buffer pool here for performance.
+      //       It would also be nice to avoid having an extra buffer copy here.
       buffer = new ByteArrayOutputStream();
     }
   }

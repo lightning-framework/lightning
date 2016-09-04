@@ -10,7 +10,7 @@ Zepto(function ($) {
     highlightCurrentLine();
 
     setTimeout(function() {
-        $("#star-frame").attr("src", "https://ghbtns.com/github-btn.html?user=perwendel&repo=spark&type=star&count=true").css("width", "95px");
+        $("#star-frame").attr("src", "https://ghbtns.com/github-btn.html?user=lightning-framework&repo=lightning&type=star&count=true").css("width", "95px");
     }, 1000);
 
     function highlightCurrentLine () {
@@ -30,7 +30,14 @@ Zepto(function ($) {
     });
 
     function setActiveFrame($this) {
-        var id = /frame\-line\-([\d]*)/.exec($this.attr('id'))[1];
+        console.log("Set Active Frame: ", $this);
+        if ($this.hasClass('shrunk')) {
+            $this.removeClass('shrunk');
+            $this.closest(".exception-container").find("div.frame.shrunk").removeClass("shrunk");
+            $($this.closest(".exception-container").find(".expander")[0]).remove();
+        }
+        var id = /frame\-line\-([\d]+)\-([\d]+)/.exec($this.attr('id'));
+        var id = id[1] + "-" + id[2];
         var $codeFrame = $('#frame-code-' + id);
 
         if ($codeFrame) {
@@ -47,6 +54,9 @@ Zepto(function ($) {
 
             $detailsContainer.scrollTop(0);
         }
+
+        $activeLine[0].scrollIntoView();
+        $detailsContainer.focus();
     }
 
     var clipboard = new Clipboard('.clipboard');
@@ -82,10 +92,36 @@ Zepto(function ($) {
         return actionMsg;
     }
 
-    $("#google-button").click(function (e) {
+    $(".google-button").click(function (e) {
         var exception = e.currentTarget.getAttribute("data-google-query");
         window.open("https://www.google.com/?#q=" + exception);
     });
+
+    function prevFrame() {
+        var frames = $(".frame");
+
+        for (var i = 0; i < frames.length; i++) {
+            if (frames[i] == $activeLine[0]) {
+                return (i > 0) ? frames[i-1] : null;
+            }
+        }
+
+        return null;
+    }
+
+    function nextFrame() {
+        var frames = $(".frame");
+
+        for (var i = 0; i < frames.length; i++) {
+            if (frames[i] == $activeLine[0]) {
+                if (i < frames.length - 1) {
+                    return frames[i+1];
+                }
+            }
+        }
+
+        return null;
+    }
 
     $(document).on('keydown', function (e) {
         if (e.ctrlKey) {
@@ -94,15 +130,17 @@ Zepto(function ($) {
             // 2) make sure the newly selected element is within the view-scope
             // 3) focus the (right) container, so arrow-up/down (without ctrl) scroll the details
             if (e.which === 38 /* arrow up */) {
-                $activeLine.prev('.frame').click();
-                $activeLine[0].scrollIntoView();
-                $detailsContainer.focus();
-                e.preventDefault();
+                var frame = prevFrame();
+                if (frame) {
+                    frame.click();
+                    e.preventDefault();
+                }
             } else if (e.which === 40 /* arrow down */) {
-                $activeLine.next('.frame').click();
-                $activeLine[0].scrollIntoView();
-                $detailsContainer.focus();
-                e.preventDefault();
+                var frame = nextFrame();
+                if (frame) {
+                    frame.click();
+                    e.preventDefault();
+                }
             }
         }
     });
@@ -113,13 +151,34 @@ Zepto(function ($) {
         $.get(this.href);
     });
 
+    function updateHeight() {
+        $(".stack-container").css({"height": ($(window).height() - $("#spark-header").height()) + "px"});
+    }
+
+    $(window).on('resize', function(event) {
+        updateHeight();
+    });
+
     // Set the first frame for which a code snippet could be found (if any) to be visible.
     // That frame will most likely be the most immediately relevant to the user.
     $(document).ready(function() {
-      var codeFrames = $('.frame.has-code');
+      updateHeight();
+      var exceptions = $(".left-panel .exception-container");
+      window.console.log("Exceptions=", exceptions);
 
-      if (codeFrames.length > 0) {
-        setActiveFrame($(codeFrames[0]));
+      for (var i = exceptions.length - 1; i >= 0; i--) {
+        var exception = exceptions[i];
+        window.console.log("Exception=", exception);
+        var codeFrames = $(exception).find('.frame.has-code');
+        window.console.log("CodeFrames=", codeFrames);
+
+        if (codeFrames.length > 0) {
+            setActiveFrame($(codeFrames[0]));
+            return;
+        }
       }
+
+      var frames = $(exceptions[exceptions.length - 1]).find(".frame");
+      setActiveFrame($(frames[0]));
     });
 });

@@ -1,9 +1,9 @@
 $(".frame").addClass("tryShrink");
 
 $("body").on("click", ".expander", function () {
-    var groupId = $(this).attr("id");
+    var groupId = $(this).attr("data-groupid");
+    $(this).closest(".exception-container").find("div.frame.shrunk").removeClass("shrunk");
     $(this).remove();
-    $("." + groupId).removeClass("shrunk");
 });
 
 setTimeout(function() { //failsafe
@@ -33,10 +33,10 @@ setTimeout(function() { //failsafe
         $(shrink[i]).removeClass("tryShrink");
         if (shrink.length > 3) {
             if (i == beginIndex) {
-                $(shrink[i]).after('<div id="' + groupId + '" class="expander">Show ' + (shrink.length - 2) + ' empty frames</div>');
+                $(shrink[i]).after('<div data-groupid="' + groupId + '" class="expander" data-count="' + (shrink.length - 2) + '">Show ' + (shrink.length - 2) + ' empty frames</div>');
             }
             if (i > 0 && i < shrink.length - 1) {
-                $(shrink[i]).addClass("shrunk " + groupId);
+                $(shrink[i]).addClass("shrunk").attr("data-groupid", groupId);
             }
         }
     }

@@ -12,7 +12,20 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import lightning.Lightning;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.MultiPartInputStreamParser;
+import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.util.resource.ResourceCollection;
+import org.eclipse.jetty.util.resource.ResourceFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.ImmutableSet;
+
+import freemarker.template.Configuration;
+import freemarker.template.TemplateExceptionHandler;
+import freemarker.template.Version;
 import lightning.ann.Before;
 import lightning.ann.Befores;
 import lightning.ann.ExceptionHandler;
@@ -54,8 +67,8 @@ import lightning.http.Request;
 import lightning.http.Response;
 import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
-import lightning.io.FileServer;
 import lightning.io.BufferingHttpServletResponse;
+import lightning.io.FileServer;
 import lightning.json.GsonJsonService;
 import lightning.json.JsonService;
 import lightning.mail.Mailer;
@@ -77,21 +90,6 @@ import lightning.templates.TemplateEngine;
 import lightning.users.User;
 import lightning.users.Users;
 import lightning.util.MimeMatcher;
-
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.util.MultiException;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
-import org.eclipse.jetty.util.resource.Resource;
-import org.eclipse.jetty.util.resource.ResourceCollection;
-import org.eclipse.jetty.util.resource.ResourceFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.ImmutableSet;
-
-import freemarker.template.Configuration;
-import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.Version;
 
 /**
  * TODO: Output is not buffered - this can lead to some strange looking pages if an exception is thrown
@@ -130,7 +128,7 @@ public class LightningHandler extends AbstractHandler {
     this.debugScreen = new DebugScreen();
     this.filterMapper = new FilterMapper<>();
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
-    this.internalTemplateConfig.setClassForTemplateLoading(Lightning.class, "templates");
+    this.internalTemplateConfig.setClassForTemplateLoading(getClass(), "/lightning");
     this.internalTemplateConfig.setShowErrorTips(config.enableDebugMode);
     this.internalTemplateConfig.setTemplateExceptionHandler(/*config.enableDebugMode ?
         TemplateExceptionHandler.HTML_DEBUG_HANDLER :*/
@@ -224,6 +222,7 @@ public class LightningHandler extends AbstractHandler {
     HandlerContext ctx = null;    
     Injector injector = null;
     InjectorModule requestModule = null;
+    Match<Method> match = null;
         
     try {            
       // Redirect insecure requests.
@@ -252,8 +251,7 @@ public class LightningHandler extends AbstractHandler {
       // Create context.
       ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer, this.jsonifier, this.cache);
       requestModule = requestSpecificInjectionModule(ctx);
-      injector = new Injector(
-          globalModule, requestModule, userModule);
+      injector = new Injector(globalModule, requestModule, userModule);
       Context.setContext(ctx);
       request.setCookieManager(ctx.cookies);
       response.setCookieManager(ctx.cookies);
@@ -278,7 +276,7 @@ public class LightningHandler extends AbstractHandler {
       }
       
       // Try to execute a route handler (if any).
-      Match<Method> match = routeMapper.lookup(request);
+      match = routeMapper.lookup(request);
       if (match != null) {
         logger.debug("Found route match: data={} params={} wildcards={}", match.getData(), match.getParams(), match.getWildcards());
         
@@ -462,10 +460,10 @@ public class LightningHandler extends AbstractHandler {
             return;
           }
           
-          sendCriticalErrorPage(ctx, e);
+          sendCriticalErrorPage(ctx, e, match);
         } catch (Throwable e2) {
           logger.warn("Exception handler returned exception:", e2);
-          sendCriticalErrorPage(ctx, e);
+          sendCriticalErrorPage(ctx, e, match);
         }
       } else {
         logger.warn("Couldn't render error page (already committed): " + request.path());
@@ -563,7 +561,7 @@ public class LightningHandler extends AbstractHandler {
     }
   }
   
-  protected void sendCriticalErrorPage(HandlerContext ctx, Throwable e) throws IOException {
+  protected void sendCriticalErrorPage(HandlerContext ctx, Throwable e, Match<Method> m) throws IOException {
     try {
       ModelAndView mv = exceptionViewProducer.produce(e.getClass(), e, ctx.request.raw(), ctx.response.raw());
       if (mv != null) {
@@ -573,7 +571,7 @@ public class LightningHandler extends AbstractHandler {
       }
       
       if (config.enableDebugMode) {
-        debugScreen.handle(e, ctx);
+        debugScreen.handle(e, ctx, m);
         return;
       }
       
