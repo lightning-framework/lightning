@@ -33,4 +33,8 @@ public enum HTTPHeader {
   public String getHeaderName() {
     return headerName;
   }
+  
+  public String httpName() {
+    return headerName;
+  }
 }

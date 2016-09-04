@@ -5,6 +5,7 @@ import java.io.Writer;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletResponse;
 
 import lightning.crypt.SecureCookieManager;
 import lightning.enums.HTTPHeader;
@@ -15,10 +16,10 @@ import lightning.util.Mimes;
  * Lightning's representation of an HTTP response.
  */
 public class Response {
-  protected final LightningHttpServletResponse response;
+  protected HttpServletResponse response;
   protected SecureCookieManager cookies;
   
-  public Response(LightningHttpServletResponse response) {
+  public Response(HttpServletResponse response) {
     this.response = response;
     cookies = null;
   }
@@ -33,15 +34,8 @@ public class Response {
   /**
    * @return The underlying Jetty response.
    */
-  public LightningHttpServletResponse raw() {
+  public HttpServletResponse raw() {
     return response;
-  }
-  
-  /**
-   * @return Whether or not output buffering is enabled on this response.
-   */
-  public boolean isBuffered() {
-    return response.isBuffered();
   }
   
   /**

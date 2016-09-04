@@ -46,7 +46,6 @@ import lightning.http.HaltException;
 import lightning.http.InternalRequest;
 import lightning.http.InternalResponse;
 import lightning.http.InternalServerErrorException;
-import lightning.http.LightningHttpServletResponse;
 import lightning.http.MethodNotAllowedException;
 import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
@@ -56,6 +55,7 @@ import lightning.http.Response;
 import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.io.FileServer;
+import lightning.io.BufferingHttpServletResponse;
 import lightning.json.GsonJsonService;
 import lightning.json.JsonService;
 import lightning.mail.Mailer;
@@ -220,7 +220,7 @@ public class LightningHandler extends AbstractHandler {
       HttpServletResponse _response) throws IOException, ServletException {
     baseRequest.setHandled(true);
     InternalRequest request = InternalRequest.makeRequest(_request, config.server.trustLoadBalancerHeaders);
-    InternalResponse response = InternalResponse.makeResponse(new LightningHttpServletResponse(_response, config, bufferingMatcher));
+    InternalResponse response = InternalResponse.makeResponse(new BufferingHttpServletResponse(_response, config, bufferingMatcher));
     HandlerContext ctx = null;    
     Injector injector = null;
     InjectorModule requestModule = null;

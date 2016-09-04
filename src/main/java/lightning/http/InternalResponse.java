@@ -1,5 +1,7 @@
 package lightning.http;
 
+import javax.servlet.http.HttpServletResponse;
+
 import lightning.crypt.SecureCookieManager;
 
 /**
@@ -7,15 +9,19 @@ import lightning.crypt.SecureCookieManager;
  * Used internally to prevent users from referencing these APIs.
  */
 public class InternalResponse extends Response {
-  public InternalResponse(LightningHttpServletResponse response) {
+  public InternalResponse(HttpServletResponse response) {
     super(response);
   }
 
-  public static InternalResponse makeResponse(LightningHttpServletResponse response) {
+  public static InternalResponse makeResponse(HttpServletResponse response) {
     return new InternalResponse(response);
   }
   
   public void setCookieManager(SecureCookieManager manager) {
     this.cookies = manager;
+  }
+  
+  public void setResponse(HttpServletResponse response) {
+    this.response = response;
   }
 }
