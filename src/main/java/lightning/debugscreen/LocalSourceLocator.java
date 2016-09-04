@@ -18,7 +18,7 @@ import com.google.common.base.Optional;
  */
 public class LocalSourceLocator implements SourceLocator {
     private final File basePathFile;
-
+    
     /**
      * @param basePath The path of the directory to search for source files within (e.g. src/main/java).
      */
@@ -31,6 +31,15 @@ public class LocalSourceLocator implements SourceLocator {
      */
     public LocalSourceLocator(File basePath) {
       this.basePathFile = basePath;
+    }
+
+    @Override
+    public String toString() {
+      try {
+        return this.basePathFile.getCanonicalPath();
+      } catch (Exception e) {
+        return this.basePathFile.getPath();
+      }
     }
 
     @Override

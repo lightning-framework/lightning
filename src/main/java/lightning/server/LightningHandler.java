@@ -46,6 +46,8 @@ import lightning.config.Config;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.debugscreen.DebugScreen;
+import lightning.debugscreen.LocalSourceLocator;
+import lightning.debugscreen.SourceLocator;
 import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
@@ -125,7 +127,14 @@ public class LightningHandler extends AbstractHandler {
     this.dbp = dbp;
     this.globalModule = globalModule;
     this.userModule = userModule;
-    this.debugScreen = new DebugScreen();
+    
+    SourceLocator[] locators = new SourceLocator[config.codeSearchPaths.size()];
+    int i = 0;
+    for (String sourcePath : config.codeSearchPaths) {
+      locators[i++] = new LocalSourceLocator(sourcePath);
+    }
+        
+    this.debugScreen = new DebugScreen(locators);
     this.filterMapper = new FilterMapper<>();
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.internalTemplateConfig.setClassForTemplateLoading(getClass(), "/lightning");

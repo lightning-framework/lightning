@@ -321,6 +321,10 @@ a {
     max-width: 100%;
 }
 
+.frame-function:before {
+    content: ':: ';
+}
+
 .frame-index {
     position: absolute;
     font-size: 11px;
@@ -354,15 +358,20 @@ a {
     color: #ee9a00;
 }
 
-.frame:not(.has-code) .frame-file, .frame:not(.has-code) .frame-function {
+.frame:not(.has-code) .frame-file {
     display: none;
+}
+
+.frame:not(.has-code) .frame-function {
+    /*display: none;*/
 }
 
 .frame:not(.has-code) .frame-method-info {
     margin: 0;
 }
 
-.frame:not(.has-code) .frame-class {
+.frame:not(.has-code) .frame-class,
+.frame:not(.has-code) .frame-function {
     font-size: 11px;
 }
 

@@ -34,7 +34,7 @@ Zepto(function ($) {
         if ($this.hasClass('shrunk')) {
             $this.removeClass('shrunk');
             $this.closest(".exception-container").find("div.frame.shrunk").removeClass("shrunk");
-            $($this.closest(".exception-container").find(".expander")[0]).remove();
+    		$this.closest(".exception-container").find(".expander").remove();
         }
         var id = /frame\-line\-([\d]+)\-([\d]+)/.exec($this.attr('id'));
         var id = id[1] + "-" + id[2];
@@ -55,7 +55,6 @@ Zepto(function ($) {
             $detailsContainer.scrollTop(0);
         }
 
-        $activeLine[0].scrollIntoView();
         $detailsContainer.focus();
     }
 
@@ -133,12 +132,14 @@ Zepto(function ($) {
                 var frame = prevFrame();
                 if (frame) {
                     frame.click();
+                    $activeLine[0].scrollIntoView();
                     e.preventDefault();
                 }
             } else if (e.which === 40 /* arrow down */) {
                 var frame = nextFrame();
                 if (frame) {
                     frame.click();
+                    $activeLine[0].scrollIntoView();
                     e.preventDefault();
                 }
             }

@@ -55,7 +55,12 @@ public class Config {
    */
   public @Required List<String> scanPrefixes;
   
-  // TODO: Add options for Whoops (debug screen) code search paths.
+  /**
+   * Specifies a list of paths in which to search for source code files to display in the debug screen when
+   * operating in debug mode.
+   */
+  public @Optional List<String> codeSearchPaths = ImmutableList.of("./src/main/java", "./src/test/java");
+  
   // TODO: Add options for Sessions and Auth.
   
   /**
@@ -341,20 +346,21 @@ public class Config {
     /**
      * Whether or not to enable output buffering.
      * PROS: Response is not committed and can therefore be mutated after you have
-     *       written to it.
-     * CONS: Memory usage increases.
+     *       written to it. Error/debug pages will render cleanly if error is thrown
+     *       after some output has been written.
+     * CONS: Memory usage increases. An extra buffer copy is introduced.
      */
     public @Optional boolean enableOutputBuffering = false;
     
     /**
-     * A list of MIME types for which responses should be buffered.
+     * A list of MIME types for which responses should be buffered (if enableOutputBuffering).
      * NOTE: You may use wildcards on either component (e.g. 'text/*').
      */
     public @Optional List<String> outputBufferingTypes = ImmutableList.of("text/html");
     
     /**
-     * The maximum amount of output that will be buffered if output buffering is enabled.
-     * Output in excess of this size will not be buffered.
+     * The maximum amount of output that will be buffered (if enableOutputBuffering).
+     * Output in excess of this size will not be buffered, but written directly to the socket.
      * Set to -1 to have no limit (but careful).
      */
     public @Optional int outputBufferingLimitBytes = 1024 * 64;

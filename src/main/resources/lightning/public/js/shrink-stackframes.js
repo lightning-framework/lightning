@@ -3,7 +3,7 @@ $(".frame").addClass("tryShrink");
 $("body").on("click", ".expander", function () {
     var groupId = $(this).attr("data-groupid");
     $(this).closest(".exception-container").find("div.frame.shrunk").removeClass("shrunk");
-    $(this).remove();
+    $(this).closest(".exception-container").find(".expander").remove();
 });
 
 setTimeout(function() { //failsafe
