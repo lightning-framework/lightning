@@ -28,7 +28,6 @@ import lightning.http.Request;
 import lightning.mvc.HandlerContext;
 import lightning.routing.RouteMapper.Match;
 import lightning.util.Iterables;
-import lightning.util.NumberFormat;
 
 /**
  * Displays a stack trace in-browser to users.
@@ -153,9 +152,10 @@ public class DebugScreen {
         environment.put("Auto-Reload Prefixes", ctx.config.autoReloadPrefixes.toString());
         environment.put("SSL Enabled", Boolean.toString(ctx.config.ssl.isEnabled()));
         environment.put("HTTP2 Enabled", Boolean.toString(ctx.config.server.enableHttp2));
-        environment.put("Trust Load Balancer Headers", Boolean.toString(ctx.config.server.trustLoadBalancerHeaders));
-        environment.put("POST Request Limit", NumberFormat.formatFileSize(ctx.config.server.maxPostBytes));
-        environment.put("MULTIPART Request Limit", NumberFormat.formatFileSize(ctx.config.server.multipartRequestLimitBytes));
+        environment.put("Multipart Enabled", Boolean.toString(ctx.config.server.multipartEnabled));
+        environment.put("Output Buffering", Boolean.toString(ctx.config.server.enableOutputBuffering));
+        environment.put("Template File Path", ctx.config.server.templateFilesPath);
+        environment.put("Static File Path", ctx.config.server.staticFilesPath);
         return environment;
     }
 
