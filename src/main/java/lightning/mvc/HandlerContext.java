@@ -176,6 +176,8 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
       db.close();
       dbProxy.reallyClose();
     }
+    
+    response.raw().flushBuffer();
   }
   
   public void closeIfNotAsync() throws Exception {
