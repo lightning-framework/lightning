@@ -197,7 +197,7 @@ a {
     color: white;
     box-sizing: border-box;
     background-color: #2a2a2a;
-    padding-top: 10px;
+    padding-top: 15px;
     padding-left: 20px;
     padding-right: 20px;
     padding-bottom: 20px;
@@ -214,7 +214,10 @@ a {
     color: white;
     box-sizing: border-box;
     background-color: #1a1a1a;
-    padding: 10px 20px;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 10px;
+    padding-bottom: 10px;
     font-size: 18px;
     display: flex;
     align-items: left;

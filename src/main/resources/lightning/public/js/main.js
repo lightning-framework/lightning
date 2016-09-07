@@ -1,5 +1,4 @@
 Zepto(function ($) {
-
     var $frameContainer = $('.frames-container');
     var $detailsContainer = $('.details-container');
     var $activeLine = $frameContainer.find('.frame.active');
@@ -160,18 +159,15 @@ Zepto(function ($) {
         updateHeight();
     });
 
-    // Set the first frame for which a code snippet could be found (if any) to be visible.
-    // That frame will most likely be the most immediately relevant to the user.
     $(document).ready(function() {
       updateHeight();
-      var exceptions = $(".left-panel .exception-container");
-      window.console.log("Exceptions=", exceptions);
 
+      /* Set the furthest down frame in the exception furthest down the causal chain to be
+         immediately visible as it will most likely contain the most relevant information. */
+      var exceptions = $(".left-panel .exception-container");
       for (var i = exceptions.length - 1; i >= 0; i--) {
         var exception = exceptions[i];
-        window.console.log("Exception=", exception);
         var codeFrames = $(exception).find('.frame.has-code');
-        window.console.log("CodeFrames=", codeFrames);
 
         if (codeFrames.length > 0) {
             setActiveFrame($(codeFrames[0]));
@@ -179,6 +175,7 @@ Zepto(function ($) {
         }
       }
 
+      /* Set the last frame to be selected by default if we didn't find any code frames. */
       var frames = $(exceptions[exceptions.length - 1]).find(".frame");
       setActiveFrame($(frames[0]));
     });

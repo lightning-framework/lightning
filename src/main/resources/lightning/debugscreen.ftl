@@ -44,7 +44,7 @@
                             </p>
                         </div>
                     </header>
-                    <div class="frames-description">Stack frames (${exception.frames?size}):</div>
+                    <div class="frames-description">Stack Frames (${exception.frames?size}):</div>
                     <div class="frames-container">
                         <#list exception.frames as frame>
                             <div class="frame<#if frame.code??> has-code</#if>" id="frame-line-${exception?index}-${frame?index}">
