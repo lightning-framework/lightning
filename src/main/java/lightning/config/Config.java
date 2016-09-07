@@ -496,5 +496,9 @@ public class Config {
     public @Optional int unreturnedConnectionTimeoutS = 50000;
     public @Optional int idleConnectionTestPeriodS = 600;
     public @Optional int maxStatementsCached = 500;
+    
+    public boolean isEnabled() {
+      return name != null && !name.isEmpty();
+    }
   }
 }

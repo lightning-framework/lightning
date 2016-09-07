@@ -49,6 +49,10 @@ public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
    * @throws SQLException On failure.
    */
   public MySQLDatabase getDatabase() throws SQLException {
+    if (source != null) {
+      throw new SQLException("No database connection configured.");
+    }
+    
     return MySQLDatabase.createConnection(this);
   }
   
@@ -57,10 +61,18 @@ public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
    * @throws SQLException On failure.
    */
   public Connection getConnection() throws SQLException {
+    if (source != null) {
+      throw new SQLException("No database connection configured.");
+    }
+    
     return source.getConnection();
   }
 
   private void initializeSource() throws SQLException, PropertyVetoException {    
+    if (!config.isEnabled()) {
+      return;
+    }
+    
     // See http://www.mchange.com/projects/c3p0/
     ComboPooledDataSource source = new ComboPooledDataSource();
     String url = String.format("jdbc:mysql://%s:%d/%s", config.host, config.port, config.name);
