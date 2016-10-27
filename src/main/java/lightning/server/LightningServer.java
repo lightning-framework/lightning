@@ -4,17 +4,6 @@ import java.lang.reflect.Method;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import lightning.ann.WebSocketFactory;
-import lightning.config.Config;
-import lightning.db.MySQLDatabaseProvider;
-import lightning.db.MySQLDatabaseProviderImpl;
-import lightning.exceptions.LightningException;
-import lightning.exceptions.LightningRuntimeException;
-import lightning.inject.Injector;
-import lightning.inject.InjectorModule;
-import lightning.scanner.ScanResult;
-import lightning.scanner.Scanner;
-
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
 import org.eclipse.jetty.http2.HTTP2Cipher;
 import org.eclipse.jetty.http2.server.HTTP2CServerConnectionFactory;
@@ -28,7 +17,6 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.websocket.server.WebSocketUpgradeFilter;
@@ -39,14 +27,21 @@ import org.eclipse.jetty.websocket.servlet.WebSocketCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import lightning.ann.WebSocketFactory;
+import lightning.config.Config;
+import lightning.db.MySQLDatabaseProvider;
+import lightning.db.MySQLDatabaseProviderImpl;
+import lightning.exceptions.LightningException;
+import lightning.exceptions.LightningRuntimeException;
+import lightning.inject.Injector;
+import lightning.inject.InjectorModule;
+import lightning.scanner.ScanResult;
+import lightning.scanner.Scanner;
+
 public class LightningServer {
   private static final Logger logger = LoggerFactory.getLogger(LightningServer.class);
   private Server server;
   private MySQLDatabaseProvider dbp;
-  
-  static {
-    Log.setLog(null);  
-  }
     
   public LightningServer(Config config, InjectorModule userModule) throws Exception {
     config.validate();
