@@ -403,7 +403,7 @@ public class Param {
   
   private void require(boolean condition, String type) {
     if (!condition) {
-      String sv = value.isPresent() ? value.get() : "EMPTY";
+      String sv = value.isPresent() ? "'" + value.get() + "'" : "EMPTY";
       throw new BadRequestException("Invalid parameter value for '" + key + "', expected " + type + " but got " + sv + ".");
     }
   }

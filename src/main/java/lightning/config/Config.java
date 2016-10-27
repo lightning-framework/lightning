@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 
 import lightning.ann.Optional;
 import lightning.ann.Required;
+import lightning.exceptions.LightningException;
 import lightning.mail.MailerConfig;
 
 import com.google.common.collect.ImmutableList;
@@ -117,11 +118,8 @@ public class Config {
     //       -Xbootclasspath/p:/path/to/alpn-boot-${alpn-version}.jar
     
     /**
-     * Enables server-side HTTP/2 support.
+     * Enables server-side HTTP/2 support over SSL via ALPN.
      * Clients that do not support HTTP/2 will fall back to HTTP/1.1 or HTTP/1.0.
-     * 
-     * NOTE:
-     *   No clients currently support HTTP/2 over unencrypted connections. HTTP/2 must be used in combination with SSL.
      * 
      * IMPORTANT:
      *   Due to changes to SSL protocol negotiation in HTTP/2 (via ALPN), you must replace your JDK's implementation of
@@ -139,6 +137,15 @@ public class Config {
      *      -Xbootclasspath/p:/path/to/alpn-boot-${alpn-version}.jar
      */
     public @Optional boolean enableHttp2 = false;
+    
+    /**
+     * Enables server-side HTTP/2 clear text upgrade support (H2C) for un-encrypted connections.
+     * Clients that do not support H2C will fall back to HTTP/1.1 or HTTP/1.0.
+     * 
+     * NOTE: No browsers currently implement H2C, so enabling this is somewhat pointless unless you
+     *       expect API clients that will utilize H2C.
+     */
+    public @Optional boolean enableHttp2C = false;
     
     /**
      * The initial flow control window size for a new stream (default 65535). 
@@ -160,6 +167,7 @@ public class Config {
      * NOTE:
      *   Must be something long, random, secret, and unique to your app.
      *   In clustered environments, all app servers must use the same key.
+     *   It is safe to change this key, but any outstanding cookies will be invalidated.
      */
     public @Required String hmacKey;
     
@@ -500,5 +508,23 @@ public class Config {
     public boolean isEnabled() {
       return name != null && !name.isEmpty();
     }
+  }
+  
+  private static void notNull(String key, Object value) throws LightningException {
+    if (value == null) {
+      throw new LightningException("Your configuration is invalid: You must set a value for config." + key + ".");
+    }
+  }
+  
+  private static void badIf(boolean condition, String message) throws LightningException {
+    if (condition) {
+      throw new LightningException("Your configuration is invalid: " + message);
+    }
+  }
+  
+  public void validate() throws LightningException {
+    notNull("scanPrefixes", scanPrefixes);
+    notNull("server.hmacKey", server.hmacKey);
+    badIf(server.enableHttp2 && !ssl.isEnabled(), "You must enable SSL to enable HTTP2.");
   }
 }

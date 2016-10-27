@@ -49,6 +49,19 @@ public class DebugScreen {
         this.sourceLocators = sourceLocators;
     }
     
+    private void addToChain(Throwable throwable, ArrayList<LinkedHashMap<String, Object>> exceptionChain) {
+      LinkedHashMap<String, Object> exceptionInfo = new LinkedHashMap<>();
+      exceptionInfo.put("frames", parseFrames(throwable));
+      exceptionInfo.put("short_message", Optional.fromNullable(StringUtils.abbreviate(throwable.getMessage(), 100)).or(""));
+      exceptionInfo.put("full_trace", traceToString(throwable));
+      exceptionInfo.put("message", Optional.fromNullable(throwable.getMessage()).or(""));
+      exceptionInfo.put("plain_exception", ExceptionUtils.getStackTrace(throwable));
+      exceptionInfo.put("name", throwable.getClass().getCanonicalName().split("\\."));
+      exceptionInfo.put("basic_type", throwable.getClass().getSimpleName());
+      exceptionInfo.put("type", throwable.getClass().getCanonicalName());
+      exceptionChain.add(exceptionInfo);
+    }
+    
     public final void handle(Throwable throwable, HandlerContext ctx, Match<Method> match) throws IOException {
         ctx.response.raw().setStatus(500); // Internal Server Error
         
@@ -57,29 +70,24 @@ public class DebugScreen {
             ArrayList<LinkedHashMap<String, Object>> exceptionChain = new ArrayList<>();
             
             while (true) {
-                LinkedHashMap<String, Object> exceptionInfo = new LinkedHashMap<>();
-                exceptionInfo.put("frames", parseFrames(throwable));
-                exceptionInfo.put("short_message", Optional.fromNullable(StringUtils.abbreviate(throwable.getMessage(), 100)).or(""));
-                exceptionInfo.put("full_trace", traceToString(throwable));
-                exceptionInfo.put("message", Optional.fromNullable(throwable.getMessage()).or(""));
-                exceptionInfo.put("plain_exception", ExceptionUtils.getStackTrace(throwable));
-                exceptionInfo.put("name", throwable.getClass().getCanonicalName().split("\\."));
-                exceptionInfo.put("basic_type", throwable.getClass().getSimpleName());
-                exceptionInfo.put("type", throwable.getClass().getCanonicalName());
-                exceptionChain.add(exceptionInfo);
-                
-                // Process the next extension in the chain.
-                if (throwable.getCause() == null) {
-                    break;
-                } else {
-                    throwable = throwable.getCause();
-                }
+              addToChain(throwable, exceptionChain);
+              
+              for (Throwable s : throwable.getSuppressed()) {
+                addToChain(s, exceptionChain);
+              }
+              
+              // Process the next extension in the chain.
+              if (throwable.getCause() == null) {
+                break;
+              } else {
+                throwable = throwable.getCause();
+              }
             }
             
             model.put("exceptions", exceptionChain);
           
             LinkedHashMap<String, Map<String, ? extends Object>> tables = new LinkedHashMap<>();
-            tables.put("Active Handler", getHandlerInfo(ctx, match));
+            tables.put("Request Handler", getHandlerInfo(ctx, match));
             installTables(tables, ctx);
             model.put("tables", tables);
             
@@ -110,8 +118,6 @@ public class DebugScreen {
      * @param tables the map containing the tables to display on the debug screen
      */
     protected void installTables(LinkedHashMap<String, Map<String, ? extends Object>> tables, HandlerContext ctx) {
-        tables.put("Environment", getEnvironmentInfo(ctx));
-
         tables.put("Request", getRequestInfo(ctx));
         
         tables.put("Request Headers", setToLinkedHashMap(ctx.request.headers(), h -> h, h -> ctx.request.header(h).stringOption().or("-")));
@@ -135,6 +141,8 @@ public class DebugScreen {
           tables.put("Session", ImmutableMap.of());
           tables.put("Auth", ImmutableMap.of());
         }
+
+        tables.put("Environment", getEnvironmentInfo(ctx));
     }
 
     private LinkedHashMap<String, Object> getHandlerInfo(HandlerContext ctx, Match<Method> match) {
@@ -152,6 +160,7 @@ public class DebugScreen {
         environment.put("Auto-Reload Prefixes", ctx.config.autoReloadPrefixes.toString());
         environment.put("SSL Enabled", Boolean.toString(ctx.config.ssl.isEnabled()));
         environment.put("HTTP2 Enabled", Boolean.toString(ctx.config.server.enableHttp2));
+        environment.put("HTTP2C Enabled", Boolean.toString(ctx.config.server.enableHttp2C));
         environment.put("Multipart Enabled", Boolean.toString(ctx.config.server.multipartEnabled));
         environment.put("Output Buffering", Boolean.toString(ctx.config.server.enableOutputBuffering));
         environment.put("Template File Path", ctx.config.server.templateFilesPath);
@@ -162,9 +171,10 @@ public class DebugScreen {
     private LinkedHashMap<String, Object> getRequestInfo(HandlerContext ctx) {
         Request request = ctx.request;
         LinkedHashMap<String, Object> req = new LinkedHashMap<>();
-        req.put("URL", Optional.fromNullable(request.url()).or("-"));
-        req.put("Scheme", request.scheme().toString());
+        req.put("Protocol", Optional.fromNullable(request.raw().getProtocol()).or("UNKNOWN"));
+        req.put("Scheme", request.scheme().toString().toUpperCase());
         req.put("Method", request.method().toString());
+        req.put("URL", Optional.fromNullable(request.url()).or("-"));
         req.put("Remote IP", Optional.fromNullable(request.ip()).or("-"));
         req.put("Path", Optional.fromNullable(request.path()).or("-"));
         req.put("Host", Optional.fromNullable(request.host()).or("-"));

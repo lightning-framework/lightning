@@ -94,8 +94,14 @@ public class Injector {
    * @throws Exception On failure (more than one constructor, if unable to resolve all parameters).
    */
   public <T> T newInstance(Class<T> type) throws Exception {
-    if (type.getConstructors().length != 1) {
-      throw new IllegalStateException("May only inject on classes with a single constructor.");
+    int numConstructors = type.getConstructors().length;
+    
+    if (numConstructors > 1) {
+      throw new IllegalStateException("May only inject on classes with a single constructor (found " + numConstructors + ").");
+    }
+    
+    if (numConstructors == 0) {
+      return (T) type.newInstance();
     }
     
     @SuppressWarnings("unchecked")

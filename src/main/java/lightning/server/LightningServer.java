@@ -9,6 +9,7 @@ import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProviderImpl;
 import lightning.exceptions.LightningException;
+import lightning.exceptions.LightningRuntimeException;
 import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.scanner.ScanResult;
@@ -48,6 +49,7 @@ public class LightningServer {
   }
     
   public LightningServer(Config config, InjectorModule userModule) throws Exception {
+    config.validate();
     server = createServer(config);
     this.dbp = new MySQLDatabaseProviderImpl(config.db);
         
@@ -174,31 +176,44 @@ public class LightningServer {
     
     http1.setInputBufferSize(config.server.inputBufferSizeBytes);
     
-    if (config.server.enableHttp2) {
-      http2 = new HTTP2ServerConnectionFactory(httpConfig);
+    if (config.server.enableHttp2C && !isSSL) {
       http2c = new HTTP2CServerConnectionFactory(httpConfig);
-      NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
-      alpn = new ALPNServerConnectionFactory();
-      alpn.setDefaultProtocol(http1.getProtocol());
-      alpn.setInputBufferSize(config.server.inputBufferSizeBytes);
-      http2.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
-      http2.setInputBufferSize(config.server.inputBufferSizeBytes);
-      http2.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
       http2c.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
       http2c.setInputBufferSize(config.server.inputBufferSizeBytes);
       http2c.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
     }
     
-    final SslContextFactory ssl = makeSslFactory(config, config.server.enableHttp2 ? alpn.getProtocol() : null);
+    String protocol = null;
     
-    ConnectionFactory[] cfs = new ConnectionFactory[]{http1};
-    
-    if (config.server.enableHttp2) {
-      if (isSSL) {
-        cfs = new ConnectionFactory[]{alpn, http2, http1};
-      } else {
-        cfs = new ConnectionFactory[]{http1, http2c};
+    if (config.server.enableHttp2 && isSSL) {
+      try {
+        NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
+      } catch (Exception e) {
+        throw new LightningRuntimeException(
+              "Your JVM does not support the SSL ALPN extension. "
+            + "This is expected for JREs <= Java 8. "
+            + "To learn how to add ALPN support, read the docs for lightning.config.Config::server::enableHttp2.");
       }
+      http2 = new HTTP2ServerConnectionFactory(httpConfig);
+      http2.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
+      http2.setInputBufferSize(config.server.inputBufferSizeBytes);
+      http2.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
+      alpn = new ALPNServerConnectionFactory();
+      alpn.setDefaultProtocol(http1.getProtocol());
+      alpn.setInputBufferSize(config.server.inputBufferSizeBytes);
+      protocol = alpn.getProtocol();
+    }
+    
+    SslContextFactory ssl = isSSL ? makeSslFactory(config, protocol) : null;
+    
+    ConnectionFactory[] cfs; 
+    
+    if (config.server.enableHttp2 && isSSL) {
+      cfs = new ConnectionFactory[]{alpn, http2, http1};
+    } else if (config.server.enableHttp2C && !isSSL) {
+      cfs = new ConnectionFactory[]{http1, http2c};
+    } else {
+      cfs = new ConnectionFactory[]{http1};
     }
     
     ServerConnector connector = isSSL
@@ -238,14 +253,15 @@ public class LightningServer {
       ssl.setKeyManagerPassword(config.ssl.keyManagerPassword);
     }
     
+    /* Prevent clients from using weak ciphers, weak protocol versions, and renegotiation. */
     ssl.addExcludeProtocols("SSL", "SSLv2", "SSLv2Hello", "SSLv3");
-    ssl.setRenegotiationAllowed(false);
     ssl.addExcludeCipherSuites(".*_RSA_.*SHA1$", ".*_RSA_.*SHA$", ".*_RSA_.*MD5$");
+    ssl.setRenegotiationAllowed(false);
     
     if (config.server.enableHttp2) {
       ssl.setCipherComparator(HTTP2Cipher.COMPARATOR);
       ssl.setUseCipherSuitesOrder(true);
-      // ssl.setProtocol(protocol);
+      //ssl.setProtocol(protocol);
     }
     
     return ssl;

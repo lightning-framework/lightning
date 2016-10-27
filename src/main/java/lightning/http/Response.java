@@ -68,6 +68,16 @@ public class Response {
   public void write(String text) throws IOException {
     response.getWriter().write(text);
   }
+  
+  /**
+   * Writes a formatted string to the HTTP response.
+   * @param format A format (in printf format).
+   * @param args For the format.
+   * @throws IOException
+   */
+  public void writef(String format, Object ...args) throws IOException {
+    response.getWriter().printf(format, args);
+  }
 
   /**
    * Sets up a redirect to the given URL with the given status code.

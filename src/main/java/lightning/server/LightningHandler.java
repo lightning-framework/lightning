@@ -372,7 +372,13 @@ public class LightningHandler extends AbstractHandler {
           while (currentClass != null) {
             if (scanResult.initializers.containsKey(currentClass)) {
               for (Method i : scanResult.initializers.get(currentClass)) {
-                i.invoke(controller, injector.getInjectedArguments(i));
+                try {
+                  i.invoke(controller, injector.getInjectedArguments(i));
+                } catch (InvocationTargetException e) {
+                  if (e.getCause() != null)
+                    throw e.getCause();
+                  throw e;
+                }
               }
             }
             
@@ -432,7 +438,13 @@ public class LightningHandler extends AbstractHandler {
               if (scanResult.finalizers.containsKey(currentClass)) {
                 for (Method i : scanResult.finalizers.get(currentClass)) {
                   try {
-                    i.invoke(controller, injector.getInjectedArguments(i));
+                    try {
+                      i.invoke(controller, injector.getInjectedArguments(i));
+                    } catch (InvocationTargetException e) {
+                      if (e.getCause() != null)
+                        throw e.getCause();
+                      throw e;
+                    }
                   } catch (Throwable e) {
                     logger.error("An error occured executing a finalizer {}: {}", i, e);
                   }
@@ -465,14 +477,21 @@ public class LightningHandler extends AbstractHandler {
           Method handler = exceptionHandlers.getHandler(e);
           requestModule.bindToClass(e);
           if (handler != null) {
-            handler.invoke(null, injector.getInjectedArguments(handler));
+            try {
+              handler.invoke(null, injector.getInjectedArguments(handler));
+            } catch (InvocationTargetException e2) {
+              if (e2.getCause() != null)
+                throw e2.getCause();
+              throw e2;
+            }
             return;
           }
           
           sendCriticalErrorPage(ctx, e, match);
         } catch (Throwable e2) {
+          e2.addSuppressed(e);
           logger.warn("Exception handler returned exception:", e2);
-          sendCriticalErrorPage(ctx, e, match);
+          sendCriticalErrorPage(ctx, e2, match);
         }
       } else {
         logger.warn("Couldn't render error page (already committed): " + request.path());
