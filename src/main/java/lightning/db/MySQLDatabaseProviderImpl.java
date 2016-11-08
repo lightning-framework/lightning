@@ -13,14 +13,14 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 
 /**
  * Provides database connections using pooling.
- * 
+ *
  * With connection pooling, each thread (or even function) can safely call getDatabase() to acquire
  * an instance for its purpose and then close() that instance when finished with it. As an example,
  * each individual web request should acquire a connection, do its work, then close it.
- * 
+ *
  * In fact, you must remember to close connections as failing to do so will cause leaks. I recommend using
  * try-with-resources to automate this.
- * 
+ *
  * NOTE: BoneCP, Apache DBCP, C3P0 are all libraries that could be used for implementing this.
  * @see http://docs.oracle.com/javase/7/docs/api/javax/sql/DataSource.html
  * @see https://www.google.com/webhp?sourceid=chrome-instant&ion=1&espv=2&ie=UTF-8#q=sql%20java%20jetty
@@ -34,53 +34,55 @@ import com.mchange.v2.c3p0.ComboPooledDataSource;
 public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
   private DataSource source;
   private final DBConfig config;
-  
+
   public MySQLDatabaseProviderImpl(DBConfig config) throws SQLException, PropertyVetoException {
     this.config = config;
     initializeSource();
   }
-  
+
   public MySQLDatabaseProviderImpl(Config config) throws SQLException, PropertyVetoException {
     this(config.db);
   }
-  
+
   /**
    * @return A MySQLDatabase instance created by connection pooling. Close after use.
    * @throws SQLException On failure.
    */
+  @Override
   public MySQLDatabase getDatabase() throws SQLException {
-    if (source != null) {
+    if (source == null) {
       throw new SQLException("No database connection configured.");
     }
-    
+
     return MySQLDatabase.createConnection(this);
   }
-  
+
   /**
    * @return A raw Connection instance created by connection pooling. Close after use.
    * @throws SQLException On failure.
    */
+  @Override
   public Connection getConnection() throws SQLException {
-    if (source != null) {
+    if (source == null) {
       throw new SQLException("No database connection configured.");
     }
-    
+
     return source.getConnection();
   }
 
-  private void initializeSource() throws SQLException, PropertyVetoException {    
+  private void initializeSource() throws SQLException, PropertyVetoException {
     if (!config.isEnabled()) {
       return;
     }
-    
+
     // See http://www.mchange.com/projects/c3p0/
     ComboPooledDataSource source = new ComboPooledDataSource();
     String url = String.format("jdbc:mysql://%s:%d/%s", config.host, config.port, config.name);
-    
+
     if (config.useSsl) {
       url += "?verifyServerCertificate=true&useSSL=true&requireSSL=true";
     }
-    
+
     source.setJdbcUrl(url);
     source.setDriverClass("com.mysql.jdbc.Driver");
     source.setUser(config.username);
@@ -103,23 +105,23 @@ public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
     source.setIdleConnectionTestPeriod(config.idleConnectionTestPeriodS); // seconds
     this.source = source;
   }
-  
+
   public String getHostName() {
     return config.host;
   }
-  
+
   public String getPassword() {
     return config.password;
   }
-  
+
   public String getUser() {
     return config.username;
   }
-  
+
   public int getPort() {
     return config.port;
   }
-  
+
   public String getDatabaseName() {
     return config.name;
   }
