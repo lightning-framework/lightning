@@ -23,6 +23,8 @@ $(document).ready(function() {
 					if (length > 1) {
 						frame.before('<div class="expander">Show ' + (length) + ' empty frames</div>');
 						length = 0;
+					} else if (length == 1) {
+						$(frames[j - 1]).removeClass("shrunk");
 					}
 				}
 			}

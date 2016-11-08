@@ -42,12 +42,12 @@ public class LightningServer {
   private static final Logger logger = LoggerFactory.getLogger(LightningServer.class);
   private Server server;
   private MySQLDatabaseProvider dbp;
-    
+
   public LightningServer(Config config, InjectorModule userModule) throws Exception {
     config.validate();
     server = createServer(config);
     this.dbp = new MySQLDatabaseProviderImpl(config.db);
-        
+
     ServletContextHandler websocketHandler = new ServletContextHandler(null, "/", false, false);
     WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
     websocketFilter.getFactory().getPolicy().setIdleTimeout(config.server.websocketTimeoutMs);
@@ -55,30 +55,30 @@ public class LightningServer {
     websocketFilter.getFactory().getPolicy().setMaxTextMessageSize(config.server.websocketMaxTextMessageSizeBytes);
     websocketFilter.getFactory().getPolicy().setAsyncWriteTimeout(config.server.websocketAsyncWriteTimeoutMs);
     websocketFilter.getFactory().getPolicy().setInputBufferSize(config.server.inputBufferSizeBytes);
-    
+
     if(!config.server.websocketEnableCompression) {
       websocketFilter.getFactory().getExtensionFactory().unregister("permessage-deflate");
       websocketFilter.getFactory().getExtensionFactory().unregister("deflate-frame");
       websocketFilter.getFactory().getExtensionFactory().unregister("x-webkit-deflate-frame");
     }
-    
+
     Scanner scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
     ScanResult result = scanner.scan();
-    
+
     InjectorModule globalModule = new InjectorModule();
     globalModule.bindClassToInstance(Config.class, config);
     globalModule.bindClassToInstance(MySQLDatabaseProvider.class, dbp);
-    
+
     boolean hasWebSockets = false;
-    
+
     for (Class<?> clazz : result.websocketFactories.keySet()) {
       for (Method m : result.websocketFactories.get(clazz)) {
         WebSocketFactory info = m.getAnnotation(WebSocketFactory.class);
-        
+
         if (info.path().contains(":") || info.path().contains("*")) {
           throw new LightningException("WebSocket path '" + info.path() + "' is invalid (may not contain wildcards or parameters).");
         }
-        
+
         logger.info("Lightning Framework :: Registered Web Socket @ {} -> {}", info.path(), m);
         hasWebSockets = true;
         WebSocketCreator creator = new WebSocketCreator() {
@@ -98,7 +98,7 @@ public class LightningServer {
         websocketFilter.addMapping(new ServletPathSpec(info.path()), creator);
       }
     }
-    
+
     if (config.enableDebugMode) {
       logger.warn("Lightning Framework :: NOTICE: You are running this server in DEBUG MODE.");
       logger.warn("Lightning Framework :: Please do not enable debug mode on production systems as it may leak internals.");
@@ -107,79 +107,79 @@ public class LightningServer {
             + "restart the server to load websocket handler code changes.");
       }
     }
-    
+
     HandlerCollection handlers = new HandlerCollection();
     LightningHandler lightningHandler = new LightningHandler(config, dbp, globalModule, userModule);
     handlers.addHandler(lightningHandler);
     handlers.addHandler(websocketHandler);
     server.setHandler(handlers);
   }
-  
+
   public LightningServer start() throws Exception {
     server.start();
     logger.info("Lightning Framework :: Ready for requests!");
     return this;
   }
-  
+
   public LightningServer join() throws Exception {
     server.join();
     return this;
   }
-  
+
   public LightningServer stop() throws Exception {
     if (server != null) {
       server.stop();
     }
     return this;
   }
-  
+
   public MySQLDatabaseProvider getDatabasePool() {
     return dbp;
   }
-  
+
   private Server createServer(Config config) throws Exception {
     BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(config.server.maxQueuedRequests);
     QueuedThreadPool pool = new QueuedThreadPool(config.server.minThreads, config.server.maxThreads, config.server.threadTimeoutMs, queue);
     Server server = new Server(pool);
-        
+
     if (config.ssl.isEnabled()) {
       if (config.ssl.redirectInsecureRequests) {
         makeConnector(config, server, config.server.port, false);
         logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
         logger.info("Lightning Framework :: Insecure requests will be redirected to their HTTPS equivalents.");
       }
-      
+
       logger.info("Lightning Framework :: Binding to HTTPS @ {}:{}", config.server.host, config.ssl.port);
       makeConnector(config, server, config.ssl.port, true);
     } else {
       logger.info("Lightning Framework :: Binding to HTTP @ {}:{}", config.server.host, config.server.port);
       makeConnector(config, server, config.server.port, false);
     }
-    
+
     server.setAttribute("org.eclipse.jetty.server.Request.maxFormContentSize", config.server.maxPostBytes);
     server.setAttribute("org.eclipse.jetty.server.Request.maxFormKeys", config.server.maxQueryParams);
-    
+
     return server;
   }
-  
+
   private ServerConnector makeConnector(Config config, Server server, int port, boolean isSSL) {
     final HttpConfiguration httpConfig = isSSL ? makeHttpsConfig(config) : makeHttpConfig(config);
     final HttpConnectionFactory http1 = new HttpConnectionFactory(httpConfig);
     HTTP2ServerConnectionFactory http2 = null;
     HTTP2CServerConnectionFactory http2c = null;
     ALPNServerConnectionFactory alpn = null;
-    
+
     http1.setInputBufferSize(config.server.inputBufferSizeBytes);
-    
+
     if (config.server.enableHttp2C && !isSSL) {
       http2c = new HTTP2CServerConnectionFactory(httpConfig);
       http2c.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
       http2c.setInputBufferSize(config.server.inputBufferSizeBytes);
       http2c.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
     }
-    
+
     String protocol = null;
-    
+
     if (config.server.enableHttp2 && isSSL) {
       try {
         NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
@@ -198,11 +198,11 @@ public class LightningServer {
       alpn.setInputBufferSize(config.server.inputBufferSizeBytes);
       protocol = alpn.getProtocol();
     }
-    
+
     SslContextFactory ssl = isSSL ? makeSslFactory(config, protocol) : null;
-    
-    ConnectionFactory[] cfs; 
-    
+
+    ConnectionFactory[] cfs;
+
     if (config.server.enableHttp2 && isSSL) {
       cfs = new ConnectionFactory[]{alpn, http2, http1};
     } else if (config.server.enableHttp2C && !isSSL) {
@@ -210,28 +210,28 @@ public class LightningServer {
     } else {
       cfs = new ConnectionFactory[]{http1};
     }
-    
+
     ServerConnector connector = isSSL
         ?  new ServerConnector(server, ssl, cfs)
         :  new ServerConnector(server, cfs);
-        
+
     connector.setIdleTimeout(config.server.connectionIdleTimeoutMs);
     connector.setSoLingerTime(-1);
     connector.setHost(config.server.host);
     connector.setPort(port);
     connector.setAcceptQueueSize(config.server.maxAcceptQueueSize);
-    
-    server.addConnector(connector);    
+
+    server.addConnector(connector);
     return connector;
   }
-  
+
   private SslContextFactory makeSslFactory(Config config, String protocol) {
     if (!config.ssl.isEnabled()) {
       return null;
     }
-    
+
     SslContextFactory ssl = new SslContextFactory(config.ssl.keyStoreFile);
-    
+
     if (config.ssl.keyStorePassword != null) {
       ssl.setKeyStorePassword(config.ssl.keyStorePassword);
     }
@@ -243,25 +243,40 @@ public class LightningServer {
     if (config.ssl.trustStorePassword != null) {
       ssl.setTrustStorePassword(config.ssl.trustStorePassword);
     }
-    
+
     if (config.ssl.keyManagerPassword != null) {
       ssl.setKeyManagerPassword(config.ssl.keyManagerPassword);
     }
-    
-    /* Prevent clients from using weak ciphers, weak protocol versions, and renegotiation. */
-    ssl.addExcludeProtocols("SSL", "SSLv2", "SSLv2Hello", "SSLv3");
-    ssl.addExcludeCipherSuites(".*_RSA_.*SHA1$", ".*_RSA_.*SHA$", ".*_RSA_.*MD5$");
+
+    /* Prevent weak protocols: require TLS > 1.0. */
+    ssl.addExcludeProtocols("SSL",
+                            "SSLv2",
+                            "SSLv2Hello",
+                            "SSLv3",
+                            "TLSv1.0");
+
+    /* Prevent weak cipher suites. */
+    ssl.addExcludeCipherSuites(".*_anon_.*",
+                               ".*_WITH_NULL.*",
+                               ".*_WITH_RC4.*",
+                               ".*_DSS_.*",
+                               ".*_DES_.*",
+                               ".*_SHA$",
+                               ".*_MD5$",
+                               ".*_SHA1$");
+
+    /* Prevent re-negotiation.*/
     ssl.setRenegotiationAllowed(false);
-    
+
     if (config.server.enableHttp2) {
       ssl.setCipherComparator(HTTP2Cipher.COMPARATOR);
       ssl.setUseCipherSuitesOrder(true);
       //ssl.setProtocol(protocol);
     }
-    
+
     return ssl;
   }
-  
+
   private HttpConfiguration makeHttpsConfig(Config config) {
     HttpConfiguration hc = makeHttpConfig(config);
     hc.setSecurePort(config.ssl.port);
@@ -269,7 +284,7 @@ public class LightningServer {
     hc.addCustomizer(new SecureRequestCustomizer());
     return hc;
   }
-    
+
   private HttpConfiguration makeHttpConfig(Config config) {
     HttpConfiguration hc = new HttpConfiguration();
     hc.setSendServerVersion(false);

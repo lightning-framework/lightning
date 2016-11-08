@@ -38,7 +38,7 @@ public class DefaultExceptionViewProducer implements ExceptionViewProducer {
       .put(AccessViolationException.class, "You do not have permission to view this page.")
       .put(BadRequestException.class, "Your request could not be serviced because it did not contain the required or "
           + "expected information. You should hit the back button on your browser and try again.")
-      .put(InternalServerErrorException.class, "The feature you are trying to access is currently under construction. "
+      .put(InternalServerErrorException.class, "An unexpected error occured processing your request. "
           + "Please try again later.")
       .put(MethodNotAllowedException.class, "The method you have requested is not supported.")
       .put(NotAuthorizedException.class, "You must authenticate to proceed. If you were previously authenticated, "

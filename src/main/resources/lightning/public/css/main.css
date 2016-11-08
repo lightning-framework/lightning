@@ -521,3 +521,168 @@ div.data-table {
         margin: 8px;
     }
 }
+
+/* Route Map */
+.route-map-container {
+    margin-left: auto;
+    margin-right: auto;
+    width: 95%;
+    min-width: 800px;
+    max-width: 1280px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    padding: 20px;
+    background-color: #fafafa;
+    box-shadow: 0px 3px 5px rgba(0,0,0,0.3);
+}
+
+.route-map-container .route-map-table {
+    margin-bottom: 20px;
+}
+
+.route-map-container .route-map-table:last-child {
+    margin-bottom: 0px;
+}
+
+.route-map-container .route-map-table .label {
+    font-size: 20px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.route-map-container .route-map-table table {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border-collapse: collapse;
+    font-size: 16px;
+    color: #252626;
+    background-color: #fafafa;
+}
+
+.route-map-container .route-map-table table tr {
+    margin: 0;
+    border-bottom: 1px solid rgb(218, 222, 229);
+    border-right: 1px solid rgb(218, 222, 229);
+    border-left: 1px solid rgb(218, 222, 229);
+    background-color: rgb(252,252,250);
+}
+
+.route-map-container .route-map-table table tr td {
+    margin: 0;
+    padding: 10px;
+    line-height: 26px;
+    vertical-align: top;
+}
+
+.route-map-container .route-map-table table tr th {
+    text-align: left;
+    margin: 0;
+    padding: 10px;
+    border-top: 1px solid rgb(218, 222, 229);
+    background-color: #303030 !important;
+    color: #FFF;
+    vertical-align: top;
+}
+
+.route-map-container .route-map-table table tbody tr:first-child {
+  border-top: 1px solid rgb(218, 222, 229);
+}
+
+.route-map-container .route-map-table table thead+tbody tr:first-child {
+  border-top: none !important;
+}
+
+.route-map-container .code {
+    font-family: 'Source Code Pro', 'Courier New', monospace;
+}
+
+.route-map-container form[name="route_lookup"] .reply {
+    font-family: 'Source Code Pro', 'Courier New', monospace;
+    white-space: pre-wrap;
+    line-height: 26px;
+    font-size: 15px;
+}
+
+/* Forms */
+
+form input[type="password"],
+form input[type="email"],
+form input[type="text"],
+form input[type="file"],
+form textarea,
+form select {
+    padding: 7px 5px;
+    font-size: 16px;
+    border: 1px solid rgb(198, 198, 198);
+    background-color: rgb(255, 255, 255);
+    font-family: inherit;
+    border-radius: 4px 4px 4px 4px;
+    box-shadow: 0pt 1px 3px rgba(0, 0, 0, 0.15) inset;
+    color: rgb(30, 57, 80);
+    margin-top: 5px;
+    margin-bottom: 5px;
+    outline: none;
+}
+
+form input[type="password"]:focus,
+form input[type="email"]:focus,
+form input[type="text"]:focus,
+form input[type="file"]:focus,
+form textarea:focus,
+form select:focus
+{
+    box-shadow: 0pt 1px 3px rgba(0, 0, 0, 0.3) inset, 0pt 0pt 5px rgb(54, 160, 255);
+    border: 1px solid rgb(48, 128, 200);
+    background: none repeat scroll 0% 0% rgb(255, 255, 255);
+}
+
+a.form_submit_style
+{
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+    font-family: inherit;
+    font-weight: bold !important;
+}
+
+form input[type="submit"],
+form .submit,
+a.form_submit_style,
+button.form_submit_style
+{
+    cursor: pointer;
+    display: inline-block;
+    margin: 0 1px;
+    font-size: 15px;
+    border: 1px solid rgb(148, 175, 189) !important;
+    text-align: center;
+    border-radius: 4px 4px 4px 4px;
+    color: rgb(90, 124, 157) !important;
+    font-weight: bold;
+    box-shadow: 0pt 1px 3px rgba(0, 0, 0, 0.2);
+    background: rgb(255, 255, 255);
+    text-shadow: 0pt 1px 0pt rgb(255, 255, 255);
+    padding: 8px;
+    position: relative;
+    font-family: inherit;
+    text-decoration: none;
+}
+
+form .submit
+{
+    padding: 7px 9px !important;
+}
+
+form input[type="submit"]:hover,
+form .submit:hover,
+a.form_submit_style:hover,
+button.form_submit_style:hover
+{
+    background-position: right -156px;
+}
+
+form input[type="submit"]:active,
+form .submit:active
+{
+    top: 1px;
+}

@@ -6,6 +6,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
@@ -21,6 +22,7 @@ import org.eclipse.jetty.util.resource.ResourceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.augustl.pathtravelagent.PathFormatException;
 import com.google.common.collect.ImmutableSet;
 
 import freemarker.template.Configuration;
@@ -45,6 +47,7 @@ import lightning.cache.driver.ExceptingCacheDriver;
 import lightning.config.Config;
 import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
+import lightning.debugmap.DebugMapController;
 import lightning.debugscreen.DebugScreen;
 import lightning.debugscreen.LocalSourceLocator;
 import lightning.debugscreen.SourceLocator;
@@ -55,6 +58,7 @@ import lightning.exceptions.LightningException;
 import lightning.fn.ExceptionViewProducer;
 import lightning.fn.RouteFilter;
 import lightning.groups.Groups;
+import lightning.healthscreen.HealthScreenController;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
 import lightning.http.HaltException;
@@ -101,7 +105,7 @@ import lightning.util.MimeMatcher;
 public class LightningHandler extends AbstractHandler {
   private static final Version FREEMARKER_VERSION = new Version(2, 3, 20);
   private static final Logger logger = LoggerFactory.getLogger(LightningHandler.class);
-  
+
   private Config config;
   private MySQLDatabaseProvider dbp;
   private TemplateEngine userTemplateConfig;
@@ -111,7 +115,7 @@ public class LightningHandler extends AbstractHandler {
   private ResourceFactory staticFileResourceFactory;
   private ScanResult scanResult;
   private DebugScreen debugScreen;
-  private ExceptionViewProducer exceptionViewProducer; 
+  private ExceptionViewProducer exceptionViewProducer;
   private FileServer staticFileServer;
   private RouteMapper<Method> routeMapper;
   private FilterMapper<Method> filterMapper;
@@ -121,19 +125,19 @@ public class LightningHandler extends AbstractHandler {
   private JsonService jsonifier;
   private Cache cache;
   private MimeMatcher bufferingMatcher;
-  
+
   public LightningHandler(Config config, MySQLDatabaseProvider dbp, InjectorModule globalModule, InjectorModule userModule) throws Exception {
     this.config = config;
     this.dbp = dbp;
     this.globalModule = globalModule;
     this.userModule = userModule;
-    
+
     SourceLocator[] locators = new SourceLocator[config.codeSearchPaths.size()];
     int i = 0;
     for (String sourcePath : config.codeSearchPaths) {
       locators[i++] = new LocalSourceLocator(sourcePath);
     }
-        
+
     this.debugScreen = new DebugScreen(locators);
     this.filterMapper = new FilterMapper<>();
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
@@ -142,25 +146,25 @@ public class LightningHandler extends AbstractHandler {
     this.internalTemplateConfig.setTemplateExceptionHandler(/*config.enableDebugMode ?
         TemplateExceptionHandler.HTML_DEBUG_HANDLER :*/
         TemplateExceptionHandler.RETHROW_HANDLER);
-    
+
     userTemplateConfig = userModule.getBindingForClass(TemplateEngine.class);
     if (userTemplateConfig == null) {
       // Use the default template engine.
       userTemplateConfig = new FreeMarkerTemplateEngine(config);
     }
-    
+
     jsonifier = userModule.getBindingForClass(JsonService.class);
     if (jsonifier == null) {
       // Use the default json engine.
       jsonifier = new GsonJsonService();
     }
-    
+
     CacheDriver cacheDriver = userModule.getBindingForClass(CacheDriver.class);
     if (cacheDriver == null) {
       cacheDriver = new ExceptingCacheDriver();
     }
     cache = new Cache(cacheDriver);
-    
+
     this.exceptionHandlers = new ExceptionMapper<>();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
     if (config.server.staticFilesPath != null) {
@@ -185,35 +189,39 @@ public class LightningHandler extends AbstractHandler {
       this.staticFileServer.disableCaching();
     }
     this.routeMapper = new RouteMapper<>();
-    
+
     if (config.mail.isEnabled()) {
       this.mailer = new Mailer(config.mail);
       globalModule.bindClassToInstance(Mailer.class, this.mailer);
     }
-    
+
     this.bufferingMatcher = new MimeMatcher(config.server.outputBufferingTypes);
-    
+
     rescan();
   }
-  
+
+  public ScanResult getLastScanResult() {
+    return scanResult;
+  }
+
   private Resource[] getResourcePaths() {
     File[] files = new File[] {
         new File("./src/main/resources", config.server.staticFilesPath),
         new File("./src/main/java", config.server.staticFilesPath),
         new File(config.server.staticFilesPath)
     };
-    
+
     ArrayList<Resource> resources = new ArrayList<>();
-    
+
     for (File f : files) {
       if (f.exists() && f.isDirectory() && f.canRead()) {
         resources.add(Resource.newResource(f));
       }
     }
-    
+
     return resources.toArray(new Resource[resources.size()]);
   }
-  
+
   @SuppressWarnings("unchecked")
   private ImmutableSet<Class<? extends Throwable>> ignoredExceptions = ImmutableSet.<Class<? extends Throwable>>of(
       NotFoundException.class, BadRequestException.class, NotAuthorizedException.class,
@@ -228,14 +236,14 @@ public class LightningHandler extends AbstractHandler {
     baseRequest.setHandled(true);
     InternalRequest request = InternalRequest.makeRequest(_request, config.server.trustLoadBalancerHeaders);
     InternalResponse response = InternalResponse.makeResponse(new BufferingHttpServletResponse(_response, config, bufferingMatcher));
-    HandlerContext ctx = null;    
+    HandlerContext ctx = null;
     Injector injector = null;
     InjectorModule requestModule = null;
     Match<Method> match = null;
-        
-    try {            
+
+    try {
       // Redirect insecure requests.
-      if (config.ssl.isEnabled() && 
+      if (config.ssl.isEnabled() &&
           config.ssl.redirectInsecureRequests &&
           !_request.getScheme().toLowerCase().equals("https")) {
           URI oldUri = new URI(_request.getRequestURL().toString());
@@ -250,54 +258,59 @@ public class LightningHandler extends AbstractHandler {
           _response.sendRedirect(newUri.toString());
           return;
       }
-      
+
       // Try to pass through a static file (if any).
       if (request.method() == HTTPMethod.GET && staticFileServer.couldConsume(_request)) {
         staticFileServer.handle(_request, _response);
         return;
-      }      
-      
+      }
+
       // Create context.
       ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer, this.jsonifier, this.cache);
       requestModule = requestSpecificInjectionModule(ctx);
       injector = new Injector(globalModule, requestModule, userModule);
+      requestModule.bindClassToInstance(Injector.class, injector);
       Context.setContext(ctx);
       request.setCookieManager(ctx.cookies);
       response.setCookieManager(ctx.cookies);
-      
+
       // Enable multi-part support.
       if (request.isMultipart()) {
         if (!config.server.multipartEnabled) {
           throw new BadRequestException("Multipart requests are disallowed.");
         }
-        
+
         request.raw().setAttribute(org.eclipse.jetty.server.Request.__MULTIPART_CONFIG_ELEMENT,
           new MultipartConfigElement(
-              config.server.multipartSaveLocation, 
-              config.server.multipartPieceLimitBytes, 
-              config.server.multipartRequestLimitBytes, 
+              config.server.multipartSaveLocation,
+              config.server.multipartPieceLimitBytes,
+              config.server.multipartRequestLimitBytes,
               config.server.multipartPieceLimitBytes));
       }
-      
+
       if (config.enableDebugMode) {
         rescan();
         internalTemplateConfig.clearTemplateCache();
       }
-      
+
       // Try to execute a route handler (if any).
       match = routeMapper.lookup(request);
       if (match != null) {
         logger.debug("Found route match: data={} params={} wildcards={}", match.getData(), match.getParams(), match.getWildcards());
-        
+
         Object controller = null;
         Method m = match.getData();
-        
+
         // Set the default content type.
         response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
-        
+
+        if (config.enableDebugMode && m.getDeclaringClass().equals(DebugMapController.class)) {
+          requestModule.bindClassToInstance(LightningHandler.class, this);
+        }
+
         try {
           // TODO: Not sure how bad the performance is going to be with reflection here.
-          
+
           if (m == null) {
             // Null indicates a web socket handler is installed at this path.
             // Set the request as not handled and return so that Jetty will invoke the next
@@ -309,10 +322,10 @@ public class LightningHandler extends AbstractHandler {
             }
             return;
           }
-          
+
           // Execute any before filters.
           FilterMatch<Method> filters = filterMapper.lookup(request.path(), request.method());
-          
+
           for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
             if (config.enableDebugMode) {
               logger.info("INCOMING REQUEST ({}): {} {} -> FILTER {}", request.ip(), request.method(), request.path(), filter.handler);
@@ -325,50 +338,50 @@ public class LightningHandler extends AbstractHandler {
               if (e.getCause() != null) {
                 throw e.getCause();
               }
-              
+
               throw e;
             }
           }
-          
+
           // Mutate the request.
           request.setWildcards(match.getWildcards());
           request.setParams(match.getParams());
-          
+
           if (config.enableDebugMode) {
             logger.info("INCOMING REQUEST ({}): {} {} -> {}", request.ip(), request.method(), request.path(), m);
           }
-          
-          // Perform pre-processing.          
+
+          // Perform pre-processing.
           if (m.getAnnotation(Multipart.class) != null) {
             ctx.requireMultipart();
           }
-          
+
           if (m.getAnnotation(RequireAuth.class) != null) {
             ctx.requireAuth();
           }
-          
+
           if (m.getAnnotation(RequireXsrfToken.class) != null) {
             RequireXsrfToken info = m.getAnnotation(RequireXsrfToken.class);
             ctx.requireXsrf(info.inputName());
           }
-          
+
           if (m.getAnnotation(Filters.class) != null) {
             for (Filter filter : m.getAnnotation(Filters.class).value()) {
-              RouteFilter instance = (RouteFilter) injector.newInstance(filter.value());
+              RouteFilter instance = injector.newInstance(filter.value());
               instance.execute();
             }
           } else if (m.getAnnotation(Filter.class) != null) {
-            RouteFilter instance = (RouteFilter) injector.newInstance(m.getAnnotation(Filter.class).value());
+            RouteFilter instance = injector.newInstance(m.getAnnotation(Filter.class).value());
             instance.execute();
           }
-          
+
           // Instantiate the controller.
-          Class<?> clazz = m.getDeclaringClass();          
+          Class<?> clazz = m.getDeclaringClass();
           controller = injector.newInstance(clazz);
-          
+
           // Run initializers.
           Class<?> currentClass = m.getDeclaringClass();
-          
+
           while (currentClass != null) {
             if (scanResult.initializers.containsKey(currentClass)) {
               for (Method i : scanResult.initializers.get(currentClass)) {
@@ -381,13 +394,13 @@ public class LightningHandler extends AbstractHandler {
                 }
               }
             }
-            
+
             currentClass = currentClass.getSuperclass();
           }
-          
+
           // Build invocation arguments.
           Object[] args = injector.getInjectedArguments(m);
-  
+
           // Invoke the controller.
           Object output = null;
           try {
@@ -397,10 +410,10 @@ public class LightningHandler extends AbstractHandler {
               throw e.getCause();
             throw e;
           }
-          
+
           // Save session before response commit.
           ctx.maybeSaveSession();
-                    
+
           // Perform post-processing.
           if (output == null) {} // Assume the handler returned void or null because it did its work.
           else if (m.getAnnotation(Json.class) != null) {
@@ -410,15 +423,15 @@ public class LightningHandler extends AbstractHandler {
             if (output instanceof ModelAndView) {
               ctx.render((ModelAndView) output);
             }
-            
+
             Template info = m.getAnnotation(Template.class);
-            
+
             if (info.value() == null) {
               throw new LightningException("Unable to process output of handler: " + match.getData().toString());
             }
-            
+
             ctx.render(new ModelAndView(info.value(), output));
-          } else if (output instanceof String) {            
+          } else if (output instanceof String) {
             response.raw().getWriter().print(output);
           } else if (output instanceof File) {
             ctx.sendFile((File) output);
@@ -433,7 +446,7 @@ public class LightningHandler extends AbstractHandler {
           // Run any finalizers.
           if (m != null && controller != null) {
             Class<?> currentClass = m.getDeclaringClass();
-            
+
             while (currentClass != null) {
               if (scanResult.finalizers.containsKey(currentClass)) {
                 for (Method i : scanResult.finalizers.get(currentClass)) {
@@ -450,26 +463,26 @@ public class LightningHandler extends AbstractHandler {
                   }
                 }
               }
-              
+
               currentClass = currentClass.getSuperclass();
             }
           }
         }
-        
+
         return;
       }
-      
+
       // Trigger a 404 page.
       if (config.enableDebugMode) {
         logger.info("INCOMING REQUEST ({}): {} {} -> NOT FOUND", request.ip(), request.method(), request.path());
       }
-      
+
       throw new NotFoundException();
     } catch (Throwable e) {
       if (!ignoredExceptions.contains(e.getClass())) {
         logger.warn("Request handler returned exception:", e);
       }
-      
+
 
       if (!response.raw().isCommitted()) {
         response.raw().reset();
@@ -486,7 +499,7 @@ public class LightningHandler extends AbstractHandler {
             }
             return;
           }
-          
+
           sendCriticalErrorPage(ctx, e, match);
         } catch (Throwable e2) {
           e2.addSuppressed(e);
@@ -506,9 +519,9 @@ public class LightningHandler extends AbstractHandler {
         logger.warn("Exception closing context:", e);
       }
       Context.clearContext();
-      
+
       if (request.isMultipart() && config.server.multipartEnabled) {
-        MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser) 
+        MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser)
             request.raw().getAttribute(org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
         if (multipartInputStream != null) {
           try {
@@ -518,13 +531,53 @@ public class LightningHandler extends AbstractHandler {
           }
         }
       }
-    } 
+    }
   }
-    
+
+  public List<String> getMatches(String path, HTTPMethod method) throws PathFormatException {
+    List<String> matches = new ArrayList<>();
+
+    Match<Method> route = routeMapper.lookup(path, method);
+    if (route != null) {
+      FilterMatch<Method> filters = filterMapper.lookup(path, method);
+
+      if (route.getData() == null) {
+        for (Class<?> type : scanResult.websocketFactories.keySet()) {
+          for (Method handler : scanResult.websocketFactories.get(type)) {
+            WebSocketFactory wf = handler.getAnnotation(WebSocketFactory.class);
+            if (wf.path().equals(path)) {
+              matches.add(type.getCanonicalName() + "@" + handler.getName());
+            }
+          }
+        }
+
+        return matches;
+      }
+
+      for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
+        matches.add(filter.handler.getDeclaringClass().getCanonicalName() + "@" + filter.handler.getName());
+      }
+
+      if (route.getData().getAnnotation(Filters.class) != null) {
+        for (Filter filter : route.getData().getAnnotation(Filters.class).value()) {
+          matches.add(filter.value().getCanonicalName());
+        }
+      }
+
+      if (route.getData().getAnnotation(Filter.class) != null) {
+        matches.add(route.getData().getAnnotation(Filter.class).value().getCanonicalName());
+      }
+
+      matches.add(route.getData().getDeclaringClass().getCanonicalName() + "@" + route.getData().getName());
+    }
+
+    return matches;
+  }
+
   protected synchronized void rescan() throws Exception {
     scanResult = scanner.scan();
     logger.debug("Scanned Annotations: {}, {}", config.scanPrefixes, scanResult);
-    
+
     // Map exception handlers.
     exceptionHandlers.clear();
     for (Class<?> clazz : scanResult.exceptionHandlers.keySet()) {
@@ -534,10 +587,10 @@ public class LightningHandler extends AbstractHandler {
         exceptionHandlers.map(annotation.value(), method);
       }
     }
-    
+
     // Map routes.
     routeMapper.clear();
-    
+
     for (Class<?> clazz : scanResult.routes.keySet()) {
       for (Method method : scanResult.routes.get(clazz)) {
         if (method.getAnnotation(Route.class) != null) {
@@ -546,7 +599,7 @@ public class LightningHandler extends AbstractHandler {
             routeMapper.map(httpMethod, route.path(), method);
           }
         }
-        
+
         if (method.getAnnotation(Routes.class) != null) {
           for (Route route : method.getAnnotation(Routes.class).value()) {
             for (HTTPMethod httpMethod : route.methods()) {
@@ -556,7 +609,10 @@ public class LightningHandler extends AbstractHandler {
         }
       }
     }
-    
+
+    DebugMapController.map(routeMapper, config);
+    HealthScreenController.map(routeMapper, config);
+
     // Map websockets to a null handler.
     for (Class<?> clazz : scanResult.websocketFactories.keySet()) {
       for (Method m : scanResult.websocketFactories.get(clazz)) {
@@ -564,22 +620,22 @@ public class LightningHandler extends AbstractHandler {
         routeMapper.map(HTTPMethod.GET, info.path(), null); // Indicate to pass to next handler in chain.
       }
     }
-    
+
     routeMapper.compile();
-    
+
     // Map filters.
     filterMapper.clear();
-    
+
     for (Class<?> clazz : scanResult.beforeFilters.keySet()) {
       for (Method m : scanResult.beforeFilters.get(clazz)) {
-        
+
         if (m.getAnnotation(Before.class) != null) {
           Before info = m.getAnnotation(Before.class);
           filterMapper.addFilterBefore(info.path(), info.methods(), info.priority(), m);
         }
-        
+
         Befores infos = m.getAnnotation(Befores.class);
-        
+
         if (infos != null) {
           for (Before info : infos.value()) {
             filterMapper.addFilterBefore(info.path(), info.methods(), info.priority(), m);
@@ -588,7 +644,7 @@ public class LightningHandler extends AbstractHandler {
       }
     }
   }
-  
+
   protected void sendCriticalErrorPage(HandlerContext ctx, Throwable e, Match<Method> m) throws IOException {
     try {
       ModelAndView mv = exceptionViewProducer.produce(e.getClass(), e, ctx.request.raw(), ctx.response.raw());
@@ -597,12 +653,12 @@ public class LightningHandler extends AbstractHandler {
         renderInternalTemplate(ctx.response, mv);
         return;
       }
-      
+
       if (config.enableDebugMode) {
         debugScreen.handle(e, ctx, m);
         return;
       }
-      
+
       ctx.response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
       renderInternalTemplate(ctx.response, exceptionViewProducer.produce(
           InternalServerErrorException.class, e, ctx.request.raw(), ctx.response.raw()));
@@ -613,20 +669,20 @@ public class LightningHandler extends AbstractHandler {
       ctx.response.raw().getWriter().println("500 INTERNAL SERVER ERROR");
     }
   }
-  
+
   protected void renderInternalTemplate(Response response, ModelAndView modelAndView) throws Exception {
     renderInternalTemplate(response, modelAndView.viewName, modelAndView.viewModel);
   }
-  
+
   protected void renderInternalTemplate(Response response, String name, Object model) throws Exception {
     renderTemplate(response, internalTemplateConfig, name, model);
   }
-  
+
   protected void renderTemplate(Response response, Configuration tplConfig, String name, Object model) throws Exception {
     response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
     tplConfig.getTemplate(name).process(model, response.raw().getWriter());
   }
-  
+
   protected InjectorModule requestSpecificInjectionModule(HandlerContext context) {
     InjectorModule m = new InjectorModule();
     m.bindClassToInstance(Validator.class, context.validator);

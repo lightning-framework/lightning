@@ -72,6 +72,8 @@ public class DebugScreen {
             while (true) {
               addToChain(throwable, exceptionChain);
               
+              // TODO: Perhaps identify suppressed extensions differently in UI?
+              // TODO: Perhaps recursively crawl the exception tree?
               for (Throwable s : throwable.getSuppressed()) {
                 addToChain(s, exceptionChain);
               }
