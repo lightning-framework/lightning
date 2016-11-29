@@ -68,7 +68,7 @@ import com.google.common.collect.ImmutableList;
 
 /**
  * A controller is a class that is used to process a single HTTP request and should be sub-classed.
- * Each controller lives only on a single thread to service a single request. Instances are 
+ * Each controller lives only on a single thread to service a single request. Instances are
  * allocated to service a single request and destroyed after a response to that request is sent.
  */
 public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
@@ -93,7 +93,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   private boolean isClosed;
   private final JsonService jsonifier;
   private final Cache cache;
-  
+
   // TODO(mschurr): Add a user property, implement a proxy for it.
   // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
 
@@ -118,7 +118,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.jsonifier = jsonifier;
     this.cache = cache;
   }
-  
+
   @Override
   public MySQLDatabase getDatabase() throws SQLException {
     return db();
@@ -128,27 +128,27 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public Connection getConnection() throws SQLException {
     return db().raw();
   }
-  
+
   public Hasher hasher() {
     return new Hasher(config.server.hmacKey);
   }
-  
+
   public TokenSets tokens() {
     return new TokenSets(hasher());
   }
-  
+
   public Mailer mail() throws LightningException {
     if (mail == null) {
       throw new LightningException("Mail is not configured.");
     }
-    
+
     return mail;
   }
-  
+
   public void goAsync() {
     this.isAsync = true;
   }
-  
+
   public void halt() {
     throw new HaltException();
   }
@@ -160,12 +160,16 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    */
   @Override
   public void close() throws Exception {
+    close(true);
+  }
+
+  private void close(boolean flush) throws Exception {
     if (isClosed) {
       return;
     }
-    
+
     isClosed = true;
-    
+
     // If the session was modified, save it.
     try {
       if (session != null && session.isDirty()) {
@@ -176,13 +180,15 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
       db.close();
       dbProxy.reallyClose();
     }
-    
-    response.raw().flushBuffer();
+
+    if (flush) {
+      response.raw().flushBuffer();
+    }
   }
-  
-  public void closeIfNotAsync() throws Exception {
+
+  public void closeIfNotAsync(boolean flush) throws Exception {
     if (!isAsync) {
-      close();
+      close(flush);
     }
   }
 
@@ -195,7 +201,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final MySQLDatabase getDB() throws SQLException {
     return db;
   }
-  
+
   /**
    * @return A database connection for use by this controller. Clients SHOULD NOT
    * close this connection, but should close any PreparedStatements and ResultSets
@@ -205,7 +211,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final MySQLDatabase db() throws SQLException {
     return getDB();
   }
-  
+
   /**
    * @return
    */
@@ -223,7 +229,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     requireAuth();
     return getAuth().getUser();
   }
-  
+
   /**
    * @return The user account that the client of this request is authenticated to.
    * @throws SessionException On internal error.
@@ -240,7 +246,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final Auth getAuth() {
     return auth;
   }
-  
+
   /**
    * @return The authentication handler for this request.
    */
@@ -254,7 +260,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final Session getSession() {
     return session;
   }
-  
+
   /**
    * @return A session for the client of this request.
    */
@@ -558,7 +564,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
       halt();
     }
   }
-  
+
   /**
    * Requires that the request has data attached for the given name (as either a GET or POST parameter).
    * @param name Of the parameter.
@@ -618,7 +624,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final Validator getValidator() {
     return validator;
   }
-  
+
   /**
    * @return Whether or not the validator has no errors.
    */
@@ -634,7 +640,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final FieldValidator validate(String queryParamName) {
     return getValidator().check(queryParamName);
   }
-  
+
   /**
    * Requires the presence of the XSRF token under the given parameter name.
    * @param queryParamName
@@ -645,7 +651,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
       throw new BadRequestException("An cross-site request forgery attack was detected and prevented.");
     }
   }
-  
+
   /**
    * Requires the presence of the XSRF token under the parameter name "_xsrf".
    * @throws Exception
@@ -653,20 +659,20 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final void requireXsrf() throws Exception {
     requireXsrf("_xsrf");
   }
-  
+
   /**
    * Validates that the XSRF token (provided by given query param name) is correct.
    * @param queryParamName
-   * @throws Exception 
+   * @throws Exception
    */
   public final void validateXsrf(String queryParamName) throws Exception {
-    getValidator().check(queryParamName).is(getSession().getXSRFToken(), 
+    getValidator().check(queryParamName).is(getSession().getXSRFToken(),
         "You entered an incorrect XSRF token.");
   }
-  
+
   /**
    * Validates that the XSRF token provided by the forms.ftl library is correct.
-   * @throws Exception 
+   * @throws Exception
    */
   public final void validateXsrf() throws Exception {
     validateXsrf("_xsrf");
@@ -696,57 +702,57 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final Map<String, Param> queryParams() {
     return queryParamsExcepting(ImmutableList.of());
   }
-  
+
   public final void sendJson(Object object) throws Exception {
     sendJson(object, null, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
-  
+
   public final void sendJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
     sendJson(object, null, policy);
   }
-  
+
   public final void sendJson(Object object, String prefix) throws Exception {
     sendJson(object, prefix, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
-  
+
   public final void sendJson(Object object, String prefix, JsonFieldNamingPolicy policy) throws Exception {
     response.status(HTTPStatus.OK);
     response.type("application/json; charset=UTF-8");
-    
+
     if (prefix != null && prefix.length() > 0) {
       response.outputStream().print(prefix);
     }
-   
+
     jsonifier.writeJson(object, response.outputStream(), policy);
   }
-  
+
   public final String toJson(Object object) throws Exception {
     return toJson(JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
-  
+
   public final String toJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
     ByteArrayOutputStream stream = new ByteArrayOutputStream();
     jsonifier.writeJson(object, stream, policy);
     return stream.toString("UTF-8");
   }
-  
+
   public final <T> T parseJson(String json, Class<T> clazz) throws Exception {
     return parseJson(json, clazz, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
-  
+
   public final <T> T parseJson(String json, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return jsonifier.readJson(clazz, IOUtils.toInputStream(json, "UTF-8"), policy);
-    
+
   }
-  
+
   public final <T> T parseJson(Class<T> clazz) throws Exception {
-   return parseJson(clazz, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES); 
+   return parseJson(clazz, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
-  
+
   public final <T> T parseJson(Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return jsonifier.readJson(clazz, request.raw().getInputStream(), policy);
   }
-  
+
   public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     if (isMultipart()) {
       return jsonifier.readJson(clazz, request.getPart(queryParamName).getInputStream(), policy);
@@ -754,11 +760,11 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
       return jsonifier.readJson(clazz, IOUtils.toInputStream(queryParam(queryParamName).stringValue(), "UTF-8"), policy);
     }
   }
-  
+
   public final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws Exception {
     return parseJsonFromParam(queryParamName, clazz, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
-  
+
   /**
    * @param model
    * @param viewName
@@ -767,7 +773,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final ModelAndView modelAndView(String viewName, Object viewModel) {
     return new ModelAndView(viewName, viewModel);
   }
-  
+
   /**
    * @param model
    * @param viewName
@@ -778,7 +784,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     templateEngine.render(viewName, viewModel, stringWriter);
     return stringWriter.toString();
   }
-  
+
   /**
    * @param modelAndView
    * @return
@@ -787,7 +793,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final String renderToString(ModelAndView modelAndView) throws Exception {
     return renderToString(modelAndView.viewName, modelAndView.viewModel);
   }
-  
+
   /**
    * @param viewName
    * @param model
@@ -796,7 +802,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final void render(String viewName, Object viewModel) throws Exception {
     templateEngine.render(viewName, viewModel, response.raw().getWriter());
   }
-  
+
   /**
    * @param modelAndView
    * @throws Exception
@@ -805,7 +811,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
     templateEngine.render(modelAndView.viewName, modelAndView.viewModel, response.raw().getWriter());
   }
-  
+
   /**
    * See sendFile(File, CacheType)
    * CAUTION: File will be sent with Cache-Control PUBLIC.
@@ -815,11 +821,11 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public void sendFile(File file) throws Exception {
     sendFile(file, CacheControl.PUBLIC);
   }
-  
+
   /**
    * Writes the contents of a file into the HTTP response, setting headers appropriately.
    * IMPORTANT: When a handler calls sendFile(), that handler essentially acts as if it exposes
-   *            the given file as if it were a static file. Thus, the entire HTTP specification 
+   *            the given file as if it were a static file. Thus, the entire HTTP specification
    *            is supported (partials, caching, etc) as if it were a static file being served.
    *            Takes advantage of async IO for speed.
    *            File name may be exposed to user.
@@ -829,12 +835,12 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    *            TODO: Can this take advantage of GZIP?
    * @param file A file.
    */
-  public void sendFile(File file, CacheControl cacheType) throws Exception {    
+  public void sendFile(File file, CacheControl cacheType) throws Exception {
     if (request.raw().isAsyncSupported()) {
       goAsync();
       this.close();
     }
-    
+
     fs.sendResource(request.raw(), response.raw(), Resource.newResource(file), cacheType);
     return;
   }
@@ -846,22 +852,22 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public Users users() {
     return users;
   }
-  
+
   public final void enableHttpCaching(CacheControl type, String etag, long lastModifiedTime) {
     if (config.enableDebugMode || type == CacheControl.NO_CACHE) {
       return;
     }
-    
+
     if (request.header(HTTPHeader.IF_NONE_MATCH).exists() &&
         request.header(HTTPHeader.IF_NONE_MATCH).isEqualTo(etag)) {
       response.status(HTTPStatus.NOT_MODIFIED);
       halt();
     }
-    
+
     if (request.header(HTTPHeader.IF_MODIFIED_SINCE).exists()) {
       try {
         long time = Time.parseFromHttp(request.header(HTTPHeader.IF_MODIFIED_SINCE).stringValue());
-        
+
         if (time >= lastModifiedTime) {
           response.status(HTTPStatus.NOT_MODIFIED);
           halt();
@@ -885,7 +891,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     if (isClosed) {
       return;
     }
-    
+
     if (session != null && session.isDirty()) {
       session.save();
     }

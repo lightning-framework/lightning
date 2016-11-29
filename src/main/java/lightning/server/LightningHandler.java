@@ -240,6 +240,7 @@ public class LightningHandler extends AbstractHandler {
     Injector injector = null;
     InjectorModule requestModule = null;
     Match<Method> match = null;
+    boolean flush = true;
 
     try {
       // Redirect insecure requests.
@@ -301,10 +302,7 @@ public class LightningHandler extends AbstractHandler {
         Object controller = null;
         Method m = match.getData();
 
-        // Set the default content type.
-        response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
-
-        if (config.enableDebugMode && m.getDeclaringClass().equals(DebugMapController.class)) {
+        if (config.enableDebugMode && m != null && m.getDeclaringClass().equals(DebugMapController.class)) {
           requestModule.bindClassToInstance(LightningHandler.class, this);
         }
 
@@ -320,8 +318,12 @@ public class LightningHandler extends AbstractHandler {
             if (config.enableDebugMode) {
               logger.info("INCOMING REQUEST ({}): {} {} -> WEBSOCKET", request.ip(), request.method(), request.path());
             }
+            flush = false;
             return;
           }
+
+          // Set the default content type.
+          response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
 
           // Execute any before filters.
           FilterMatch<Method> filters = filterMapper.lookup(request.path(), request.method());
@@ -513,7 +515,7 @@ public class LightningHandler extends AbstractHandler {
       try {
         if (ctx != null) {
           logger.debug("Closing Context");
-          ctx.closeIfNotAsync();
+          ctx.closeIfNotAsync(flush);
         }
       } catch (Exception e) {
         logger.warn("Exception closing context:", e);
