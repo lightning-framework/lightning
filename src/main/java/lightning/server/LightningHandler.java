@@ -138,7 +138,7 @@ public class LightningHandler extends AbstractHandler {
       locators[i++] = new LocalSourceLocator(sourcePath);
     }
 
-    this.debugScreen = new DebugScreen(locators);
+    this.debugScreen = new DebugScreen(config, locators);
     this.filterMapper = new FilterMapper<>();
     this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
     this.internalTemplateConfig.setClassForTemplateLoading(getClass(), "/lightning");

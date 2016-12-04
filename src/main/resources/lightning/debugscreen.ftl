@@ -17,6 +17,9 @@
     <ul>
         <li><a href="https://lightning-framework.github.io/#info" target="_blank">View Documentation</a></li>
         <li><a href="https://github.com/lightning-framework/examples" target="_blank">View Examples</a></li>
+        <#if route_map_path?has_content>
+        <li><a href="${route_map_path}" target="_blank">View Routes</a></li>
+        </#if>
     </ul>
     <div id="some-buttons">
         <!--<a id="some-twitter" class="some-button" href="https://twitter.com/sparkjava" target="_blank"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxuczpzdmc9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHg9IjAiIHk9IjAiIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSI0MCAtNjAgMjAwIDIwMCIgZW5hYmxlLWJhY2tncm91bmQ9Im5ldyA0MCAtNTkuOCAyMDAgMjAwIiB4bWw6c3BhY2U9InByZXNlcnZlIj48cGF0aCBmaWxsPSIjMkFBOUUwIiBkPSJNMTQwLTUwYzUwIDAgOTAgNDAgOTAgOTBzLTQwIDkwLTkwIDkwYy01MCAwLTkwLTQwLTkwLTkwUzkwLTUwIDE0MC01ME0xNDAtNjBDODUtNjAgNDAtMTUgNDAgNDBzNDUgMTAwIDEwMCAxMDBjNTUgMCAxMDAtNDUgMTAwLTEwMFMxOTUtNjAgMTQwLTYwTDE0MC02MHpNMTk5IDljLTQgMi05IDMtMTQgNCA1LTMgOS04IDExLTEzIC01IDMtMTAgNS0xNSA2IC00LTUtMTEtOC0xOC04IC0xMyAwLTI0IDExLTI0IDI0IDAgMiAwIDQgMSA2IC0yMC0xLTM4LTExLTUwLTI1IC0yIDQtMyA4LTMgMTIgMCA4IDQgMTYgMTEgMjAgLTQgMC04LTEtMTEtMyAwIDAgMCAwIDAgMCAwIDEyIDggMjIgMTkgMjQgLTIgMS00IDEtNiAxIC0yIDAtMyAwLTUgMCAzIDEwIDEyIDE3IDIzIDE3IC04IDctMTkgMTAtMzAgMTAgLTIgMC00IDAtNiAwIDExIDcgMjQgMTEgMzcgMTEgNDUgMCA2OS0zNyA2OS02OSAwLTEgMC0yIDAtM0MxOTIgMTggMTk2IDE0IDE5OSA5TDE5OSA5eiIvPjwvc3ZnPg==" title="Follow Spark on Twitter" alt="Follow Spark on Twitter"></a>
@@ -32,7 +35,13 @@
             <#list exceptions as exception>
                 <div class="exception-container">
                     <#if !first>
-                        <div class="exception-separator">Caused By:</div>
+                        <div class="exception-separator">
+                            <#if exception.suppressed>
+                                Suppressed:
+                            <#else>
+                                Caused By:
+                            </#if>
+                        </div>
                     </#if>
                     <header>
                         <div class="exception">
