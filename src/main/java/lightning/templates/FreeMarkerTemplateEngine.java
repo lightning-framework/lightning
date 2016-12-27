@@ -14,11 +14,11 @@ import freemarker.template.Version;
 
 public final class FreeMarkerTemplateEngine implements TemplateEngine {
   private static final Version FREEMARKER_VERSION = new Version(2, 3, 20);
-  private final Config config;
+  private final boolean isCacheable;
   private final Configuration configuration;
   
   public FreeMarkerTemplateEngine(Config config) throws Exception {
-    this.config = config;
+    this.isCacheable = !config.enableDebugMode;
     this.configuration = new Configuration(FREEMARKER_VERSION);
     this.configuration.setSharedVariable("__LIGHTNING_DEV", config.enableDebugMode);
     this.configuration.setShowErrorTips(config.enableDebugMode);
@@ -38,9 +38,18 @@ public final class FreeMarkerTemplateEngine implements TemplateEngine {
     }
   }
   
+  public FreeMarkerTemplateEngine(Class<?> clazz, String path) throws Exception {
+    this.isCacheable = true;
+    this.configuration = new Configuration(FREEMARKER_VERSION);
+    this.configuration.setSharedVariable("__LIGHTNING_DEV", false);
+    this.configuration.setShowErrorTips(false);
+    this.configuration.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);  
+    this.configuration.setClassForTemplateLoading(clazz, path);
+  }
+  
   @Override
   public void render(String templateName, Object viewModel, Writer outputStream) throws Exception {
-    if (config.enableDebugMode) {
+    if (!isCacheable) {
       configuration.clearTemplateCache();
     }
     

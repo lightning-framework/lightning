@@ -10,6 +10,8 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.http.HttpServletRequest;
+
 import lightning.enums.HTTPMethod;
 import lightning.http.Request;
 
@@ -40,21 +42,18 @@ public class RouteMapper<T> {
   private static final Logger logger = LoggerFactory.getLogger(RouteMapper.class);
 
   static final class RouteRequest implements IRequest {
-    private final Request request;
     private final List<String> segments;
 
     public RouteRequest(Request request) throws PathFormatException {
-      this.request = request;
       this.segments = DefaultPathToPathSegments.parse(request.path());
     }
 
-    public RouteRequest(String path) throws PathFormatException {
-      this.request = null;
-      this.segments = DefaultPathToPathSegments.parse(path);
+    public RouteRequest(HttpServletRequest request) throws PathFormatException {
+      this.segments = DefaultPathToPathSegments.parse(request.getPathInfo());
     }
-
-    public Request getRequest() {
-      return request;
+    
+    public RouteRequest(String path) throws PathFormatException {
+      this.segments = DefaultPathToPathSegments.parse(path);
     }
 
     @Override
@@ -297,6 +296,20 @@ public class RouteMapper<T> {
 
     try {
       return matcher.match(routes.get(request.method()), new RouteRequest(request));
+    } catch (PathFormatException e) {
+      return null;
+    }
+  }
+  
+  public Match<T> lookup(HttpServletRequest request) {
+    HTTPMethod method = HTTPMethod.valueOf(request.getMethod().toUpperCase());
+    
+    if (!routes.containsKey(method)) {
+      return null;
+    }
+    
+    try {
+      return matcher.match(routes.get(method), new RouteRequest(request));
     } catch (PathFormatException e) {
       return null;
     }

@@ -540,4 +540,18 @@ public class Config {
     notNull("server.hmacKey", server.hmacKey);
     badIf(server.enableHttp2 && !ssl.isEnabled(), "You must enable SSL to enable HTTP2.");
   }
+  
+  public boolean canReloadClass(Class<?> type) {
+    if (!enableDebugMode) {
+      return false;
+    }
+    
+    for (String prefix : autoReloadPrefixes) {
+      if (type.getCanonicalName().startsWith(prefix)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
 }

@@ -92,7 +92,7 @@ public class DebugScreen {
     }
   }
 
-  public final void handle(Throwable throwable, HandlerContext ctx, Match<Method> match)
+  public final void handle(Throwable throwable, HandlerContext ctx, Match<Object> match)
       throws IOException {
     // Set the status to 500 Internal Server Error (important so that AJAX requests fail).
     ctx.response.raw().setStatus(500);
@@ -182,15 +182,23 @@ public class DebugScreen {
     tables.put("Environment", getEnvironmentInfo(ctx));
   }
 
-  private LinkedHashMap<String, Object> getHandlerInfo(HandlerContext ctx, Match<Method> match) {
+  private LinkedHashMap<String, Object> getHandlerInfo(HandlerContext ctx, Match<Object> match) {
     LinkedHashMap<String, Object> data = new LinkedHashMap<>();
-    data.put("Controller",
-             (match.getData() != null
-               ? match.getData().getDeclaringClass().getCanonicalName()
-               : "N/A"));
-
-    data.put("Method",
-             (match.getData() != null ? match.getData().getName() : "N/A"));
+    
+    if (match.getData() instanceof Method) {
+      Method method = (Method)match.getData();
+      data.put("Controller", method.getDeclaringClass().getCanonicalName());
+      data.put("Method", method.getName());
+    }
+    else if (match.getData() instanceof Class) {
+      Class<?> clazz = (Class<?>)match.getData();
+      data.put("Controller", clazz.getCanonicalName());
+      data.put("Method", "N/A");
+    }
+    else {
+      data.put("Controller", "N/A");
+      data.put("Method", "N/A");
+    }
 
     return data;
   }

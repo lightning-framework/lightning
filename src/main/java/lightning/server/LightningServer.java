@@ -1,8 +1,13 @@
 package lightning.server;
 
-import java.lang.reflect.Method;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+
+import lightning.config.Config;
+import lightning.db.MySQLDatabaseProvider;
+import lightning.db.MySQLDatabaseProviderImpl;
+import lightning.exceptions.LightningRuntimeException;
+import lightning.inject.InjectorModule;
 
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
 import org.eclipse.jetty.http2.HTTP2Cipher;
@@ -15,28 +20,12 @@ import org.eclipse.jetty.server.NegotiatingServerConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.HandlerCollection;
-import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.eclipse.jetty.websocket.server.WebSocketUpgradeFilter;
-import org.eclipse.jetty.websocket.server.pathmap.ServletPathSpec;
-import org.eclipse.jetty.websocket.servlet.ServletUpgradeRequest;
-import org.eclipse.jetty.websocket.servlet.ServletUpgradeResponse;
-import org.eclipse.jetty.websocket.servlet.WebSocketCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import lightning.ann.WebSocketFactory;
-import lightning.config.Config;
-import lightning.db.MySQLDatabaseProvider;
-import lightning.db.MySQLDatabaseProviderImpl;
-import lightning.exceptions.LightningException;
-import lightning.exceptions.LightningRuntimeException;
-import lightning.inject.Injector;
-import lightning.inject.InjectorModule;
-import lightning.scanner.ScanResult;
-import lightning.scanner.Scanner;
+import com.google.common.base.Joiner;
 
 public class LightningServer {
   private static final Logger logger = LoggerFactory.getLogger(LightningServer.class);
@@ -48,71 +37,16 @@ public class LightningServer {
     server = createServer(config);
     this.dbp = new MySQLDatabaseProviderImpl(config.db);
 
-    ServletContextHandler websocketHandler = new ServletContextHandler(null, "/", false, false);
-    WebSocketUpgradeFilter websocketFilter = WebSocketUpgradeFilter.configureContext(websocketHandler);
-    websocketFilter.getFactory().getPolicy().setIdleTimeout(config.server.websocketTimeoutMs);
-    websocketFilter.getFactory().getPolicy().setMaxBinaryMessageSize(config.server.websocketMaxBinaryMessageSizeBytes);
-    websocketFilter.getFactory().getPolicy().setMaxTextMessageSize(config.server.websocketMaxTextMessageSizeBytes);
-    websocketFilter.getFactory().getPolicy().setAsyncWriteTimeout(config.server.websocketAsyncWriteTimeoutMs);
-    websocketFilter.getFactory().getPolicy().setInputBufferSize(config.server.inputBufferSizeBytes);
-
-    if(!config.server.websocketEnableCompression) {
-      websocketFilter.getFactory().getExtensionFactory().unregister("permessage-deflate");
-      websocketFilter.getFactory().getExtensionFactory().unregister("deflate-frame");
-      websocketFilter.getFactory().getExtensionFactory().unregister("x-webkit-deflate-frame");
-    }
-
-    Scanner scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
-    ScanResult result = scanner.scan();
-
-    InjectorModule globalModule = new InjectorModule();
-    globalModule.bindClassToInstance(Config.class, config);
-    globalModule.bindClassToInstance(MySQLDatabaseProvider.class, dbp);
-
-    boolean hasWebSockets = false;
-
-    for (Class<?> clazz : result.websocketFactories.keySet()) {
-      for (Method m : result.websocketFactories.get(clazz)) {
-        WebSocketFactory info = m.getAnnotation(WebSocketFactory.class);
-
-        if (info.path().contains(":") || info.path().contains("*")) {
-          throw new LightningException("WebSocket path '" + info.path() + "' is invalid (may not contain wildcards or parameters).");
-        }
-
-        logger.info("Lightning Framework :: Registered Web Socket @ {} -> {}", info.path(), m);
-        hasWebSockets = true;
-        WebSocketCreator creator = new WebSocketCreator() {
-          @Override
-          public Object createWebSocket(ServletUpgradeRequest req, ServletUpgradeResponse res) {
-            try {
-              InjectorModule wsModule = new InjectorModule();
-              wsModule.bindClassToInstance(ServletUpgradeRequest.class, req);
-              wsModule.bindClassToInstance(ServletUpgradeResponse.class, res);
-              return m.invoke(null, new Injector(globalModule, userModule, wsModule).getInjectedArguments(m));
-            } catch (Exception e) {
-              logger.warn("Failed to create websocket:", e);
-              return null;
-            }
-          }
-        };
-        websocketFilter.addMapping(new ServletPathSpec(info.path()), creator);
-      }
-    }
-
     if (config.enableDebugMode) {
       logger.warn("Lightning Framework :: NOTICE: You are running this server in DEBUG MODE.");
-      logger.warn("Lightning Framework :: Please do not enable debug mode on production systems as it may leak internals.");
-      if (hasWebSockets) {
-        logger.warn("Lightning Framework :: NOTICE: Websocket handlers can not be automatically reloaded; you will need to "
-            + "restart the server to load websocket handler code changes.");
+      logger.warn("Lightning Framework :: NOTICE: Please do not enable debug mode on production systems as it may leak internals.");
+      if (config.autoReloadPrefixes != null && !config.autoReloadPrefixes.isEmpty()) {
+        logger.warn("Lightning Framework :: NOTICE: You have enabled code hot swaps in packages: " + Joiner.on(", ").join(config.autoReloadPrefixes));
       }
     }
 
-    HandlerCollection handlers = new HandlerCollection();
-    LightningHandler lightningHandler = new LightningHandler(config, dbp, globalModule, userModule);
-    handlers.addHandler(lightningHandler);
-    handlers.addHandler(websocketHandler);
-    server.setHandler(handlers);
+    LightningHandler lightningHandler = new LightningHandler(config, dbp, userModule);
+    server.setHandler(lightningHandler);
   }
 
   public LightningServer start() throws Exception {
@@ -173,9 +107,9 @@ public class LightningServer {
 
     if (config.server.enableHttp2C && !isSSL) {
       http2c = new HTTP2CServerConnectionFactory(httpConfig);
-      http2c.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
       http2c.setInputBufferSize(config.server.inputBufferSizeBytes);
       http2c.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
+      http2c.setInitialStreamRecvWindow(config.server.http2InitialStreamSendWindowBytes);
     }
 
     String protocol = null;
@@ -190,7 +124,7 @@ public class LightningServer {
             + "To learn how to add ALPN support, read the docs for lightning.config.Config::server::enableHttp2.");
       }
       http2 = new HTTP2ServerConnectionFactory(httpConfig);
-      http2.setInitialStreamSendWindow(config.server.http2InitialStreamSendWindowBytes);
+      http2.setInitialStreamRecvWindow(config.server.http2InitialStreamSendWindowBytes);
       http2.setInputBufferSize(config.server.inputBufferSizeBytes);
       http2.setMaxConcurrentStreams(config.server.http2MaxConcurrentStreams);
       alpn = new ALPNServerConnectionFactory();

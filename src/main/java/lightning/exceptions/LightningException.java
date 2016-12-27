@@ -10,4 +10,8 @@ public class LightningException extends Exception {
   public LightningException(String m) {
     super(m);
   }
+  
+  public LightningException() {
+    super();
+  }
 }
