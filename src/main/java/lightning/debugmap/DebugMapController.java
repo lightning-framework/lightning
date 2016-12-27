@@ -37,6 +37,10 @@ import lightning.util.ReflectionUtil;
 import lightning.websockets.LightningWebSocketCreator;
 import lightning.websockets.WebSocketHandler;
 
+/**
+ * Renders an in-browser table displaying all installed handlers.
+ * Includes routes, web sockets, filters, exception handlers, etc.
+ */
 @Controller
 public class DebugMapController {
   public static void map(RouteMapper<Object> mapper, Config config) throws Exception {

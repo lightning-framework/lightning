@@ -33,7 +33,7 @@ import lightning.routing.RouteMapper.Match;
 import lightning.util.Iterables;
 
 /**
- * Displays a stack trace in-browser to users.
+ * Renders an in-browser stack trace.
  */
 public class DebugScreen {
   protected final Configuration templateConfig;
