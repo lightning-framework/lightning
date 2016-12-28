@@ -101,14 +101,14 @@ public final class LightningHandler extends AbstractHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(LightningHandler.class);
   @SuppressWarnings("unchecked")
   private static final ImmutableSet<Class<? extends Throwable>> INTERNAL_EXCEPTIONS = ImmutableSet.of(
-      NotFoundException.class, 
-      BadRequestException.class, 
+      NotFoundException.class,
+      BadRequestException.class,
       NotAuthorizedException.class,
-      AccessViolationException.class, 
-      InternalServerErrorException.class, 
+      AccessViolationException.class,
+      InternalServerErrorException.class,
       MethodNotAllowedException.class,
       NotImplementedException.class);
-  
+
   private final Scanner scanner;
   private final Mailer mailer;
   private final Config config;
@@ -126,13 +126,13 @@ public final class LightningHandler extends AbstractHandler {
   private final DebugScreen debugScreen;
   private final ExceptionViewProducer exceptionViews;
   private final MimeMatcher outputBufferMatcher;
-  
+
   private WebSocketServerFactory webSocketFactory;
   private ScanResult scanResult;
   private Map<String, LightningWebSocketCreator> singletonWebSockets;
-  
-  public LightningHandler(Config config, 
-                          MySQLDatabaseProvider dbProvider, 
+
+  public LightningHandler(Config config,
+                          MySQLDatabaseProvider dbProvider,
                           InjectorModule userInjectorModule) throws Exception {
     this.config = config;
     this.dbProvider = dbProvider;
@@ -144,13 +144,13 @@ public final class LightningHandler extends AbstractHandler {
     this.routes = new RouteMapper<>();
     this.internalTemplateEngine = new FreeMarkerTemplateEngine(getClass(), "/lightning");
     this.exceptionViews = new DefaultExceptionViewProducer();
-    
+
     // Set up user template engine.
     {
       TemplateEngine engine = userInjectorModule.getBindingForClass(TemplateEngine.class);
       this.userTemplateEngine = (engine != null) ? engine : new FreeMarkerTemplateEngine(config);
     }
-    
+
     // Set up output buffering.
     {
       if (config.server.enableOutputBuffering) {
@@ -159,19 +159,19 @@ public final class LightningHandler extends AbstractHandler {
         this.outputBufferMatcher = null;
       }
     }
-    
+
     // Set up user json service.
     {
       JsonService service = userInjectorModule.getBindingForClass(JsonService.class);
       this.jsonService = (service != null) ? service : new GsonJsonService();
     }
-    
+
     // Set up cache driver.
     {
       CacheDriver driver = userInjectorModule.getBindingForClass(CacheDriver.class);
       this.cache = new Cache((driver != null) ? driver : new ExceptingCacheDriver());
     }
-    
+
     // Set up debug screen.
     {
       SourceLocator[] locators = new SourceLocator[config.codeSearchPaths.size()];
@@ -181,26 +181,27 @@ public final class LightningHandler extends AbstractHandler {
       }
       this.debugScreen = new DebugScreen(config, locators);
     }
-    
+
     // Set up mail.
     if (config.mail.isEnabled()) {
       this.mailer = new Mailer(config.mail);
     } else {
       this.mailer = null;
     }
-    
+
     // Set up static files.
     {
-      if (config.server.staticFilesPath != null) {        
-        ResourceFactory factory = (config.enableDebugMode) 
+      if (config.server.staticFilesPath != null) {
+        ResourceFactory factory = (config.enableDebugMode)
             ? new ResourceCollection(getStaticFileResourcePaths())
             : Resource.newClassPathResource(config.server.staticFilesPath);
-        this.fileServer = new FileServer(factory);
-        this.fileServer.usePublicCaching();
+        // NOTE: We disable MMAP in debug mode because MMAP will lock files preventing people from
+        // making changes to them.
+        this.fileServer = new FileServer(factory, !config.enableDebugMode);
         this.fileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
         this.fileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
         this.fileServer.setMaxCacheSize(config.server.maxStaticFileCacheSizeBytes);
-        
+
         if (config.enableDebugMode) {
           this.fileServer.disableCaching();
         }
@@ -208,12 +209,12 @@ public final class LightningHandler extends AbstractHandler {
         this.fileServer = null;
       }
     }
-    
+
     // Set up web sockets.
     {
       this.singletonWebSockets = (config.enableDebugMode) ? new HashMap<>() : null;
     }
-    
+
     // Set up the global injection module.
     {
       this.globalInjectorModule = new InjectorModule();
@@ -222,10 +223,10 @@ public final class LightningHandler extends AbstractHandler {
       this.globalInjectorModule.bindClassToInstance(MySQLDatabaseProvider.class, this.dbProvider);
       this.globalInjectorModule.bindClassToInstance(Mailer.class, this.mailer);
     }
-    
+
     rescan();
   }
-  
+
   private Resource[] getStaticFileResourcePaths() {
     assert (config.server.staticFilesPath != null && config.enableDebugMode);
     ArrayList<Resource> resources = new ArrayList<>();
@@ -234,38 +235,38 @@ public final class LightningHandler extends AbstractHandler {
       new File("./src/main/java", config.server.staticFilesPath),
       new File(config.server.staticFilesPath)
     );
-    
+
     for (File f : possible) {
       if (f.exists() && f.isDirectory() && f.canRead()) {
         resources.add(Resource.newResource(f));
       }
     }
-    
+
     return resources.toArray(new Resource[resources.size()]);
   }
-  
+
   public synchronized ScanResult getLastScanResult() {
     // For use in debug map page.
     return scanResult;
   }
-  
+
   public synchronized Match<Object> getRouteMatch(String path, HTTPMethod method) throws PathFormatException {
     // For use in debug map page.
     return routes.lookup(path, method);
   }
-  
+
   public synchronized FilterMatch<Method> getFilterMatch(String path, HTTPMethod method) throws PathFormatException {
     // For use in debug map page.
     return filters.lookup(path, method);
   }
-  
+
   @Override
   public void destroy() {
    // TODO: Probably a few other things that need to be cleaned up.
    fileServer.destroy();
    super.destroy();
   }
-  
+
   @Override
   protected void doStart() throws Exception {
     // Set up web socket factory.
@@ -276,8 +277,8 @@ public final class LightningHandler extends AbstractHandler {
       policy.setMaxTextMessageSize(config.server.websocketMaxTextMessageSizeBytes);
       policy.setAsyncWriteTimeout(config.server.websocketAsyncWriteTimeoutMs);
       policy.setInputBufferSize(config.server.inputBufferSizeBytes);
-      
-      Constructor<WebSocketServerFactory> c = 
+
+      Constructor<WebSocketServerFactory> c =
           WebSocketServerFactory.class.getDeclaredConstructor(
               WebSocketPolicy.class, Executor.class, ByteBufferPool.class);
       c.setAccessible(true);
@@ -289,11 +290,11 @@ public final class LightningHandler extends AbstractHandler {
         this.webSocketFactory.getExtensionFactory().unregister("x-webkit-deflate-frame");
       }
     }
-    
+
     addBean(webSocketFactory);
     super.doStart();
   }
-  
+
   public void sendErrorPage(HttpServletRequest request,
                              HttpServletResponse response,
                              Throwable error,
@@ -302,31 +303,39 @@ public final class LightningHandler extends AbstractHandler {
       LOGGER.warn("Failed to render an error page (response already committed).");
       return; // We can't render an error page if the response is committed.
     }
-    
+
     Method exceptionHandler = exceptionHandlers.getHandler(error);
-    
+
     if (exceptionHandler == null) {
       sendBuiltInErrorPage(request, response, error, route);
       return;
     }
 
     response.reset();
-    response.addHeader("Content-Type", "text/html; charset=UTF-8");    
-    
+    response.addHeader("Content-Type", "text/html; charset=UTF-8");
+
     try {
       HandlerContext context = context(request, response);
       context.bindings().bindToClass(error);
       exceptionHandler.invoke(null, context.injector().getInjectedArguments(exceptionHandler));
     } catch (Throwable exceptionHandlerError) {
-      exceptionHandlerError.addSuppressed(error);
+      if ((exceptionHandlerError instanceof InvocationTargetException) &&
+          exceptionHandlerError.getCause() != null) {
+        exceptionHandlerError = exceptionHandlerError.getCause();
+      }
+
+      if (exceptionHandlerError != error) { // If the exception handler re-threw the exception we passed it.
+        exceptionHandlerError.addSuppressed(error);
+      }
+
       LOGGER.warn("An exception handler returned an exception:", exceptionHandlerError);
-      
+
       // If the user exception handler threw an exception (not unlikely), we can try to render
       // the built-in page instead.
       sendBuiltInErrorPage(request, response, exceptionHandlerError, route);
     }
   }
-  
+
   public void sendBuiltInErrorPage(HttpServletRequest request,
                                     HttpServletResponse response,
                                     Throwable error,
@@ -336,10 +345,10 @@ public final class LightningHandler extends AbstractHandler {
         LOGGER.warn("Failed to render an error page (response already committed).");
         return; // We can't render an error page if the response is committed.
       }
-  
+
       response.reset();
-      response.addHeader("Content-Type", "text/html; charset=UTF-8"); 
-      
+      response.addHeader("Content-Type", "text/html; charset=UTF-8");
+
       // For built-in exception types (e.g. 404 Not Found):
       ModelAndView view = exceptionViews.produce(error.getClass(), error, request, response);
       if (view != null) {
@@ -347,7 +356,7 @@ public final class LightningHandler extends AbstractHandler {
         internalTemplateEngine.render(view.viewName, view.viewModel, response.getWriter());
         return;
       }
-      
+
       // For all other exception types:
       if (config.enableDebugMode) {
         // Show the debug screen in debug mode.
@@ -358,13 +367,13 @@ public final class LightningHandler extends AbstractHandler {
         view = exceptionViews.produce(InternalServerErrorException.class, error, request, response);
         internalTemplateEngine.render(view.viewName, view.viewModel, response.getWriter());
       }
-    } catch (Throwable e2) {      
+    } catch (Throwable e2) {
       // This should be very rare.
       response.setStatus(HTTPStatus.INTERNAL_SERVER_ERROR.getCode());
       response.getWriter().println("500 INTERNAL SERVER ERROR");
     }
   }
-  
+
   private void logRequest(HttpServletRequest request, String target) {
     if (config.enableDebugMode) {
       LOGGER.info("REQUEST ({}): {} {} -> {}",
@@ -374,49 +383,49 @@ public final class LightningHandler extends AbstractHandler {
           target);
     }
   }
-  
+
   private boolean acceptWebSocket(HttpServletRequest request,
                                  HttpServletResponse response,
                                  Match<Object> route) throws IOException {
     if (!(route.getData() instanceof LightningWebSocketCreator)) {
       return false;
     }
-    
+
     LightningWebSocketCreator creator = (LightningWebSocketCreator)route.getData();
-    
+
     logRequest(request, "@WebSocket " + creator.getType().getCanonicalName());
-    
+
     if (!webSocketFactory.isUpgradeRequest(request, response)) {
       throw new BadRequestException();
     }
-    
+
     // The request is consumed regardless of what acceptWebSocket returns.
     // If it fails, the factory commits the response with an error code.
     webSocketFactory.acceptWebSocket(creator, request, response);
     return true;
   }
-  
+
   private boolean sendStaticFile(HttpServletRequest request,
                                  HttpServletResponse response) throws ServletException, IOException {
     if (config.server.staticFilesPath != null &&
-        request.getMethod().equalsIgnoreCase("GET") && 
+        request.getMethod().equalsIgnoreCase("GET") &&
         fileServer.couldConsume(request, response)) {
       logRequest(request, "STATIC FILE");
       fileServer.handle(request, response);
       return true;
     }
-    
+
     return false;
   }
-  
-  private boolean redirectInsecureRequest(HttpServletRequest request, 
+
+  private boolean redirectInsecureRequest(HttpServletRequest request,
                                           HttpServletResponse response) throws URISyntaxException, IOException {
     if (!config.ssl.isEnabled() ||
         !config.ssl.redirectInsecureRequests ||
         !request.getScheme().equalsIgnoreCase("https")) {
       return false;
     }
-    
+
     logRequest(request, "HTTPS REDIRECT");
     URI httpUri = new URI(request.getRequestURL().toString());
     URI httpsUri = new URI("https",
@@ -426,14 +435,14 @@ public final class LightningHandler extends AbstractHandler {
                            httpUri.getPath(),
                            httpUri.getQuery(),
                            null);
-    
+
     response.sendRedirect(httpsUri.toString());
     return true;
   }
-  
+
   private synchronized void rescan() throws Exception {
     scanResult = scanner.scan();
-    
+
     // Exception Handlers
     {
       exceptionHandlers.clear();
@@ -444,17 +453,17 @@ public final class LightningHandler extends AbstractHandler {
         }
       }
     }
-    
+
     // Routes & Web Sockets
     {
       routes.clear();
-      
+
       // Built-ins.
       {
         DebugMapController.map(routes, config);
         HealthScreenController.map(routes, config);
       }
-      
+
       // @Route annotations.
       {
         for (Class<?> clazz : scanResult.routes.keySet()) {
@@ -475,7 +484,7 @@ public final class LightningHandler extends AbstractHandler {
           }
         }
       }
-      
+
       // TODO: Drop active web socket connections immediately when code changes (instead of on next event).
       // TODO: Add tighter integration between framework and web sockets (e.g. Context.* properties).
       // @WebSocket annotations.
@@ -503,9 +512,9 @@ public final class LightningHandler extends AbstractHandler {
           }
 
           if (creator == null) {
-            creator = new LightningWebSocketCreator(config, 
-                                                    new Injector(globalInjectorModule, userInjectorModule), 
-                                                    ws, 
+            creator = new LightningWebSocketCreator(config,
+                                                    new Injector(globalInjectorModule, userInjectorModule),
+                                                    ws,
                                                     info.isSingleton());
           }
 
@@ -518,14 +527,14 @@ public final class LightningHandler extends AbstractHandler {
                           creator);
         }
       }
-      
+
       routes.compile();
     }
-    
+
     // Filters
     {
       filters.clear();
-      
+
       for (Class<?> clazz : scanResult.beforeFilters.keySet()) {
         for (Method m : scanResult.beforeFilters.get(clazz)) {
           if (m.getAnnotation(Before.class) != null) {
@@ -543,53 +552,53 @@ public final class LightningHandler extends AbstractHandler {
   }
 
   @Override
-  public void handle(String target, 
-                     org.eclipse.jetty.server.Request baseRequest, 
+  public void handle(String target,
+                     org.eclipse.jetty.server.Request baseRequest,
                      HttpServletRequest sRequest,
-                     HttpServletResponse sResponse) throws IOException, ServletException {   
+                     HttpServletResponse sResponse) throws IOException, ServletException {
     Match<Object> route = null;
     baseRequest.setHandled(true);
-    
+
     try {
       if (config.enableDebugMode) {
         rescan(); // Reloads all routes, exception handlers, filters, etc.
       }
-      
+
       if (redirectInsecureRequest(sRequest, sResponse)) {
         return;
       }
-      
+
       if (sendStaticFile(sRequest, sResponse)) {
         return;
       }
-      
+
       route = routes.lookup(sRequest);
-      
+
       if (route != null) {
         if (acceptWebSocket(sRequest, sResponse, route)) {
           return;
         }
-        
+
         if (config.server.enableOutputBuffering) {
           sResponse = new BufferingHttpServletResponse(sResponse, config, outputBufferMatcher);
         }
-        
+
         if (processRoute(sRequest, sResponse, route)) {
           return;
         }
       }
-      
+
       logRequest(sRequest, "NOT FOUND");
       throw new NotFoundException();
     } catch (Throwable error) {
       if (!INTERNAL_EXCEPTIONS.contains(error.getClass())) {
         LOGGER.warn("A request handler returned an exception: ", error);
       }
-      
+
       sendErrorPage(sRequest, sResponse, error, route);
     } finally {
       HandlerContext context = (HandlerContext)sRequest.getAttribute(HandlerContext.ATTRIBUTE);
-      
+
       if (context != null && !context.isAsync()) {
         context.close();
         sRequest.removeAttribute(HandlerContext.ATTRIBUTE);
@@ -610,14 +619,14 @@ public final class LightningHandler extends AbstractHandler {
           LOGGER.warn("Using servlet async with multipart request may not clean pieces - use Lightning's goAsync instead.");
         }
       }
-      
+
       Context.clearContext();
     }
   }
-  
+
   private void runControllerInitializers(HandlerContext context, Object controller) throws Throwable {
     assert (controller != null);
-    
+
     Class<?> currentClass = controller.getClass();
 
     while (currentClass != null) {
@@ -630,7 +639,7 @@ public final class LightningHandler extends AbstractHandler {
       currentClass = currentClass.getSuperclass();
     }
   }
-  
+
   private void runControllerFinalizers(HandlerContext context, Object controller) {
     assert (controller != null);
     Class<?> currentClass = controller.getClass();
@@ -649,12 +658,12 @@ public final class LightningHandler extends AbstractHandler {
       currentClass = currentClass.getSuperclass();
     }
   }
-  
-  private void processControllerOutput(HandlerContext context, 
-                                       Method target, 
+
+  private void processControllerOutput(HandlerContext context,
+                                       Method target,
                                        Object output) throws Throwable {
     assert (output != null);
-    
+
     Json json = target.getAnnotation(Json.class);
     if (json != null) {
      context.sendJson(output, json.prefix(), json.names());
@@ -665,32 +674,32 @@ public final class LightningHandler extends AbstractHandler {
       context.render((ModelAndView)output);
       return;
     }
-    
+
     Template template = target.getAnnotation(Template.class);
     if (template != null) {
       if (template.value() != null) {
         context.render(template.value(), output);
         return;
       }
-      
+
       throw new LightningException("Improper use of @Template annotation - refer to documentation.");
     }
-    
+
     if (output instanceof File) {
       context.sendFile((File)output);
       return;
     }
-   
+
     if (output instanceof String) {
       context.response.write((String)output);
       return;
     }
-    
+
     throw new LightningException("Unable to process return value of @Route - refer to documentation.");
   }
-  
+
   private void processBeforeFilters(HandlerContext context) throws Throwable {
-    FilterMatch<Method> filters = this.filters.lookup(context.request.path(), 
+    FilterMatch<Method> filters = this.filters.lookup(context.request.path(),
                                                       context.request.method());
 
     for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
@@ -699,7 +708,7 @@ public final class LightningHandler extends AbstractHandler {
       filter.handler.invoke(null, context.injector().getInjectedArguments(filter.handler));
     }
   }
-  
+
   private void processBeforeAnnotationFilters(HandlerContext context, Method target) throws Throwable {
     if (target.getAnnotation(Filters.class) != null) {
       for (Filter filter : target.getAnnotation(Filters.class).value()) {
@@ -711,19 +720,19 @@ public final class LightningHandler extends AbstractHandler {
       instance.execute();
     }
   }
-  
-  private boolean processRoute(HttpServletRequest request, 
-                               HttpServletResponse response, 
+
+  private boolean processRoute(HttpServletRequest request,
+                               HttpServletResponse response,
                                Match<Object> route) throws Throwable {
     if (!(route.getData() instanceof Method)) {
       return false;
     }
-    
+
     Method target = (Method)route.getData();
     Object controller = null;
     HandlerContext context = context(request, response);
     logRequest(request, "@Route " + target.toString());
-    
+
     if (context.request.isMultipart()) {
       if (!config.server.multipartEnabled) {
         throw new BadRequestException("Multipart requests are disallowed.");
@@ -737,85 +746,85 @@ public final class LightningHandler extends AbstractHandler {
               config.server.multipartRequestLimitBytes,
               config.server.multipartPieceLimitBytes));
     }
-    
+
     try {
       // Set the default content type for all route targets.
       response.setContentType("text/html; charset=UTF-8");
-      
+
       // Execute @Before filters.
       processBeforeFilters(context);
 
       ((InternalRequest)context.request).setWildcards(route.getWildcards());
       ((InternalRequest)context.request).setParams(route.getParams());
-      
+
       // Perform pre-processing.
       if (target.getAnnotation(Multipart.class) != null) {
         context.requireMultipart();
       }
-      
+
       if (target.getAnnotation(RequireAuth.class) != null) {
         context.requireAuth();
       }
-      
+
       {
         RequireXsrfToken info = target.getAnnotation(RequireXsrfToken.class);
         if (info != null) {
           context.requireXsrf(info.inputName());
         }
       }
-      
+
       // Execute @Filter filters.
       processBeforeAnnotationFilters(context, target);
-      
+
       // Instantiate the controller.
       controller = context.injector().newInstance(target.getDeclaringClass());
-      
+
       // Run @Initializers.
       runControllerInitializers(context, controller);
-      
+
       // Execute the @Route.
       Object output = target.invoke(controller, context.injector().getInjectedArguments(target));
-      
+
       // Try to save the session here if we need to since post-processing may commit the response.
       context.maybeSaveSession();
-      
+
       // Perform post-processing.
       if (output != null) {
         processControllerOutput(context, target, output);
       }
-    } catch (HaltException e) {
-      // A halt exception says to jump to here in the life cycle.
-    } catch (InvocationTargetException e) { 
+    } catch (InvocationTargetException e) {
       if (e.getCause() != null) {
         // Leads to better error logs/debug screens.
         throw e.getCause();
       }
-      
+
       throw e;
+    } catch (HaltException e) {
+      // A halt exception says to jump to here in the life cycle.
     } finally {
       // Run @Finalizers.
       if (controller != null) {
         runControllerFinalizers(context, controller);
       }
     }
-    
+
     return true;
   }
-  
+
   private HandlerContext context(HttpServletRequest request, HttpServletResponse response) {
     HandlerContext context = (HandlerContext)request.getAttribute(HandlerContext.ATTRIBUTE);
-    
+
     if (context == null) {
       InternalRequest lRequest = InternalRequest.makeRequest(request, config.server.trustLoadBalancerHeaders);
       InternalResponse lResponse = InternalResponse.makeResponse(response);
-      context = new HandlerContext(lRequest, lResponse, dbProvider, config, userTemplateEngine, fileServer, 
+      context = new HandlerContext(lRequest, lResponse, dbProvider, config, userTemplateEngine, fileServer,
                                    mailer, jsonService, cache, globalInjectorModule, userInjectorModule);
       lRequest.setCookieManager(context.cookies);
       lResponse.setCookieManager(context.cookies);
       request.setAttribute(HandlerContext.ATTRIBUTE, context);
       Context.setContext(context);
     }
-    
+
     return context;
   }
 }

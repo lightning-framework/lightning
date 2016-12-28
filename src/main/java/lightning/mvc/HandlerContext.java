@@ -139,9 +139,9 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.bindings.bindClassToResolver(User.class, () -> this.user());
     this.bindings.bindClassToResolver(MySQLDatabase.class, () -> this.db());
     this.injector = new Injector(globalModule, userModule, this.bindings);
-    this.bindings.bindClassToInstance(Injector.class, this.injector); 
+    this.bindings.bindClassToInstance(Injector.class, this.injector);
   }
-  
+
   public Injector injector() {
     return this.injector;
   }
@@ -149,7 +149,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public InjectorModule bindings() {
     return this.bindings;
   }
-  
+
   @Override
   public MySQLDatabase getDatabase() throws SQLException {
     return db();
@@ -187,11 +187,11 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     if (!request.raw().isAsyncSupported()) {
       throw new LightningException("Async is not supported on your platform.");
     }
-    
+
     if (asyncContext != null || request.raw().isAsyncStarted() || isClosed) {
       throw new LightningException("Async has already been started on this request.");
     }
-    
+
     this.asyncContext = request.raw().startAsync();
     return this;
   }
@@ -214,9 +214,9 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     if (isClosed) {
       return;
     }
-    
+
     logger.debug("context closed");
-    
+
     if (asyncContext != null) {
       MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser)request.raw().getAttribute(
           org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
@@ -230,7 +230,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     }
 
     isClosed = true;
-    
+
     try {
       // If the session was modified, save it.
       try {
@@ -254,7 +254,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
           logger.warn("Error closing handler context:", e);
         }
       }
-  
+
       if (flush) {
         try {
           logger.debug("flushing buffer");
@@ -916,16 +916,27 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @param file A file.
    */
   public void sendFile(File file, CacheControl cacheType) throws Exception {
+    if (!file.exists()) {
+      throw new NotFoundException();
+    }
+
+    if (file.isDirectory()) {
+      throw new LightningException("sendFile cannot accept directories.");
+    }
+
+    if (!file.canRead()) {
+      throw new LightningException("sendFile cannot read the passed file: " + file.getCanonicalPath());
+    }
+
     if (response.hasSentHeaders()) {
       throw new IOException("Cannot send file to committed response.");
     }
-    
-    response.raw().reset();
+
     fs.sendResource(request.raw(), response.raw(), Resource.newResource(file), cacheType);
     response.raw().flushBuffer();
     return;
   }
-  
+
   public boolean isAsync() {
     return asyncContext != null;
   }
@@ -981,14 +992,14 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
       session.save();
     }
   }
-  
+
   public void handleException(Throwable error) {
     logger.warn("Route handler returned exception: ", error);
     try {
       LightningHandler handler = injector().getInjectedArgumentForClass(LightningHandler.class);
-      handler.sendErrorPage(request.raw(), 
-                            response.raw(), 
-                            error, 
+      handler.sendErrorPage(request.raw(),
+                            response.raw(),
+                            error,
                             handler.getRouteMatch(request.path(), request.method()));
     } catch (Exception e) {
       // Nothing we can do.

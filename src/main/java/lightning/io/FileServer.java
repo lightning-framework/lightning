@@ -27,7 +27,7 @@ import com.google.common.collect.ImmutableList;
 public class FileServer implements ResourceFactory, WelcomeFactory {
   private static final Logger LOG = Log.getLogger(FileServer.class);
   private boolean isCachingEnabled;
-  
+
   private final ResourceFactory _resourceFactory;
   private final ResourceService _resourceService;
   private final CachedContentFactory _cache;
@@ -35,17 +35,17 @@ public class FileServer implements ResourceFactory, WelcomeFactory {
   private final CompressedContentFormat[] _precompressedFormats;
   private final List<String> _gzipEquivalentFileExtensions;
 
-  public FileServer(ResourceFactory resourceFactory) {
+  public FileServer(ResourceFactory resourceFactory, boolean enableMmap) {
     _mimeTypes = new MimeTypes();
     _precompressedFormats = new CompressedContentFormat[]{ CompressedContentFormat.GZIP,
                                                            CompressedContentFormat.BR };
     _gzipEquivalentFileExtensions = ImmutableList.of(".svgz");
     _resourceFactory = resourceFactory;
-    _cache = new CachedContentFactory(null, this, _mimeTypes, true, true, _precompressedFormats);
+    _cache = new CachedContentFactory(null, this, _mimeTypes, enableMmap, true, _precompressedFormats);
     _resourceService = createService(CacheControl.PUBLIC, _cache);
   }
-  
-  private ResourceService createService(CacheControl cacheControl, 
+
+  private ResourceService createService(CacheControl cacheControl,
                                         ContentFactory contentFactory) {
     ResourceService resourceService = new ResourceService();
     resourceService.setAcceptRanges(true);
@@ -62,12 +62,12 @@ public class FileServer implements ResourceFactory, WelcomeFactory {
     return resourceService;
   }
 
-  public void sendResource(HttpServletRequest request, 
-                           HttpServletResponse response, 
+  public void sendResource(HttpServletRequest request,
+                           HttpServletResponse response,
                            Resource resource,
                            CacheControl cacheControl) throws ServletException, IOException {
     // TODO: Would be nice to re-use the existing _cache.
-    
+
     ResourceFactory factory = new ResourceFactory() {
       @Override
       public Resource getResource(String path) {
@@ -81,7 +81,7 @@ public class FileServer implements ResourceFactory, WelcomeFactory {
 
   public boolean couldConsume(HttpServletRequest request, HttpServletResponse response) {
     String path = getPathInContext(request);
-    
+
     if (isCachingEnabled) {
       try {
         HttpContent content = _cache.getContent(path, response.getBufferSize());
@@ -89,27 +89,27 @@ public class FileServer implements ResourceFactory, WelcomeFactory {
       } catch (IOException e) {
         LOG.warn(e);
         return false;
-      }    
+      }
     }
-    
+
     Resource resource = getResource(path);
     return resource != null && resource.exists() && !resource.isDirectory();
   }
-  
+
   @Override
   public Resource getResource(String pathInContext) {
     return _resourceFactory.getResource(pathInContext);
   }
-  
+
   private String getPathInContext(HttpServletRequest request) {
     return request.getPathInfo();
   }
-  
+
 
   public void setMaxCacheSize(int maxCacheSize) {
     _cache.setMaxCacheSize(maxCacheSize);
   }
-  
+
 
   public void setMaxCachedFiles(int maxCachedFiles) {
     _cache.setMaxCachedFiles(maxCachedFiles);
@@ -119,18 +119,12 @@ public class FileServer implements ResourceFactory, WelcomeFactory {
     _cache.setMaxCachedFileSize(maxCachedFileSize);
   }
 
-  public void usePublicCaching() {
-    isCachingEnabled = true;
-    _cache.flushCache();
-    _resourceService.setCacheControl(CacheControl.PUBLIC.toHttpField());
-  }
-
   public void disableCaching() {
     isCachingEnabled = false;
     _cache.flushCache();
     _resourceService.setCacheControl(CacheControl.NO_CACHE.toHttpField());
   }
-  
+
   public void destroy() {
     _cache.flushCache();
   }
