@@ -126,10 +126,6 @@ public class Config {
    */
   public @Required ServerConfig server = new ServerConfig();
   public static final class ServerConfig {
-
-    //    3) You must start your JVM with the following argument to enable ALPN:
-    //       -Xbootclasspath/p:/path/to/alpn-boot-${alpn-version}.jar
-
     /**
      * Enables server-side HTTP/2 support over SSL via ALPN.
      * Clients that do not support HTTP/2 will fall back to HTTP/1.1 or HTTP/1.0.
@@ -365,24 +361,38 @@ public class Config {
     public @Optional int maxResponseHeaderSizeBytes = 2048;
 
     /**
-     * Whether or not to enable output buffering.
-     * PROS: Response is not committed and can therefore be mutated after you have
-     *       written to it. Error/debug pages will render cleanly if error is thrown
-     *       after some output has been written.
-     * CONS: Memory usage increases. An extra buffer copy is introduced.
+     * Whether or not to enable output buffering. If you enable output buffering, all
+     * writes to HTTP responses in filters, controllers, and exception handlers will
+     * be buffered if they content type matches an output buffering type (set below).
+     * The response will not be committed (the first byte will not be written to the
+     * underlying socket) until control returns from the last handler executed for a
+     * given request (or, for async handlers, when the async context is closed).
+     *
+     * PROS: Response is not committed when you write the first byte and can therefore
+     *       be mutated after you have written to it. Error/debug pages will render
+     *       cleanly if error is thrown after some output has been written since it's
+     *       possible to reset the response and avoid mangling the output of the error
+     *       page with the output already written.
+     * CONS: Increased memory usage and decreased performance (extra buffer copy).
+     *
+     * Our recommendation:
+     *   - Enable this when you are developing/debugging with debug mode for cleaner error pages
+     *   - Disable this in production for increased performance/scalability
      */
     public @Optional boolean enableOutputBuffering = false;
 
     /**
      * A list of MIME types for which responses should be buffered (if enableOutputBuffering).
+     * This setting only affects output written by registered controllers, filters, exception handlers.
+     * We recommend keeping the default setting (only buffer HTML pages).
      * NOTE: You may use wildcards on either component (e.g. 'text/*').
      */
     public @Optional List<String> outputBufferingTypes = ImmutableList.of("text/html");
 
     /**
-     * The maximum amount of output that will be buffered (if enableOutputBuffering).
-     * Output in excess of this size will not be buffered, but written directly to the socket.
-     * Set to -1 to have no limit (but careful).
+     * The maximum amount of output that will be buffered (if enableOutputBuffering). Once this
+     * limit is reached, the output buffer will start automatically flushing to the underlying
+     * socket. You may set to -1 to have no limit (but be careful).
      */
     public @Optional int outputBufferingLimitBytes = 1024 * 64;
   }
