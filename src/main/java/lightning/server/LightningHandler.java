@@ -2,32 +2,22 @@ package lightning.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executor;
 
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.util.MultiException;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
-import org.eclipse.jetty.util.resource.Resource;
-import org.eclipse.jetty.util.resource.ResourceCollection;
-import org.eclipse.jetty.util.resource.ResourceFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.augustl.pathtravelagent.PathFormatException;
-import com.google.common.collect.ImmutableSet;
-
-import freemarker.template.Configuration;
-import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.Version;
 import lightning.ann.Before;
 import lightning.ann.Befores;
 import lightning.ann.ExceptionHandler;
@@ -40,24 +30,21 @@ import lightning.ann.RequireXsrfToken;
 import lightning.ann.Route;
 import lightning.ann.Routes;
 import lightning.ann.Template;
-import lightning.ann.WebSocketFactory;
+import lightning.ann.WebSocket;
 import lightning.cache.Cache;
 import lightning.cache.CacheDriver;
 import lightning.cache.driver.ExceptingCacheDriver;
 import lightning.config.Config;
-import lightning.db.MySQLDatabase;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.debugmap.DebugMapController;
 import lightning.debugscreen.DebugScreen;
 import lightning.debugscreen.LocalSourceLocator;
 import lightning.debugscreen.SourceLocator;
-import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningException;
 import lightning.fn.ExceptionViewProducer;
 import lightning.fn.RouteFilter;
-import lightning.groups.Groups;
 import lightning.healthscreen.HealthScreenController;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -69,8 +56,6 @@ import lightning.http.MethodNotAllowedException;
 import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
-import lightning.http.Request;
-import lightning.http.Response;
 import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.io.BufferingHttpServletResponse;
@@ -81,8 +66,6 @@ import lightning.mail.Mailer;
 import lightning.mvc.DefaultExceptionViewProducer;
 import lightning.mvc.HandlerContext;
 import lightning.mvc.ModelAndView;
-import lightning.mvc.URLGenerator;
-import lightning.mvc.Validator;
 import lightning.routing.ExceptionMapper;
 import lightning.routing.FilterMapper;
 import lightning.routing.FilterMapper.FilterMatch;
@@ -90,619 +73,749 @@ import lightning.routing.RouteMapper;
 import lightning.routing.RouteMapper.Match;
 import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
-import lightning.sessions.Session;
 import lightning.templates.FreeMarkerTemplateEngine;
 import lightning.templates.TemplateEngine;
-import lightning.users.User;
-import lightning.users.Users;
 import lightning.util.MimeMatcher;
+import lightning.websockets.LightningWebSocketCreator;
+import lightning.websockets.WebSocketHandler;
 
-/**
- * TODO: Output is not buffered - this can lead to some strange looking pages if an exception is thrown
- * after some output has already been sent (both in production and debug mode). May want to come up with
- * a better solution to this.
- */
-public class LightningHandler extends AbstractHandler {
-  private static final Version FREEMARKER_VERSION = new Version(2, 3, 20);
-  private static final Logger logger = LoggerFactory.getLogger(LightningHandler.class);
+import org.eclipse.jetty.io.ByteBufferPool;
+import org.eclipse.jetty.io.MappedByteBufferPool;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.MultiPartInputStreamParser;
+import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.util.resource.ResourceCollection;
+import org.eclipse.jetty.util.resource.ResourceFactory;
+import org.eclipse.jetty.websocket.api.WebSocketBehavior;
+import org.eclipse.jetty.websocket.api.WebSocketPolicy;
+import org.eclipse.jetty.websocket.server.WebSocketServerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-  private Config config;
-  private MySQLDatabaseProvider dbp;
-  private TemplateEngine userTemplateConfig;
-  private Configuration internalTemplateConfig;
-  private ExceptionMapper<Method> exceptionHandlers;
-  private Scanner scanner;
-  private ResourceFactory staticFileResourceFactory;
+import com.augustl.pathtravelagent.PathFormatException;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+
+public final class LightningHandler extends AbstractHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LightningHandler.class);
+  @SuppressWarnings("unchecked")
+  private static final ImmutableSet<Class<? extends Throwable>> INTERNAL_EXCEPTIONS = ImmutableSet.of(
+      NotFoundException.class, 
+      BadRequestException.class, 
+      NotAuthorizedException.class,
+      AccessViolationException.class, 
+      InternalServerErrorException.class, 
+      MethodNotAllowedException.class,
+      NotImplementedException.class);
+  
+  private final Scanner scanner;
+  private final Mailer mailer;
+  private final Config config;
+  private final MySQLDatabaseProvider dbProvider;
+  private final TemplateEngine userTemplateEngine;
+  private final TemplateEngine internalTemplateEngine;
+  private final ExceptionMapper<Method> exceptionHandlers;
+  private final InjectorModule userInjectorModule;
+  private final InjectorModule globalInjectorModule;
+  private final FileServer fileServer;
+  private final RouteMapper<Object> routes;
+  private final FilterMapper<Method> filters;
+  private final JsonService jsonService;
+  private final Cache cache;
+  private final DebugScreen debugScreen;
+  private final ExceptionViewProducer exceptionViews;
+  private final MimeMatcher outputBufferMatcher;
+  
+  private WebSocketServerFactory webSocketFactory;
   private ScanResult scanResult;
-  private DebugScreen debugScreen;
-  private ExceptionViewProducer exceptionViewProducer;
-  private FileServer staticFileServer;
-  private RouteMapper<Method> routeMapper;
-  private FilterMapper<Method> filterMapper;
-  private InjectorModule globalModule;
-  private InjectorModule userModule;
-  private Mailer mailer;
-  private JsonService jsonifier;
-  private Cache cache;
-  private MimeMatcher bufferingMatcher;
-
-  public LightningHandler(Config config, MySQLDatabaseProvider dbp, InjectorModule globalModule, InjectorModule userModule) throws Exception {
+  private Map<String, LightningWebSocketCreator> singletonWebSockets;
+  
+  public LightningHandler(Config config, 
+                          MySQLDatabaseProvider dbProvider, 
+                          InjectorModule userInjectorModule) throws Exception {
     this.config = config;
-    this.dbp = dbp;
-    this.globalModule = globalModule;
-    this.userModule = userModule;
-
-    SourceLocator[] locators = new SourceLocator[config.codeSearchPaths.size()];
-    int i = 0;
-    for (String sourcePath : config.codeSearchPaths) {
-      locators[i++] = new LocalSourceLocator(sourcePath);
-    }
-
-    this.debugScreen = new DebugScreen(config, locators);
-    this.filterMapper = new FilterMapper<>();
-    this.internalTemplateConfig = new Configuration(FREEMARKER_VERSION);
-    this.internalTemplateConfig.setClassForTemplateLoading(getClass(), "/lightning");
-    this.internalTemplateConfig.setShowErrorTips(config.enableDebugMode);
-    this.internalTemplateConfig.setTemplateExceptionHandler(/*config.enableDebugMode ?
-        TemplateExceptionHandler.HTML_DEBUG_HANDLER :*/
-        TemplateExceptionHandler.RETHROW_HANDLER);
-
-    userTemplateConfig = userModule.getBindingForClass(TemplateEngine.class);
-    if (userTemplateConfig == null) {
-      // Use the default template engine.
-      userTemplateConfig = new FreeMarkerTemplateEngine(config);
-    }
-
-    jsonifier = userModule.getBindingForClass(JsonService.class);
-    if (jsonifier == null) {
-      // Use the default json engine.
-      jsonifier = new GsonJsonService();
-    }
-
-    CacheDriver cacheDriver = userModule.getBindingForClass(CacheDriver.class);
-    if (cacheDriver == null) {
-      cacheDriver = new ExceptingCacheDriver();
-    }
-    cache = new Cache(cacheDriver);
-
+    this.dbProvider = dbProvider;
+    this.userInjectorModule = userInjectorModule;
+    this.scanResult = null;
+    this.filters = new FilterMapper<>();
     this.exceptionHandlers = new ExceptionMapper<>();
     this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
-    if (config.server.staticFilesPath != null) {
-      this.staticFileResourceFactory = config.enableDebugMode
-          ? new ResourceCollection(getResourcePaths())
-          : Resource.newClassPathResource(config.server.staticFilesPath);
-    } else {
-      this.staticFileResourceFactory = new ResourceFactory() {
-        @Override
-        public Resource getResource(String path) {
-          return null;
-        }
-      };
+    this.routes = new RouteMapper<>();
+    this.internalTemplateEngine = new FreeMarkerTemplateEngine(getClass(), "/lightning");
+    this.exceptionViews = new DefaultExceptionViewProducer();
+    
+    // Set up user template engine.
+    {
+      TemplateEngine engine = userInjectorModule.getBindingForClass(TemplateEngine.class);
+      this.userTemplateEngine = (engine != null) ? engine : new FreeMarkerTemplateEngine(config);
     }
-    this.exceptionViewProducer = new DefaultExceptionViewProducer();
-    this.staticFileServer = new FileServer(this.staticFileResourceFactory);
-    this.staticFileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
-    this.staticFileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
-    this.staticFileServer.setMaxCacheSize(config.server.maxStaticFileCacheSizeBytes);
-    this.staticFileServer.usePublicCaching();
-    if (config.enableDebugMode) {
-      this.staticFileServer.disableCaching();
+    
+    // Set up output buffering.
+    {
+      if (config.server.enableOutputBuffering) {
+        this.outputBufferMatcher = new MimeMatcher(config.server.outputBufferingTypes);
+      } else {
+        this.outputBufferMatcher = null;
+      }
     }
-    this.routeMapper = new RouteMapper<>();
-
+    
+    // Set up user json service.
+    {
+      JsonService service = userInjectorModule.getBindingForClass(JsonService.class);
+      this.jsonService = (service != null) ? service : new GsonJsonService();
+    }
+    
+    // Set up cache driver.
+    {
+      CacheDriver driver = userInjectorModule.getBindingForClass(CacheDriver.class);
+      this.cache = new Cache((driver != null) ? driver : new ExceptingCacheDriver());
+    }
+    
+    // Set up debug screen.
+    {
+      SourceLocator[] locators = new SourceLocator[config.codeSearchPaths.size()];
+      int i = 0;
+      for (String path : config.codeSearchPaths) {
+        locators[i++] = new LocalSourceLocator(path);
+      }
+      this.debugScreen = new DebugScreen(config, locators);
+    }
+    
+    // Set up mail.
     if (config.mail.isEnabled()) {
       this.mailer = new Mailer(config.mail);
-      globalModule.bindClassToInstance(Mailer.class, this.mailer);
+    } else {
+      this.mailer = null;
     }
-
-    this.bufferingMatcher = new MimeMatcher(config.server.outputBufferingTypes);
-
+    
+    // Set up static files.
+    {
+      if (config.server.staticFilesPath != null) {        
+        ResourceFactory factory = (config.enableDebugMode) 
+            ? new ResourceCollection(getStaticFileResourcePaths())
+            : Resource.newClassPathResource(config.server.staticFilesPath);
+        this.fileServer = new FileServer(factory);
+        this.fileServer.usePublicCaching();
+        this.fileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
+        this.fileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
+        this.fileServer.setMaxCacheSize(config.server.maxStaticFileCacheSizeBytes);
+        
+        if (config.enableDebugMode) {
+          this.fileServer.disableCaching();
+        }
+      } else {
+        this.fileServer = null;
+      }
+    }
+    
+    // Set up web sockets.
+    {
+      this.singletonWebSockets = (config.enableDebugMode) ? new HashMap<>() : null;
+    }
+    
+    // Set up the global injection module.
+    {
+      this.globalInjectorModule = new InjectorModule();
+      this.globalInjectorModule.bindClassToInstance(LightningHandler.class, this);
+      this.globalInjectorModule.bindClassToInstance(Config.class, this.config);
+      this.globalInjectorModule.bindClassToInstance(MySQLDatabaseProvider.class, this.dbProvider);
+      this.globalInjectorModule.bindClassToInstance(Mailer.class, this.mailer);
+    }
+    
     rescan();
   }
-
-  public ScanResult getLastScanResult() {
-    return scanResult;
-  }
-
-  private Resource[] getResourcePaths() {
-    File[] files = new File[] {
-        new File("./src/main/resources", config.server.staticFilesPath),
-        new File("./src/main/java", config.server.staticFilesPath),
-        new File(config.server.staticFilesPath)
-    };
-
+  
+  private Resource[] getStaticFileResourcePaths() {
+    assert (config.server.staticFilesPath != null && config.enableDebugMode);
     ArrayList<Resource> resources = new ArrayList<>();
-
-    for (File f : files) {
+    List<File> possible = ImmutableList.of(
+      new File("./src/main/resources", config.server.staticFilesPath),
+      new File("./src/main/java", config.server.staticFilesPath),
+      new File(config.server.staticFilesPath)
+    );
+    
+    for (File f : possible) {
       if (f.exists() && f.isDirectory() && f.canRead()) {
         resources.add(Resource.newResource(f));
       }
     }
-
+    
     return resources.toArray(new Resource[resources.size()]);
   }
-
-  @SuppressWarnings("unchecked")
-  private ImmutableSet<Class<? extends Throwable>> ignoredExceptions = ImmutableSet.<Class<? extends Throwable>>of(
-      NotFoundException.class, BadRequestException.class, NotAuthorizedException.class,
-      AccessViolationException.class, InternalServerErrorException.class, MethodNotAllowedException.class,
-      NotImplementedException.class);
-
-
-  @SuppressWarnings("resource")
+  
+  public synchronized ScanResult getLastScanResult() {
+    // For use in debug map page.
+    return scanResult;
+  }
+  
+  public synchronized Match<Object> getRouteMatch(String path, HTTPMethod method) throws PathFormatException {
+    // For use in debug map page.
+    return routes.lookup(path, method);
+  }
+  
+  public synchronized FilterMatch<Method> getFilterMatch(String path, HTTPMethod method) throws PathFormatException {
+    // For use in debug map page.
+    return filters.lookup(path, method);
+  }
+  
   @Override
-  public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest _request,
-      HttpServletResponse _response) throws IOException, ServletException {
-    baseRequest.setHandled(true);
-    InternalRequest request = InternalRequest.makeRequest(_request, config.server.trustLoadBalancerHeaders);
-    InternalResponse response = InternalResponse.makeResponse(new BufferingHttpServletResponse(_response, config, bufferingMatcher));
-    HandlerContext ctx = null;
-    Injector injector = null;
-    InjectorModule requestModule = null;
-    Match<Method> match = null;
-    boolean flush = true;
+  public void destroy() {
+   // TODO: Probably a few other things that need to be cleaned up.
+   fileServer.destroy();
+   super.destroy();
+  }
+  
+  @Override
+  protected void doStart() throws Exception {
+    // Set up web socket factory.
+    {
+      WebSocketPolicy policy = new WebSocketPolicy(WebSocketBehavior.SERVER);
+      policy.setIdleTimeout(config.server.websocketTimeoutMs);
+      policy.setMaxBinaryMessageSize(config.server.websocketMaxBinaryMessageSizeBytes);
+      policy.setMaxTextMessageSize(config.server.websocketMaxTextMessageSizeBytes);
+      policy.setAsyncWriteTimeout(config.server.websocketAsyncWriteTimeoutMs);
+      policy.setInputBufferSize(config.server.inputBufferSizeBytes);
+      
+      Constructor<WebSocketServerFactory> c = 
+          WebSocketServerFactory.class.getDeclaredConstructor(
+              WebSocketPolicy.class, Executor.class, ByteBufferPool.class);
+      c.setAccessible(true);
+      webSocketFactory = c.newInstance(policy, getServer().getThreadPool(), new MappedByteBufferPool());
 
-    try {
-      // Redirect insecure requests.
-      if (config.ssl.isEnabled() &&
-          config.ssl.redirectInsecureRequests &&
-          !_request.getScheme().toLowerCase().equals("https")) {
-          URI oldUri = new URI(_request.getRequestURL().toString());
-          URI newUri = new URI("https",
-                             oldUri.getUserInfo(),
-                             oldUri.getHost(),
-                             config.ssl.port,
-                             oldUri.getPath(),
-                             oldUri.getQuery(),
-                             null);
-
-          _response.sendRedirect(newUri.toString());
-          return;
+      if(!config.server.websocketEnableCompression) {
+        this.webSocketFactory.getExtensionFactory().unregister("permessage-deflate");
+        this.webSocketFactory.getExtensionFactory().unregister("deflate-frame");
+        this.webSocketFactory.getExtensionFactory().unregister("x-webkit-deflate-frame");
       }
+    }
+    
+    addBean(webSocketFactory);
+    super.doStart();
+  }
+  
+  public void sendErrorPage(HttpServletRequest request,
+                             HttpServletResponse response,
+                             Throwable error,
+                             Match<Object> route) throws ServletException, IOException {
+    if (response.isCommitted()) {
+      LOGGER.warn("Failed to render an error page (response already committed).");
+      return; // We can't render an error page if the response is committed.
+    }
+    
+    Method exceptionHandler = exceptionHandlers.getHandler(error);
+    
+    if (exceptionHandler == null) {
+      sendBuiltInErrorPage(request, response, error, route);
+      return;
+    }
 
-      // Try to pass through a static file (if any).
-      if (request.method() == HTTPMethod.GET && staticFileServer.couldConsume(_request)) {
-        staticFileServer.handle(_request, _response);
+    response.reset();
+    response.addHeader("Content-Type", "text/html; charset=UTF-8");    
+    
+    try {
+      HandlerContext context = context(request, response);
+      context.bindings().bindToClass(error);
+      exceptionHandler.invoke(null, context.injector().getInjectedArguments(exceptionHandler));
+    } catch (Throwable exceptionHandlerError) {
+      exceptionHandlerError.addSuppressed(error);
+      LOGGER.warn("An exception handler returned an exception:", exceptionHandlerError);
+      
+      // If the user exception handler threw an exception (not unlikely), we can try to render
+      // the built-in page instead.
+      sendBuiltInErrorPage(request, response, exceptionHandlerError, route);
+    }
+  }
+  
+  public void sendBuiltInErrorPage(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    Throwable error,
+                                    Match<Object> route) throws ServletException, IOException {
+    try {
+      if (response.isCommitted()) {
+        LOGGER.warn("Failed to render an error page (response already committed).");
+        return; // We can't render an error page if the response is committed.
+      }
+  
+      response.reset();
+      response.addHeader("Content-Type", "text/html; charset=UTF-8"); 
+      
+      // For built-in exception types (e.g. 404 Not Found):
+      ModelAndView view = exceptionViews.produce(error.getClass(), error, request, response);
+      if (view != null) {
+        response.setStatus(HTTPStatus.fromException(error).getCode());
+        internalTemplateEngine.render(view.viewName, view.viewModel, response.getWriter());
         return;
       }
-
-      // Create context.
-      ctx = new HandlerContext(request, response, dbp, config, userTemplateConfig, this.staticFileServer, this.mailer, this.jsonifier, this.cache);
-      requestModule = requestSpecificInjectionModule(ctx);
-      injector = new Injector(globalModule, requestModule, userModule);
-      requestModule.bindClassToInstance(Injector.class, injector);
-      Context.setContext(ctx);
-      request.setCookieManager(ctx.cookies);
-      response.setCookieManager(ctx.cookies);
-
-      // Enable multi-part support.
-      if (request.isMultipart()) {
-        if (!config.server.multipartEnabled) {
-          throw new BadRequestException("Multipart requests are disallowed.");
+      
+      // For all other exception types:
+      if (config.enableDebugMode) {
+        // Show the debug screen in debug mode.
+        debugScreen.handle(error, context(request, response), route);
+      } else {
+        // Otherwise show a generic internal server error page.
+        response.setStatus(HTTPStatus.INTERNAL_SERVER_ERROR.getCode());
+        view = exceptionViews.produce(InternalServerErrorException.class, error, request, response);
+        internalTemplateEngine.render(view.viewName, view.viewModel, response.getWriter());
+      }
+    } catch (Throwable e2) {      
+      // This should be very rare.
+      response.setStatus(HTTPStatus.INTERNAL_SERVER_ERROR.getCode());
+      response.getWriter().println("500 INTERNAL SERVER ERROR");
+    }
+  }
+  
+  private void logRequest(HttpServletRequest request, String target) {
+    if (config.enableDebugMode) {
+      LOGGER.info("REQUEST ({}): {} {} -> {}",
+          request.getRemoteAddr(),
+          request.getMethod().toUpperCase(),
+          request.getPathInfo(),
+          target);
+    }
+  }
+  
+  private boolean acceptWebSocket(HttpServletRequest request,
+                                 HttpServletResponse response,
+                                 Match<Object> route) throws IOException {
+    if (!(route.getData() instanceof LightningWebSocketCreator)) {
+      return false;
+    }
+    
+    LightningWebSocketCreator creator = (LightningWebSocketCreator)route.getData();
+    
+    logRequest(request, "@WebSocket " + creator.getType().getCanonicalName());
+    
+    if (!webSocketFactory.isUpgradeRequest(request, response)) {
+      throw new BadRequestException();
+    }
+    
+    // The request is consumed regardless of what acceptWebSocket returns.
+    // If it fails, the factory commits the response with an error code.
+    webSocketFactory.acceptWebSocket(creator, request, response);
+    return true;
+  }
+  
+  private boolean sendStaticFile(HttpServletRequest request,
+                                 HttpServletResponse response) throws ServletException, IOException {
+    if (config.server.staticFilesPath != null &&
+        request.getMethod().equalsIgnoreCase("GET") && 
+        fileServer.couldConsume(request, response)) {
+      logRequest(request, "STATIC FILE");
+      fileServer.handle(request, response);
+      return true;
+    }
+    
+    return false;
+  }
+  
+  private boolean redirectInsecureRequest(HttpServletRequest request, 
+                                          HttpServletResponse response) throws URISyntaxException, IOException {
+    if (!config.ssl.isEnabled() ||
+        !config.ssl.redirectInsecureRequests ||
+        !request.getScheme().equalsIgnoreCase("https")) {
+      return false;
+    }
+    
+    logRequest(request, "HTTPS REDIRECT");
+    URI httpUri = new URI(request.getRequestURL().toString());
+    URI httpsUri = new URI("https",
+                           httpUri.getUserInfo(),
+                           httpUri.getHost(),
+                           config.ssl.port,
+                           httpUri.getPath(),
+                           httpUri.getQuery(),
+                           null);
+    
+    response.sendRedirect(httpsUri.toString());
+    return true;
+  }
+  
+  private synchronized void rescan() throws Exception {
+    scanResult = scanner.scan();
+    
+    // Exception Handlers
+    {
+      exceptionHandlers.clear();
+      for (Class<?> clazz : scanResult.exceptionHandlers.keySet()) {
+        for (Method method : scanResult.exceptionHandlers.get(clazz)) {
+          ExceptionHandler annotation = method.getAnnotation(ExceptionHandler.class);
+          exceptionHandlers.map(annotation.value(), method);
         }
+      }
+    }
+    
+    // Routes & Web Sockets
+    {
+      routes.clear();
+      
+      // Built-ins.
+      {
+        DebugMapController.map(routes, config);
+        HealthScreenController.map(routes, config);
+      }
+      
+      // @Route annotations.
+      {
+        for (Class<?> clazz : scanResult.routes.keySet()) {
+          for (Method method : scanResult.routes.get(clazz)) {
+            if (method.getAnnotation(Route.class) != null) {
+              Route route = method.getAnnotation(Route.class);
+              for (HTTPMethod httpMethod : route.methods()) {
+                routes.map(httpMethod, route.path(), method);
+              }
+            }
+            else if (method.getAnnotation(Routes.class) != null) {
+              for (Route route : method.getAnnotation(Routes.class).value()) {
+                for (HTTPMethod httpMethod : route.methods()) {
+                  routes.map(httpMethod, route.path(), method);
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      // TODO: Drop active web socket connections immediately when code changes (instead of on next event).
+      // TODO: Add tighter integration between framework and web sockets (e.g. Context.* properties).
+      // @WebSocket annotations.
+      {
+        Map<String, LightningWebSocketCreator> oldSingletonWebSockets = singletonWebSockets;
+        singletonWebSockets = config.enableDebugMode ? new HashMap<>() : null;
 
-        request.raw().setAttribute(org.eclipse.jetty.server.Request.__MULTIPART_CONFIG_ELEMENT,
+        for (Class<?> clazz : scanResult.websockets) {
+          @SuppressWarnings("unchecked")
+          Class<? extends WebSocketHandler> ws = (Class<? extends WebSocketHandler>)clazz;
+          WebSocket info = clazz.getAnnotation(WebSocket.class);
+          LightningWebSocketCreator creator = null;
+
+          // Handler code can be reloaded in debug mode.
+          // For singleton web sockets, we are clearing the route entries which means we create
+          // a new singleton on each rescan. We need to instead use the old singleton unless the
+          // code or path for that singleton has changed.
+          if (config.enableDebugMode) {
+            LightningWebSocketCreator oldCreator = oldSingletonWebSockets.get(info.path());
+            if (oldCreator != null &&
+                oldCreator.getType().getCanonicalName() == clazz.getCanonicalName() &&
+                !oldCreator.isCodeChanged()) {
+              creator = oldCreator;
+            }
+          }
+
+          if (creator == null) {
+            creator = new LightningWebSocketCreator(config, 
+                                                    new Injector(globalInjectorModule, userInjectorModule), 
+                                                    ws, 
+                                                    info.isSingleton());
+          }
+
+          if (config.enableDebugMode && info.isSingleton()) {
+            singletonWebSockets.put(info.path(), creator);
+          }
+
+          routes.map(HTTPMethod.GET,
+                          info.path(),
+                          creator);
+        }
+      }
+      
+      routes.compile();
+    }
+    
+    // Filters
+    {
+      filters.clear();
+      
+      for (Class<?> clazz : scanResult.beforeFilters.keySet()) {
+        for (Method m : scanResult.beforeFilters.get(clazz)) {
+          if (m.getAnnotation(Before.class) != null) {
+            Before info = m.getAnnotation(Before.class);
+            filters.addFilterBefore(info.path(), info.methods(), info.priority(), m);
+          }
+          else if (m.getAnnotation(Before.class) != null) {
+            for (Before info : m.getAnnotation(Befores.class).value()) {
+              filters.addFilterBefore(info.path(), info.methods(), info.priority(), m);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Override
+  public void handle(String target, 
+                     org.eclipse.jetty.server.Request baseRequest, 
+                     HttpServletRequest sRequest,
+                     HttpServletResponse sResponse) throws IOException, ServletException {   
+    Match<Object> route = null;
+    baseRequest.setHandled(true);
+    
+    try {
+      if (config.enableDebugMode) {
+        rescan(); // Reloads all routes, exception handlers, filters, etc.
+      }
+      
+      if (redirectInsecureRequest(sRequest, sResponse)) {
+        return;
+      }
+      
+      if (sendStaticFile(sRequest, sResponse)) {
+        return;
+      }
+      
+      route = routes.lookup(sRequest);
+      
+      if (route != null) {
+        if (acceptWebSocket(sRequest, sResponse, route)) {
+          return;
+        }
+        
+        if (config.server.enableOutputBuffering) {
+          sResponse = new BufferingHttpServletResponse(sResponse, config, outputBufferMatcher);
+        }
+        
+        if (processRoute(sRequest, sResponse, route)) {
+          return;
+        }
+      }
+      
+      logRequest(sRequest, "NOT FOUND");
+      throw new NotFoundException();
+    } catch (Throwable error) {
+      if (!INTERNAL_EXCEPTIONS.contains(error.getClass())) {
+        LOGGER.warn("A request handler returned an exception: ", error);
+      }
+      
+      sendErrorPage(sRequest, sResponse, error, route);
+    } finally {
+      HandlerContext context = (HandlerContext)sRequest.getAttribute(HandlerContext.ATTRIBUTE);
+      
+      if (context != null && !context.isAsync()) {
+        context.close();
+        sRequest.removeAttribute(HandlerContext.ATTRIBUTE);
+      }
+
+      MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser)sRequest.getAttribute(
+          org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
+      if (multipartInputStream != null) {
+        if (!sRequest.isAsyncStarted()) {
+          try {
+            multipartInputStream.deleteParts();
+          } catch (MultiException e){
+            LOGGER.warn("Error cleaning multiparts:", e);
+          }
+        } else if (context == null || !context.isAsync()) {
+          // If you get this error, it's because you invoked request().raw().startAsync() instead of goAsync on
+          // lightning.server.Context.
+          LOGGER.warn("Using servlet async with multipart request may not clean pieces - use Lightning's goAsync instead.");
+        }
+      }
+      
+      Context.clearContext();
+    }
+  }
+  
+  private void runControllerInitializers(HandlerContext context, Object controller) throws Throwable {
+    assert (controller != null);
+    
+    Class<?> currentClass = controller.getClass();
+
+    while (currentClass != null) {
+      if (scanResult.initializers.containsKey(currentClass)) {
+        for (Method i : scanResult.initializers.get(currentClass)) {
+          i.invoke(controller, context.injector().getInjectedArguments(i));
+        }
+      }
+
+      currentClass = currentClass.getSuperclass();
+    }
+  }
+  
+  private void runControllerFinalizers(HandlerContext context, Object controller) {
+    assert (controller != null);
+    Class<?> currentClass = controller.getClass();
+
+    while (currentClass != null) {
+      if (scanResult.finalizers.containsKey(currentClass)) {
+        for (Method i : scanResult.finalizers.get(currentClass)) {
+          try {
+            i.invoke(controller, context.injector().getInjectedArguments(i));
+          } catch (Throwable e) {
+            LOGGER.error("An error occured executing a finalizer {}: {}", i, e);
+          }
+        }
+      }
+
+      currentClass = currentClass.getSuperclass();
+    }
+  }
+  
+  private void processControllerOutput(HandlerContext context, 
+                                       Method target, 
+                                       Object output) throws Throwable {
+    assert (output != null);
+    
+    Json json = target.getAnnotation(Json.class);
+    if (json != null) {
+     context.sendJson(output, json.prefix(), json.names());
+     return;
+    }
+
+    if (output instanceof ModelAndView) {
+      context.render((ModelAndView)output);
+      return;
+    }
+    
+    Template template = target.getAnnotation(Template.class);
+    if (template != null) {
+      if (template.value() != null) {
+        context.render(template.value(), output);
+        return;
+      }
+      
+      throw new LightningException("Improper use of @Template annotation - refer to documentation.");
+    }
+    
+    if (output instanceof File) {
+      context.sendFile((File)output);
+      return;
+    }
+   
+    if (output instanceof String) {
+      context.response.write((String)output);
+      return;
+    }
+    
+    throw new LightningException("Unable to process return value of @Route - refer to documentation.");
+  }
+  
+  private void processBeforeFilters(HandlerContext context) throws Throwable {
+    FilterMatch<Method> filters = this.filters.lookup(context.request.path(), 
+                                                      context.request.method());
+
+    for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
+      ((InternalRequest)context.request).setWildcards(filter.wildcards(context.request.path()));
+      ((InternalRequest)context.request).setParams(filter.params(context.request.path()));
+      filter.handler.invoke(null, context.injector().getInjectedArguments(filter.handler));
+    }
+  }
+  
+  private void processBeforeAnnotationFilters(HandlerContext context, Method target) throws Throwable {
+    if (target.getAnnotation(Filters.class) != null) {
+      for (Filter filter : target.getAnnotation(Filters.class).value()) {
+        RouteFilter instance = context.injector().newInstance(filter.value());
+        instance.execute();
+      }
+    } else if (target.getAnnotation(Filter.class) != null) {
+      RouteFilter instance = context.injector().newInstance(target.getAnnotation(Filter.class).value());
+      instance.execute();
+    }
+  }
+  
+  private boolean processRoute(HttpServletRequest request, 
+                               HttpServletResponse response, 
+                               Match<Object> route) throws Throwable {
+    if (!(route.getData() instanceof Method)) {
+      return false;
+    }
+    
+    Method target = (Method)route.getData();
+    Object controller = null;
+    HandlerContext context = context(request, response);
+    logRequest(request, "@Route " + target.toString());
+    
+    if (context.request.isMultipart()) {
+      if (!config.server.multipartEnabled) {
+        throw new BadRequestException("Multipart requests are disallowed.");
+      }
+
+      request.setAttribute(
+          org.eclipse.jetty.server.Request.__MULTIPART_CONFIG_ELEMENT,
           new MultipartConfigElement(
               config.server.multipartSaveLocation,
               config.server.multipartPieceLimitBytes,
               config.server.multipartRequestLimitBytes,
               config.server.multipartPieceLimitBytes));
-      }
-
-      if (config.enableDebugMode) {
-        rescan();
-        internalTemplateConfig.clearTemplateCache();
-      }
-
-      // Try to execute a route handler (if any).
-      match = routeMapper.lookup(request);
-      if (match != null) {
-        logger.debug("Found route match: data={} params={} wildcards={}", match.getData(), match.getParams(), match.getWildcards());
-
-        Object controller = null;
-        Method m = match.getData();
-
-        if (config.enableDebugMode && m != null && m.getDeclaringClass().equals(DebugMapController.class)) {
-          requestModule.bindClassToInstance(LightningHandler.class, this);
-        }
-
-        try {
-          // TODO: Not sure how bad the performance is going to be with reflection here.
-
-          if (m == null) {
-            // Null indicates a web socket handler is installed at this path.
-            // Set the request as not handled and return so that Jetty will invoke the next
-            // handler in the chain - the web socket handler.
-            logger.debug("WebSocket Handler Detected, skip");
-            baseRequest.setHandled(false);
-            if (config.enableDebugMode) {
-              logger.info("INCOMING REQUEST ({}): {} {} -> WEBSOCKET", request.ip(), request.method(), request.path());
-            }
-            flush = false;
-            return;
-          }
-
-          // Set the default content type.
-          response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
-
-          // Execute any before filters.
-          FilterMatch<Method> filters = filterMapper.lookup(request.path(), request.method());
-
-          for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
-            if (config.enableDebugMode) {
-              logger.info("INCOMING REQUEST ({}): {} {} -> FILTER {}", request.ip(), request.method(), request.path(), filter.handler);
-            }
-            request.setWildcards(filter.wildcards(request.path()));
-            request.setParams(filter.params(request.path()));
-            try {
-              filter.handler.invoke(null, injector.getInjectedArguments(filter.handler));
-            } catch (InvocationTargetException e) {
-              if (e.getCause() != null) {
-                throw e.getCause();
-              }
-
-              throw e;
-            }
-          }
-
-          // Mutate the request.
-          request.setWildcards(match.getWildcards());
-          request.setParams(match.getParams());
-
-          if (config.enableDebugMode) {
-            logger.info("INCOMING REQUEST ({}): {} {} -> {}", request.ip(), request.method(), request.path(), m);
-          }
-
-          // Perform pre-processing.
-          if (m.getAnnotation(Multipart.class) != null) {
-            ctx.requireMultipart();
-          }
-
-          if (m.getAnnotation(RequireAuth.class) != null) {
-            ctx.requireAuth();
-          }
-
-          if (m.getAnnotation(RequireXsrfToken.class) != null) {
-            RequireXsrfToken info = m.getAnnotation(RequireXsrfToken.class);
-            ctx.requireXsrf(info.inputName());
-          }
-
-          if (m.getAnnotation(Filters.class) != null) {
-            for (Filter filter : m.getAnnotation(Filters.class).value()) {
-              RouteFilter instance = injector.newInstance(filter.value());
-              instance.execute();
-            }
-          } else if (m.getAnnotation(Filter.class) != null) {
-            RouteFilter instance = injector.newInstance(m.getAnnotation(Filter.class).value());
-            instance.execute();
-          }
-
-          // Instantiate the controller.
-          Class<?> clazz = m.getDeclaringClass();
-          controller = injector.newInstance(clazz);
-
-          // Run initializers.
-          Class<?> currentClass = m.getDeclaringClass();
-
-          while (currentClass != null) {
-            if (scanResult.initializers.containsKey(currentClass)) {
-              for (Method i : scanResult.initializers.get(currentClass)) {
-                try {
-                  i.invoke(controller, injector.getInjectedArguments(i));
-                } catch (InvocationTargetException e) {
-                  if (e.getCause() != null)
-                    throw e.getCause();
-                  throw e;
-                }
-              }
-            }
-
-            currentClass = currentClass.getSuperclass();
-          }
-
-          // Build invocation arguments.
-          Object[] args = injector.getInjectedArguments(m);
-
-          // Invoke the controller.
-          Object output = null;
-          try {
-            output = m.invoke(controller, args);
-          } catch (InvocationTargetException e) {
-            if (e.getCause() != null)
-              throw e.getCause();
-            throw e;
-          }
-
-          // Save session before response commit.
-          ctx.maybeSaveSession();
-
-          // Perform post-processing.
-          if (output == null) {} // Assume the handler returned void or null because it did its work.
-          else if (m.getAnnotation(Json.class) != null) {
-            Json info = m.getAnnotation(Json.class);
-            ctx.sendJson(output, info.prefix(), info.names());
-          } else if (m.getAnnotation(Template.class) != null) {
-            if (output instanceof ModelAndView) {
-              ctx.render((ModelAndView) output);
-            }
-
-            Template info = m.getAnnotation(Template.class);
-
-            if (info.value() == null) {
-              throw new LightningException("Unable to process output of handler: " + match.getData().toString());
-            }
-
-            ctx.render(new ModelAndView(info.value(), output));
-          } else if (output instanceof String) {
-            response.raw().getWriter().print(output);
-          } else if (output instanceof File) {
-            ctx.sendFile((File) output);
-          } else if (output instanceof ModelAndView) {
-            ctx.render((ModelAndView) output);
-          } else {
-            throw new LightningException("Unable to process output of handler: " + match.getData().toString());
-          }
-        } catch (HaltException e) {
-          // Halt exception just says to jump to here.
-        } finally {
-          // Run any finalizers.
-          if (m != null && controller != null) {
-            Class<?> currentClass = m.getDeclaringClass();
-
-            while (currentClass != null) {
-              if (scanResult.finalizers.containsKey(currentClass)) {
-                for (Method i : scanResult.finalizers.get(currentClass)) {
-                  try {
-                    try {
-                      i.invoke(controller, injector.getInjectedArguments(i));
-                    } catch (InvocationTargetException e) {
-                      if (e.getCause() != null)
-                        throw e.getCause();
-                      throw e;
-                    }
-                  } catch (Throwable e) {
-                    logger.error("An error occured executing a finalizer {}: {}", i, e);
-                  }
-                }
-              }
-
-              currentClass = currentClass.getSuperclass();
-            }
-          }
-        }
-
-        return;
-      }
-
-      // Trigger a 404 page.
-      if (config.enableDebugMode) {
-        logger.info("INCOMING REQUEST ({}): {} {} -> NOT FOUND", request.ip(), request.method(), request.path());
-      }
-
-      throw new NotFoundException();
-    } catch (Throwable e) {
-      if (!ignoredExceptions.contains(e.getClass())) {
-        logger.warn("Request handler returned exception:", e);
-      }
-
-
-      if (!response.raw().isCommitted()) {
-        response.raw().reset();
-        try {
-          Method handler = exceptionHandlers.getHandler(e);
-          requestModule.bindToClass(e);
-          if (handler != null) {
-            try {
-              handler.invoke(null, injector.getInjectedArguments(handler));
-            } catch (InvocationTargetException e2) {
-              if (e2.getCause() != null)
-                throw e2.getCause();
-              throw e2;
-            }
-            return;
-          }
-
-          sendCriticalErrorPage(ctx, e, match);
-        } catch (Throwable e2) {
-          e2.addSuppressed(e);
-          logger.warn("Exception handler returned exception:", e2);
-          sendCriticalErrorPage(ctx, e2, match);
-        }
-      } else {
-        logger.warn("Couldn't render error page (already committed): " + request.path());
-      }
-    } finally {
-      try {
-        if (ctx != null) {
-          logger.debug("Closing Context");
-          ctx.closeIfNotAsync(flush);
-        }
-      } catch (Exception e) {
-        logger.warn("Exception closing context:", e);
-      }
-      Context.clearContext();
-
-      if (request.isMultipart() && config.server.multipartEnabled) {
-        MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser)
-            request.raw().getAttribute(org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
-        if (multipartInputStream != null) {
-          try {
-            multipartInputStream.deleteParts();
-          } catch (MultiException e) {
-            logger.warn("Error cleaning multiparts:", e);
-          }
-        }
-      }
     }
-  }
-
-  public List<String> getMatches(String path, HTTPMethod method) throws PathFormatException {
-    List<String> matches = new ArrayList<>();
-
-    Match<Method> route = routeMapper.lookup(path, method);
-    if (route != null) {
-      FilterMatch<Method> filters = filterMapper.lookup(path, method);
-
-      if (route.getData() == null) {
-        for (Class<?> type : scanResult.websocketFactories.keySet()) {
-          for (Method handler : scanResult.websocketFactories.get(type)) {
-            WebSocketFactory wf = handler.getAnnotation(WebSocketFactory.class);
-            if (wf.path().equals(path)) {
-              matches.add(type.getCanonicalName() + "@" + handler.getName());
-            }
-          }
-        }
-
-        return matches;
-      }
-
-      for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
-        matches.add(filter.handler.getDeclaringClass().getCanonicalName() + "@" + filter.handler.getName());
-      }
-
-      if (route.getData().getAnnotation(Filters.class) != null) {
-        for (Filter filter : route.getData().getAnnotation(Filters.class).value()) {
-          matches.add(filter.value().getCanonicalName());
-        }
-      }
-
-      if (route.getData().getAnnotation(Filter.class) != null) {
-        matches.add(route.getData().getAnnotation(Filter.class).value().getCanonicalName());
-      }
-
-      matches.add(route.getData().getDeclaringClass().getCanonicalName() + "@" + route.getData().getName());
-    }
-
-    return matches;
-  }
-
-  protected synchronized void rescan() throws Exception {
-    scanResult = scanner.scan();
-    logger.debug("Scanned Annotations: {}, {}", config.scanPrefixes, scanResult);
-
-    // Map exception handlers.
-    exceptionHandlers.clear();
-    for (Class<?> clazz : scanResult.exceptionHandlers.keySet()) {
-      for (Method method : scanResult.exceptionHandlers.get(clazz)) {
-        ExceptionHandler annotation = method.getAnnotation(ExceptionHandler.class);
-        logger.debug("Added Exception Handler: {} -> {}", annotation.value(), method);
-        exceptionHandlers.map(annotation.value(), method);
-      }
-    }
-
-    // Map routes.
-    routeMapper.clear();
-
-    for (Class<?> clazz : scanResult.routes.keySet()) {
-      for (Method method : scanResult.routes.get(clazz)) {
-        if (method.getAnnotation(Route.class) != null) {
-          Route route = method.getAnnotation(Route.class);
-          for (HTTPMethod httpMethod : route.methods()) {
-            routeMapper.map(httpMethod, route.path(), method);
-          }
-        }
-
-        if (method.getAnnotation(Routes.class) != null) {
-          for (Route route : method.getAnnotation(Routes.class).value()) {
-            for (HTTPMethod httpMethod : route.methods()) {
-              routeMapper.map(httpMethod, route.path(), method);
-            }
-          }
-        }
-      }
-    }
-
-    DebugMapController.map(routeMapper, config);
-    HealthScreenController.map(routeMapper, config);
-
-    // Map websockets to a null handler.
-    for (Class<?> clazz : scanResult.websocketFactories.keySet()) {
-      for (Method m : scanResult.websocketFactories.get(clazz)) {
-        WebSocketFactory info = m.getAnnotation(WebSocketFactory.class);
-        routeMapper.map(HTTPMethod.GET, info.path(), null); // Indicate to pass to next handler in chain.
-      }
-    }
-
-    routeMapper.compile();
-
-    // Map filters.
-    filterMapper.clear();
-
-    for (Class<?> clazz : scanResult.beforeFilters.keySet()) {
-      for (Method m : scanResult.beforeFilters.get(clazz)) {
-
-        if (m.getAnnotation(Before.class) != null) {
-          Before info = m.getAnnotation(Before.class);
-          filterMapper.addFilterBefore(info.path(), info.methods(), info.priority(), m);
-        }
-
-        Befores infos = m.getAnnotation(Befores.class);
-
-        if (infos != null) {
-          for (Before info : infos.value()) {
-            filterMapper.addFilterBefore(info.path(), info.methods(), info.priority(), m);
-          }
-        }
-      }
-    }
-  }
-
-  protected void sendCriticalErrorPage(HandlerContext ctx, Throwable e, Match<Method> m) throws IOException {
+    
     try {
-      ModelAndView mv = exceptionViewProducer.produce(e.getClass(), e, ctx.request.raw(), ctx.response.raw());
-      if (mv != null) {
-        ctx.response.status(HTTPStatus.fromException(e));
-        renderInternalTemplate(ctx.response, mv);
-        return;
-      }
+      // Set the default content type for all route targets.
+      response.setContentType("text/html; charset=UTF-8");
+      
+      // Execute @Before filters.
+      processBeforeFilters(context);
 
-      if (config.enableDebugMode) {
-        debugScreen.handle(e, ctx, m);
-        return;
+      ((InternalRequest)context.request).setWildcards(route.getWildcards());
+      ((InternalRequest)context.request).setParams(route.getParams());
+      
+      // Perform pre-processing.
+      if (target.getAnnotation(Multipart.class) != null) {
+        context.requireMultipart();
       }
-
-      ctx.response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
-      renderInternalTemplate(ctx.response, exceptionViewProducer.produce(
-          InternalServerErrorException.class, e, ctx.request.raw(), ctx.response.raw()));
-    } catch (Throwable e2) {
-      // This should basically never happen, but just in case everything that can go wrong goes wrong.
-      logger.warn("Failed to render critical error page with exception: ", e2);
-      ctx.response.status(HTTPStatus.INTERNAL_SERVER_ERROR);
-      ctx.response.raw().getWriter().println("500 INTERNAL SERVER ERROR");
+      
+      if (target.getAnnotation(RequireAuth.class) != null) {
+        context.requireAuth();
+      }
+      
+      {
+        RequireXsrfToken info = target.getAnnotation(RequireXsrfToken.class);
+        if (info != null) {
+          context.requireXsrf(info.inputName());
+        }
+      }
+      
+      // Execute @Filter filters.
+      processBeforeAnnotationFilters(context, target);
+      
+      // Instantiate the controller.
+      controller = context.injector().newInstance(target.getDeclaringClass());
+      
+      // Run @Initializers.
+      runControllerInitializers(context, controller);
+      
+      // Execute the @Route.
+      Object output = target.invoke(controller, context.injector().getInjectedArguments(target));
+      
+      // Try to save the session here if we need to since post-processing may commit the response.
+      context.maybeSaveSession();
+      
+      // Perform post-processing.
+      if (output != null) {
+        processControllerOutput(context, target, output);
+      }
+    } catch (HaltException e) {
+      // A halt exception says to jump to here in the life cycle.
+    } catch (InvocationTargetException e) { 
+      if (e.getCause() != null) {
+        // Leads to better error logs/debug screens.
+        throw e.getCause();
+      }
+      
+      throw e;
+    } finally {
+      // Run @Finalizers.
+      if (controller != null) {
+        runControllerFinalizers(context, controller);
+      }
     }
+    
+    return true;
   }
-
-  protected void renderInternalTemplate(Response response, ModelAndView modelAndView) throws Exception {
-    renderInternalTemplate(response, modelAndView.viewName, modelAndView.viewModel);
-  }
-
-  protected void renderInternalTemplate(Response response, String name, Object model) throws Exception {
-    renderTemplate(response, internalTemplateConfig, name, model);
-  }
-
-  protected void renderTemplate(Response response, Configuration tplConfig, String name, Object model) throws Exception {
-    response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
-    tplConfig.getTemplate(name).process(model, response.raw().getWriter());
-  }
-
-  protected InjectorModule requestSpecificInjectionModule(HandlerContext context) {
-    InjectorModule m = new InjectorModule();
-    m.bindClassToInstance(Validator.class, context.validator);
-    m.bindClassToInstance(HandlerContext.class, context);
-    m.bindClassToInstance(Session.class, context.session);
-    m.bindClassToInstance(Request.class, context.request);
-    m.bindClassToInstance(Response.class, context.response);
-    m.bindClassToInstance(HttpServletRequest.class, context.request.raw());
-    m.bindClassToInstance(HttpServletResponse.class, context.response.raw());
-    m.bindClassToInstance(URLGenerator.class, context.url);
-    m.bindClassToInstance(Groups.class, context.groups());
-    m.bindClassToInstance(Users.class, context.users());
-    m.bindClassToResolver(User.class, () -> {
-      return context.user();
-    });
-    m.bindClassToResolver(MySQLDatabase.class, () -> {
-      return context.db();
-    });
-    return m;
+  
+  private HandlerContext context(HttpServletRequest request, HttpServletResponse response) {
+    HandlerContext context = (HandlerContext)request.getAttribute(HandlerContext.ATTRIBUTE);
+    
+    if (context == null) {
+      InternalRequest lRequest = InternalRequest.makeRequest(request, config.server.trustLoadBalancerHeaders);
+      InternalResponse lResponse = InternalResponse.makeResponse(response);
+      context = new HandlerContext(lRequest, lResponse, dbProvider, config, userTemplateEngine, fileServer, 
+                                   mailer, jsonService, cache, globalInjectorModule, userInjectorModule);
+      lRequest.setCookieManager(context.cookies);
+      lResponse.setCookieManager(context.cookies);
+      request.setAttribute(HandlerContext.ATTRIBUTE, context);
+      Context.setContext(context);
+    }
+    
+    return context;
   }
 }

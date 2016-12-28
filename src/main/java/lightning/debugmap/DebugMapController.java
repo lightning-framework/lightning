@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.augustl.pathtravelagent.PathFormatException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 
@@ -23,18 +24,26 @@ import lightning.ann.Filter;
 import lightning.ann.Filters;
 import lightning.ann.Json;
 import lightning.ann.Route;
-import lightning.ann.WebSocketFactory;
+import lightning.ann.WebSocket;
 import lightning.config.Config;
 import lightning.enums.HTTPMethod;
 import lightning.mvc.HandlerContext;
+import lightning.routing.FilterMapper.FilterMatch;
 import lightning.routing.RouteMapper;
+import lightning.routing.RouteMapper.Match;
 import lightning.scanner.ScanResult;
 import lightning.server.LightningHandler;
 import lightning.util.ReflectionUtil;
+import lightning.websockets.LightningWebSocketCreator;
+import lightning.websockets.WebSocketHandler;
 
+/**
+ * Renders an in-browser table displaying all installed handlers.
+ * Includes routes, web sockets, filters, exception handlers, etc.
+ */
 @Controller
 public class DebugMapController {
-  public static void map(RouteMapper<Method> mapper, Config config) throws Exception {
+  public static void map(RouteMapper<Object> mapper, Config config) throws Exception {
     if (config.debugRouteMapPath != null && config.enableDebugMode) {
       mapper.map(HTTPMethod.GET,
                  config.debugRouteMapPath,
@@ -80,14 +89,12 @@ public class DebugMapController {
     model.put("exception_handlers", exceptionHandlers);
 
     List<Object> websockets = new ArrayList<>();
-    for (Class<?> type : result.websocketFactories.keySet()) {
-      for (Method target : result.websocketFactories.get(type)) {
-        WebSocketFactory ws = notNull(target.getAnnotation(WebSocketFactory.class));
+    for (Class<? extends WebSocketHandler> type : result.websockets) {
+        WebSocket ws = notNull(type.getAnnotation(WebSocket.class));
         websockets.add(ImmutableMap.<String, Object>of(
           "path", ws.path(),
-          "target", type.getCanonicalName() + "@" + target.getName()
+          "target", type.getCanonicalName()
         ));
-      }
     }
     model.put("websockets", websockets);
 
@@ -133,12 +140,47 @@ public class DebugMapController {
 
     try {
       return ImmutableMap.of("status", "success",
-                             "matches", handler.getMatches(path, method));
+                             "matches", getMatches(handler, path, method));
     } catch (Exception e) {
       return ImmutableMap.of("status", "error",
                              "type", e.getClass().getCanonicalName(),
                              "message", e.getMessage());
     }
+  }
+  
+  private static List<String> getMatches(LightningHandler handler, String path, HTTPMethod method) throws PathFormatException {
+    List<String> matches = new ArrayList<>();
+    Match<Object> route = handler.getRouteMatch(path, method);
+    
+    if (route != null) {
+      if (route.getData() instanceof LightningWebSocketCreator) {
+        LightningWebSocketCreator socket = (LightningWebSocketCreator)route.getData();
+        matches.add(socket.getType().getCanonicalName());
+      }
+
+      if (route.getData() instanceof Method) {
+        FilterMatch<Method> filters = handler.getFilterMatch(path, method);
+        Method m = (Method)route.getData();
+
+        for (lightning.routing.FilterMapper.Filter<Method> filter : filters.beforeFilters()) {
+          matches.add(filter.handler.getDeclaringClass().getCanonicalName() + "@" + filter.handler.getName());
+        }
+
+        if (m.getAnnotation(Filters.class) != null) {
+          for (Filter filter : m.getAnnotation(Filters.class).value()) {
+            matches.add(filter.value().getCanonicalName());
+          }
+        }
+
+        if (m.getAnnotation(Filter.class) != null) {
+          matches.add(m.getAnnotation(Filter.class).value().getCanonicalName());
+        }
+
+        matches.add(m.getDeclaringClass().getCanonicalName() + "@" + m.getName());
+      }
+    }
+
+    return matches;
   }
 
   private static <T> T notNull(T item) {

@@ -65,21 +65,8 @@ public class Context {
     controller.remove();
   }
   
-  /**
-   * Returns a fixed snapshot of the context that can be used asynchronously.
-   * Does not make the underlying request asynchronous; you must do this on your own.
-   * 
-   * IF YOU GO ASYNCHRONOUS, BE AWARE:
-   *   - You MUST close the HandlerContext by invoking close() to avoid leaking resources.
-   *   - Methods on HandlerContext were designed with the assumption the request is being handled synchronously.
-   *     Some of them may not work correctly while going asynchronous.
-   *   - Static methods on Context are no longer safe to use in your async handlers; use the instance returned
-   *     by this function instead.
-   * @return
-   */
-  public static final HandlerContext goAsync() {
-    context().goAsync();
-    return context();
+  public static final HandlerContext goAsync() throws Exception {
+    return context().goAsync();
   }
   
   public static final Cache cache() {

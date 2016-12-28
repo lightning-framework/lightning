@@ -16,9 +16,10 @@ import lightning.ann.Finalizer;
 import lightning.ann.Initializer;
 import lightning.ann.Route;
 import lightning.ann.Routes;
-import lightning.ann.WebSocketFactory;
+import lightning.ann.WebSocket;
 import lightning.classloaders.ExceptingClassLoader;
 import lightning.classloaders.ExceptingClassLoader.PrefixClassLoaderExceptor;
+import lightning.websockets.WebSocketHandler;
 
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
@@ -67,13 +68,13 @@ public class Scanner {
     Map<Class<?>, Set<Method>> finalizers = new HashMap<>();
     Map<Class<?>, Set<Method>> exceptionHandlers = new HashMap<>();
     Map<Class<?>, Set<Method>> routes = new HashMap<>();
-    Map<Class<?>, Set<Method>> websocketFactories = new HashMap<>();
+    Set<Class<? extends WebSocketHandler>> websockets = new HashSet<>();
     Map<Class<?>, Set<Method>> beforeFilters = new HashMap<>();
     ClassLoader classLoader = enableAutoReload
         ? new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), "target/classes")
         : this.getClass().getClassLoader();
     
-    for (Reflections scanner : reflections(classLoader)) {      
+    for (Reflections scanner : reflections(classLoader)) {
       for (Method m : scanner.getMethodsAnnotatedWith(Initializer.class)) {
         // TODO: check returns void, can inject
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
@@ -117,17 +118,31 @@ public class Scanner {
         }
       }
       
-      for (Method m : scanner.getMethodsAnnotatedWith(WebSocketFactory.class)) {
-        // TODO: verify return value, can inject
-        if (Modifier.isStatic(m.getModifiers()) &&
-            Modifier.isPublic(m.getModifiers()) &&
-            !Modifier.isAbstract(m.getModifiers())) {
-          putMethod(websocketFactories, m);
-        } else {
-          logger.error(
-              "ERROR: Could not install @WebSocketFactory for {}. "
-            + "WebSocketFactory must be public, concrete, static.", m);
+      for (Class<?> c : scanner.getTypesAnnotatedWith(WebSocket.class)) {
+        if (!Modifier.isPublic(c.getModifiers())) {
+          logger.error("ERROR: @WebSocket {} must be public.", c.getCanonicalName());
+          continue;
         }
+        
+        if (Modifier.isAbstract(c.getModifiers()) || c.isInterface()) {
+          logger.error("ERROR: @WebSocket {} must be instantiatable.", c.getCanonicalName());
+          continue;
+        }
+        
+        if (!WebSocketHandler.class.isAssignableFrom(c)) {
+          logger.error("ERROR: @WebSocket {} must implement interface WebSocketHandler.", c.getCanonicalName());
+          continue;
+        }
+        
+        if (c.getConstructors().length > 1) {
+          // TODO: Should also check the constructor is public and injectable.
+          logger.error("ERROR: @WebSocket {} must have one public constructor.", c.getCanonicalName());
+          continue;
+        }
+        
+        @SuppressWarnings("unchecked")
+        Class<? extends WebSocketHandler> cl = (Class<? extends WebSocketHandler>)c;
+        websockets.add(cl);
       }
       
       for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Before.class), scanner.getMethodsAnnotatedWith(Befores.class))) {
@@ -144,7 +159,7 @@ public class Scanner {
       }
       
       for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Route.class), scanner.getMethodsAnnotatedWith(Routes.class))) {
-        // TODO: verify can inject
+        // TODO: verify can inject, verify any @Filter(s) constructors are injectable
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
             !Modifier.isStatic(m.getModifiers()) &&
             !Modifier.isAbstract(m.getModifiers()) &&
@@ -159,7 +174,9 @@ public class Scanner {
       }
     }
     
-    return new ScanResult(controllers, initializers, exceptionHandlers, routes, websocketFactories, finalizers, beforeFilters);
+    // TODO: Should check all controller constructors are injectable.
+    
+    return new ScanResult(controllers, initializers, exceptionHandlers, routes, websockets, finalizers, beforeFilters);
   }
   
   private Reflections[] reflections(ClassLoader classLoader) {

@@ -1,9 +1,6 @@
 package lightning.healthscreen;
 
-import java.lang.reflect.Method;
 import java.util.Map;
-
-import com.google.common.collect.ImmutableMap;
 
 import lightning.ann.Controller;
 import lightning.config.Config;
@@ -12,9 +9,11 @@ import lightning.mvc.HandlerContext;
 import lightning.routing.RouteMapper;
 import lightning.util.ReflectionUtil;
 
+import com.google.common.collect.ImmutableMap;
+
 @Controller
 public class HealthScreenController {
-  public static void map(RouteMapper<Method> mapper, Config config) throws Exception {
+  public static void map(RouteMapper<Object> mapper, Config config) throws Exception {
     if (config.healthPath != null) {
       mapper.map(HTTPMethod.GET,
                  config.healthPath,

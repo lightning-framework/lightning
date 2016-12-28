@@ -4,6 +4,8 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Set;
 
+import lightning.websockets.WebSocketHandler;
+
 public class ScanResult {
   // Classes annotated with @Controller:
   public final Set<Class<?>> controllers;
@@ -24,21 +26,21 @@ public class ScanResult {
   public final Map<Class<?>, Set<Method>> beforeFilters;
   
   // Static methods annotated with @WebSocketFactory:
-  public final Map<Class<?>, Set<Method>> websocketFactories;
+  public final Set<Class<? extends WebSocketHandler>> websockets;
   
   public ScanResult(
       Set<Class<?>> controllers,
       Map<Class<?>, Set<Method>> initializers,
       Map<Class<?>, Set<Method>> exceptionHandlers,
       Map<Class<?>, Set<Method>> routes,
-      Map<Class<?>, Set<Method>> websocketFactories,
+      Set<Class<? extends WebSocketHandler>> websockets,
       Map<Class<?>, Set<Method>> finalizers,
       Map<Class<?>, Set<Method>> beforeFilters) {
     this.controllers = controllers;
     this.initializers = initializers;
     this.exceptionHandlers = exceptionHandlers;
     this.routes = routes;
-    this.websocketFactories = websocketFactories;
+    this.websockets = websockets;
     this.finalizers = finalizers;
     this.beforeFilters = beforeFilters;
   }
@@ -47,7 +49,7 @@ public class ScanResult {
   public String toString() {
     return "ScanResult [controllers=" + controllers + ", initializers=" + initializers
         + ", exceptionHandlers=" + exceptionHandlers + ", routes=" + routes
-        + ", websocketFactories=" + websocketFactories + ", finalizers=" + finalizers + ""
+        + ", websockets=" + websockets + ", finalizers=" + finalizers + ""
         + ", beforeFilters=" + beforeFilters + "]";
   }
 }

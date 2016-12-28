@@ -12,7 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nullable;
+import javax.servlet.AsyncContext;
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
 
 import lightning.auth.Auth;
@@ -44,10 +47,13 @@ import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
 import lightning.http.Request;
 import lightning.http.Response;
+import lightning.inject.Injector;
+import lightning.inject.InjectorModule;
 import lightning.io.FileServer;
 import lightning.json.JsonService;
 import lightning.mail.Mailer;
 import lightning.mvc.Validator.FieldValidator;
+import lightning.server.LightningHandler;
 import lightning.sessions.Session;
 import lightning.sessions.Session.SessionException;
 import lightning.sessions.drivers.MySQLSessionDriver;
@@ -60,6 +66,8 @@ import lightning.util.Time;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.ByteArrayOutputStream;
+import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.MultiPartInputStreamParser;
 import org.eclipse.jetty.util.resource.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +80,6 @@ import com.google.common.collect.ImmutableList;
  * allocated to service a single request and destroyed after a response to that request is sent.
  */
 public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
-  @SuppressWarnings("unused")
   private static final Logger logger = LoggerFactory.getLogger(HandlerContext.class);
   public final Request request;
   public final Response response;
@@ -86,18 +93,19 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public final MySQLDatabase db;
   private final @Nullable Mailer mail;
   private final FileServer fs;
-  private boolean isAsync;
   private final MySQLDatabaseProxy dbProxy;
   private final Groups groups;
   private final Users users;
   private boolean isClosed;
   private final JsonService jsonifier;
   private final Cache cache;
+  private final Injector injector;
+  private final InjectorModule bindings;
+  public static final String ATTRIBUTE = HandlerContext.class.getCanonicalName();
+  private AsyncContext asyncContext;
 
-  // TODO(mschurr): Add a user property, implement a proxy for it.
-  // TODO(mschurr): Add a memory cache accessor, and implement the API for it.
-
-  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, TemplateEngine te, FileServer fs, @Nullable Mailer mailer, JsonService jsonifier, Cache cache) {
+  public HandlerContext(Request rq, Response re, MySQLDatabaseProvider dbp, Config c, TemplateEngine te, FileServer fs, @Nullable Mailer mailer, JsonService jsonifier, Cache cache, InjectorModule globalModule, InjectorModule userModule) {
+    logger.debug("context created");
     isClosed = false;
     this.request = rq;
     this.response = re;
@@ -109,7 +117,6 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.validator = Validator.create(this);
     this.dbProxy = new MySQLDatabaseProxy(dbp);
     this.db = dbProxy;
-    this.isAsync = false;
     this.fs = fs;
     this.session = Session.forRequest(rq, re, config, new MySQLSessionDriver(this));
     this.groups = new Groups(new MySQLGroupDriver(this));
@@ -117,8 +124,32 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.auth = Auth.forSession(session, new MySQLAuthDriver(this), users);
     this.jsonifier = jsonifier;
     this.cache = cache;
+    this.bindings = new InjectorModule();
+    this.bindings.bindClassToInstance(Validator.class, this.validator);
+    this.bindings.bindClassToInstance(HandlerContext.class, this);
+    this.bindings.bindClassToInstance(Session.class, this.session);
+    this.bindings.bindClassToInstance(Request.class, this.request);
+    this.bindings.bindClassToInstance(Response.class, this.response);
+    this.bindings.bindClassToInstance(HttpServletRequest.class, this.request.raw());
+    this.bindings.bindClassToInstance(HttpServletResponse.class, this.response.raw());
+    this.bindings.bindClassToInstance(URLGenerator.class, this.url);
+    this.bindings.bindClassToInstance(Groups.class, this.groups());
+    this.bindings.bindClassToInstance(Users.class, this.users());
+    this.bindings.bindClassToInstance(Cache.class, this.cache());
+    this.bindings.bindClassToResolver(User.class, () -> this.user());
+    this.bindings.bindClassToResolver(MySQLDatabase.class, () -> this.db());
+    this.injector = new Injector(globalModule, userModule, this.bindings);
+    this.bindings.bindClassToInstance(Injector.class, this.injector); 
+  }
+  
+  public Injector injector() {
+    return this.injector;
   }
 
+  public InjectorModule bindings() {
+    return this.bindings;
+  }
+  
   @Override
   public MySQLDatabase getDatabase() throws SQLException {
     return db();
@@ -145,8 +176,24 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     return mail;
   }
 
-  public void goAsync() {
-    this.isAsync = true;
+  /**
+   * Starts asynchronous handling for the current request and returns a context.
+   * You MUST manually close() this context in order to avoid leaking resources.
+   * Methods on lightning.server.Context.* are unsafe to use after invoking this.
+   * @return
+   * @throws Exception
+   */
+  public HandlerContext goAsync() throws Exception {
+    if (!request.raw().isAsyncSupported()) {
+      throw new LightningException("Async is not supported on your platform.");
+    }
+    
+    if (asyncContext != null || request.raw().isAsyncStarted() || isClosed) {
+      throw new LightningException("Async has already been started on this request.");
+    }
+    
+    this.asyncContext = request.raw().startAsync();
+    return this;
   }
 
   public void halt() {
@@ -159,36 +206,68 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @see {@link java.util.AutoCloseable}
    */
   @Override
-  public void close() throws Exception {
+  public void close() {
     close(true);
   }
 
-  private void close(boolean flush) throws Exception {
+  private void close(boolean flush) {
     if (isClosed) {
       return;
     }
+    
+    logger.debug("context closed");
+    
+    if (asyncContext != null) {
+      MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser)request.raw().getAttribute(
+          org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
+      if (multipartInputStream != null) {
+        try {
+          multipartInputStream.deleteParts();
+        } catch (MultiException e) {
+          logger.warn("Error closing handler context:", e);
+        }
+      }
+    }
 
     isClosed = true;
-
-    // If the session was modified, save it.
+    
     try {
-      if (session != null && session.isDirty()) {
-        session.save();
+      // If the session was modified, save it.
+      try {
+        if (session != null && session.isDirty()) {
+          try {
+            session.save();
+          } catch (SessionException e) {
+            logger.warn("Error closing handler context:", e);
+          }
+        }
+      } finally {
+        // If a database connection was opened, free it.
+        try {
+          db.close();
+        } catch (SQLException e) {
+          logger.warn("Error closing handler context:", e);
+        }
+        try {
+          dbProxy.reallyClose();
+        } catch (SQLException e) {
+          logger.warn("Error closing handler context:", e);
+        }
+      }
+  
+      if (flush) {
+        try {
+          logger.debug("flushing buffer");
+          response.raw().flushBuffer();
+        } catch (IOException e) {
+          logger.warn("Error closing handler context:", e);
+        }
       }
     } finally {
-      // If a database connection was opened, free it.
-      db.close();
-      dbProxy.reallyClose();
-    }
-
-    if (flush) {
-      response.raw().flushBuffer();
-    }
-  }
-
-  public void closeIfNotAsync(boolean flush) throws Exception {
-    if (!isAsync) {
-      close(flush);
+      request.raw().removeAttribute(HandlerContext.ATTRIBUTE);
+      if (asyncContext != null) {
+        asyncContext.complete();
+      }
     }
   }
 
@@ -800,6 +879,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @throws Exception
    */
   public final void render(String viewName, Object viewModel) throws Exception {
+    response.header(HTTPHeader.CONTENT_TYPE, "text/html; charset=UTF-8");
     templateEngine.render(viewName, viewModel, response.raw().getWriter());
   }
 
@@ -836,13 +916,18 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @param file A file.
    */
   public void sendFile(File file, CacheControl cacheType) throws Exception {
-    if (request.raw().isAsyncSupported()) {
-      goAsync();
-      this.close();
+    if (response.hasSentHeaders()) {
+      throw new IOException("Cannot send file to committed response.");
     }
-
+    
+    response.raw().reset();
     fs.sendResource(request.raw(), response.raw(), Resource.newResource(file), cacheType);
+    response.raw().flushBuffer();
     return;
+  }
+  
+  public boolean isAsync() {
+    return asyncContext != null;
   }
 
   public Groups groups() {
@@ -894,6 +979,19 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
 
     if (session != null && session.isDirty()) {
       session.save();
+    }
+  }
+  
+  public void handleException(Throwable error) {
+    logger.warn("Route handler returned exception: ", error);
+    try {
+      LightningHandler handler = injector().getInjectedArgumentForClass(LightningHandler.class);
+      handler.sendErrorPage(request.raw(), 
+                            response.raw(), 
+                            error, 
+                            handler.getRouteMatch(request.path(), request.method()));
+    } catch (Exception e) {
+      // Nothing we can do.
     }
   }
 }
