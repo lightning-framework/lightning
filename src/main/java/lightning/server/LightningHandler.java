@@ -8,15 +8,31 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executor;
 
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import org.eclipse.jetty.io.ByteBufferPool;
+import org.eclipse.jetty.io.MappedByteBufferPool;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.MultiPartInputStreamParser;
+import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.util.resource.ResourceCollection;
+import org.eclipse.jetty.util.resource.ResourceFactory;
+import org.eclipse.jetty.websocket.api.WebSocketBehavior;
+import org.eclipse.jetty.websocket.api.WebSocketPolicy;
+import org.eclipse.jetty.websocket.server.WebSocketServerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.augustl.pathtravelagent.PathFormatException;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import lightning.ann.Before;
 import lightning.ann.Befores;
@@ -56,7 +72,6 @@ import lightning.http.MethodNotAllowedException;
 import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
-import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.io.BufferingHttpServletResponse;
 import lightning.io.FileServer;
@@ -76,26 +91,7 @@ import lightning.scanner.Scanner;
 import lightning.templates.FreeMarkerTemplateEngine;
 import lightning.templates.TemplateEngine;
 import lightning.util.MimeMatcher;
-import lightning.websockets.LightningWebSocketCreator;
-import lightning.websockets.WebSocketHandler;
-
-import org.eclipse.jetty.io.ByteBufferPool;
-import org.eclipse.jetty.io.MappedByteBufferPool;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.util.MultiException;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
-import org.eclipse.jetty.util.resource.Resource;
-import org.eclipse.jetty.util.resource.ResourceCollection;
-import org.eclipse.jetty.util.resource.ResourceFactory;
-import org.eclipse.jetty.websocket.api.WebSocketBehavior;
-import org.eclipse.jetty.websocket.api.WebSocketPolicy;
-import org.eclipse.jetty.websocket.server.WebSocketServerFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.augustl.pathtravelagent.PathFormatException;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import lightning.websockets.WebSocketHolder;
 
 public final class LightningHandler extends AbstractHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(LightningHandler.class);
@@ -129,7 +125,6 @@ public final class LightningHandler extends AbstractHandler {
 
   private WebSocketServerFactory webSocketFactory;
   private ScanResult scanResult;
-  private Map<String, LightningWebSocketCreator> singletonWebSockets;
 
   public LightningHandler(Config config,
                           MySQLDatabaseProvider dbProvider,
@@ -210,11 +205,6 @@ public final class LightningHandler extends AbstractHandler {
       }
     }
 
-    // Set up web sockets.
-    {
-      this.singletonWebSockets = (config.enableDebugMode) ? new HashMap<>() : null;
-    }
-
     // Set up the global injection module.
     {
       this.globalInjectorModule = new InjectorModule();
@@ -222,6 +212,9 @@ public final class LightningHandler extends AbstractHandler {
       this.globalInjectorModule.bindClassToInstance(Config.class, this.config);
       this.globalInjectorModule.bindClassToInstance(MySQLDatabaseProvider.class, this.dbProvider);
       this.globalInjectorModule.bindClassToInstance(Mailer.class, this.mailer);
+      this.globalInjectorModule.bindClassToInstance(TemplateEngine.class, this.userTemplateEngine);
+      this.globalInjectorModule.bindClassToInstance(Cache.class, this.cache);
+      this.globalInjectorModule.bindClassToInstance(JsonService.class, this.jsonService);
     }
 
     rescan();
@@ -387,13 +380,13 @@ public final class LightningHandler extends AbstractHandler {
   private boolean acceptWebSocket(HttpServletRequest request,
                                  HttpServletResponse response,
                                  Match<Object> route) throws IOException {
-    if (!(route.getData() instanceof LightningWebSocketCreator)) {
+    if (!(route.getData() instanceof WebSocketHolder)) {
       return false;
     }
 
-    LightningWebSocketCreator creator = (LightningWebSocketCreator)route.getData();
+    WebSocketHolder wrapper = (WebSocketHolder)route.getData();
 
-    logRequest(request, "@WebSocket " + creator.getType().getCanonicalName());
+    logRequest(request, "@WebSocket " + wrapper.getType().getCanonicalName());
 
     if (!webSocketFactory.isUpgradeRequest(request, response)) {
       throw new BadRequestException();
@@ -401,7 +394,7 @@ public final class LightningHandler extends AbstractHandler {
 
     // The request is consumed regardless of what acceptWebSocket returns.
     // If it fails, the factory commits the response with an error code.
-    webSocketFactory.acceptWebSocket(creator, request, response);
+    webSocketFactory.acceptWebSocket(wrapper.getCreator(context(request, response)), request, response);
     return true;
   }
 
@@ -486,41 +479,14 @@ public final class LightningHandler extends AbstractHandler {
       }
 
       // TODO: Drop active web socket connections immediately when code changes (instead of on next event).
-      // TODO: Add tighter integration between framework and web sockets (e.g. Context.* properties).
       // @WebSocket annotations.
       {
-        Map<String, LightningWebSocketCreator> oldSingletonWebSockets = singletonWebSockets;
-        singletonWebSockets = config.enableDebugMode ? new HashMap<>() : null;
 
         for (Class<?> clazz : scanResult.websockets) {
           @SuppressWarnings("unchecked")
-          Class<? extends WebSocketHandler> ws = (Class<? extends WebSocketHandler>)clazz;
+          Class<? extends WebSocketHolder> ws = (Class<? extends WebSocketHolder>)clazz;
           WebSocket info = clazz.getAnnotation(WebSocket.class);
-          LightningWebSocketCreator creator = null;
-
-          // Handler code can be reloaded in debug mode.
-          // For singleton web sockets, we are clearing the route entries which means we create
-          // a new singleton on each rescan. We need to instead use the old singleton unless the
-          // code or path for that singleton has changed.
-          if (config.enableDebugMode) {
-            LightningWebSocketCreator oldCreator = oldSingletonWebSockets.get(info.path());
-            if (oldCreator != null &&
-                oldCreator.getType().getCanonicalName() == clazz.getCanonicalName() &&
-                !oldCreator.isCodeChanged()) {
-              creator = oldCreator;
-            }
-          }
-
-          if (creator == null) {
-            creator = new LightningWebSocketCreator(config,
-                                                    new Injector(globalInjectorModule, userInjectorModule),
-                                                    ws,
-                                                    info.isSingleton());
-          }
-
-          if (config.enableDebugMode && info.isSingleton()) {
-            singletonWebSockets.put(info.path(), creator);
-          }
+          WebSocketHolder creator = new WebSocketHolder(ws);
 
           routes.map(HTTPMethod.GET,
                           info.path(),
@@ -748,57 +714,59 @@ public final class LightningHandler extends AbstractHandler {
     }
 
     try {
-      // Set the default content type for all route targets.
-      response.setContentType("text/html; charset=UTF-8");
+      try {
+        // Set the default content type for all route targets.
+        response.setContentType("text/html; charset=UTF-8");
 
-      // Execute @Before filters.
-      processBeforeFilters(context);
+        // Execute @Before filters.
+        processBeforeFilters(context);
 
-      ((InternalRequest)context.request).setWildcards(route.getWildcards());
-      ((InternalRequest)context.request).setParams(route.getParams());
+        ((InternalRequest)context.request).setWildcards(route.getWildcards());
+        ((InternalRequest)context.request).setParams(route.getParams());
 
-      // Perform pre-processing.
-      if (target.getAnnotation(Multipart.class) != null) {
-        context.requireMultipart();
-      }
-
-      if (target.getAnnotation(RequireAuth.class) != null) {
-        context.requireAuth();
-      }
-
-      {
-        RequireXsrfToken info = target.getAnnotation(RequireXsrfToken.class);
-        if (info != null) {
-          context.requireXsrf(info.inputName());
+        // Perform pre-processing.
+        if (target.getAnnotation(Multipart.class) != null) {
+          context.requireMultipart();
         }
+
+        if (target.getAnnotation(RequireAuth.class) != null) {
+          context.requireAuth();
+        }
+
+        {
+          RequireXsrfToken info = target.getAnnotation(RequireXsrfToken.class);
+          if (info != null) {
+            context.requireXsrf(info.inputName());
+          }
+        }
+
+        // Execute @Filter filters.
+        processBeforeAnnotationFilters(context, target);
+
+        // Instantiate the controller.
+        controller = context.injector().newInstance(target.getDeclaringClass());
+
+        // Run @Initializers.
+        runControllerInitializers(context, controller);
+
+        // Execute the @Route.
+        Object output = target.invoke(controller, context.injector().getInjectedArguments(target));
+
+        // Try to save the session here if we need to since post-processing may commit the response.
+        context.maybeSaveSession();
+
+        // Perform post-processing.
+        if (output != null) {
+          processControllerOutput(context, target, output);
+        }
+      } catch (InvocationTargetException e) {
+        // Leads to better error pages.
+        // Also: Important so that exception handlers map correctly.
+        if (e.getCause() != null) {
+          throw e.getCause();
+        }
+        throw e;
       }
-
-      // Execute @Filter filters.
-      processBeforeAnnotationFilters(context, target);
-
-      // Instantiate the controller.
-      controller = context.injector().newInstance(target.getDeclaringClass());
-
-      // Run @Initializers.
-      runControllerInitializers(context, controller);
-
-      // Execute the @Route.
-      Object output = target.invoke(controller, context.injector().getInjectedArguments(target));
-
-      // Try to save the session here if we need to since post-processing may commit the response.
-      context.maybeSaveSession();
-
-      // Perform post-processing.
-      if (output != null) {
-        processControllerOutput(context, target, output);
-      }
-    } catch (InvocationTargetException e) {
-      if (e.getCause() != null) {
-        // Leads to better error logs/debug screens.
-        throw e.getCause();
-      }
-
-      throw e;
     } catch (HaltException e) {
       // A halt exception says to jump to here in the life cycle.
     } finally {

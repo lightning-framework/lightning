@@ -34,8 +34,7 @@ import lightning.routing.RouteMapper.Match;
 import lightning.scanner.ScanResult;
 import lightning.server.LightningHandler;
 import lightning.util.ReflectionUtil;
-import lightning.websockets.LightningWebSocketCreator;
-import lightning.websockets.WebSocketHandler;
+import lightning.websockets.WebSocketHolder;
 
 /**
  * Renders an in-browser table displaying all installed handlers.
@@ -89,7 +88,7 @@ public class DebugMapController {
     model.put("exception_handlers", exceptionHandlers);
 
     List<Object> websockets = new ArrayList<>();
-    for (Class<? extends WebSocketHandler> type : result.websockets) {
+    for (Class<?> type : result.websockets) {
         WebSocket ws = notNull(type.getAnnotation(WebSocket.class));
         websockets.add(ImmutableMap.<String, Object>of(
           "path", ws.path(),
@@ -147,14 +146,14 @@ public class DebugMapController {
                              "message", e.getMessage());
     }
   }
-  
+
   private static List<String> getMatches(LightningHandler handler, String path, HTTPMethod method) throws PathFormatException {
     List<String> matches = new ArrayList<>();
     Match<Object> route = handler.getRouteMatch(path, method);
-    
+
     if (route != null) {
-      if (route.getData() instanceof LightningWebSocketCreator) {
-        LightningWebSocketCreator socket = (LightningWebSocketCreator)route.getData();
+      if (route.getData() instanceof WebSocketHolder) {
+        WebSocketHolder socket = (WebSocketHolder)route.getData();
         matches.add(socket.getType().getCanonicalName());
       }
 

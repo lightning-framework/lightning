@@ -13,16 +13,16 @@ import java.util.Map;
 public class MySQLDatabaseProxy implements MySQLDatabase {
   private final MySQLDatabaseProvider provider;
   private MySQLDatabase delegate;
-  
+
   public MySQLDatabaseProxy(MySQLDatabaseProvider provider) {
     this.provider = provider;
     delegate = null;
   }
-  
+
   public MySQLDatabaseProvider getProvider() {
     return this.provider;
   }
-  
+
   private void lazyLoad() throws SQLException {
     if (delegate == null) {
       delegate = provider.getDatabase();
@@ -40,7 +40,7 @@ public class MySQLDatabaseProxy implements MySQLDatabase {
     lazyLoad();
     delegate.transaction(transaction, level);
   }
-  
+
   @Override
   public <T> T transaction(Transaction<T> transaction) throws Exception {
     lazyLoad();
@@ -57,10 +57,11 @@ public class MySQLDatabaseProxy implements MySQLDatabase {
   public void close() throws SQLException {
     // Do nothing, users shouldn't be able to close the proxy.
   }
-  
+
   public void reallyClose() throws SQLException {
     if (delegate != null) {
       delegate.close();
+      delegate = null;
     }
   }
 

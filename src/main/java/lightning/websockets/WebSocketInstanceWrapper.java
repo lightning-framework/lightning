@@ -1,111 +1,144 @@
 package lightning.websockets;
 
-import java.io.InputStream;
-
-import lightning.config.Config;
-import lightning.inject.Injector;
-import lightning.scanner.Snapshot;
-
 import org.eclipse.jetty.websocket.api.Session;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketClose;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketError;
-import org.eclipse.jetty.websocket.api.annotations.OnWebSocketMessage;
+import org.eclipse.jetty.websocket.api.WebSocketListener;
 import org.eclipse.jetty.websocket.api.annotations.WebSocket;
-import org.eclipse.jetty.websocket.servlet.ServletUpgradeRequest;
-import org.eclipse.jetty.websocket.servlet.ServletUpgradeResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import lightning.scanner.Snapshot;
+import lightning.websockets.WebSocketHolder.WebSocketBindings;
+
 @WebSocket
-public final class WebSocketInstanceWrapper {
+public final class WebSocketInstanceWrapper implements WebSocketListener {
   private final Logger LOGGER = LoggerFactory.getLogger(WebSocketInstanceWrapper.class);
-  private final Config config;
-  private WebSocketHandler handler;
-  private Session session;
+  private final WebSocketBindings bindings;
+  private final WebSocketHandlerContext context;
+  private final Object handler;
   private Snapshot snapshot;
-  
-  public WebSocketInstanceWrapper(Config config, Injector injector, Class<? extends WebSocketHandler> type) throws Exception {
-    this.config = config;
-    this.handler = injector.newInstance(type);
-    this.session = null;
-    this.snapshot = config.enableDebugMode ? Snapshot.capture(config.autoReloadPrefixes) : null;
-  }
-  
-  @OnWebSocketConnect
-  public void connected(Session session) {
-    try {
-      if (!isCodeChanged()) {
-        this.session = session;
-        handler.onConnected(session);
-      } else {
-        session.close(1011, "");
-      }
-    } catch (Exception e) {
-      error(session, e);
-      session.close(1011, "");
-    }
+
+  public WebSocketInstanceWrapper(WebSocketBindings bindings,
+                                  WebSocketHandlerContext context,
+                                  Object handler) throws Exception {
+    this.handler = handler;
+    this.bindings = bindings;
+    this.context = context;
+    this.snapshot = context.config().enableDebugMode
+        ? Snapshot.capture(context.config().autoReloadPrefixes)
+        : null;
   }
 
-  @OnWebSocketClose
-  public void closed(Session session, int status, String reason) {
+  private boolean isCodeChanged() throws Exception {
+    return context.config().canReloadClass(handler.getClass()) &&
+           !Snapshot.capture(context.config().autoReloadPrefixes).equals(snapshot);
+  }
+
+  @Override
+  public void onWebSocketClose(int status, String reason) {
     try {
-      if (this.session != null) {
-        this.session = null;
-        handler.onClose(session, status, reason);
+      if (context.hasSession()) {
+        if (bindings.close != null) {
+          try {
+            context.install();
+            context.injector().invoke(bindings.close, handler, status, reason);
+          } finally {
+            context.uninstall();
+          }
+        }
       }
     } catch (Exception e) {
       // The session is closed already.
       // Suppress the exception and log it.
       LOGGER.warn("Exception in web socket close handler:", e);
+    } finally {
+      context.clearSession();
     }
   }
 
-  @OnWebSocketError
-  public void error(Session session, Throwable error) {
+  @Override
+  public void onWebSocketConnect(Session session) {
     try {
-      handler.onError(session, error);
+      if (!isCodeChanged()) {
+        context.setSession(session);
+        if (bindings.open != null) {
+          try {
+            context.install();
+            context.injector().invoke(bindings.open, handler);
+          } finally {
+            context.uninstall();
+          }
+        }
+      } else {
+        session.close(1011, "");
+      }
+    } catch (Exception e) {
+      onWebSocketError(e);
+      session.close(1011, "");
+    }
+  }
+
+  @Override
+  public void onWebSocketError(Throwable error) {
+    try {
+      if (bindings.error != null) {
+        context.injector().invoke(bindings.error, handler, error);
+      } else {
+        LOGGER.warn("A web socket error occured: ", error);
+      }
     } catch (Exception e) {
       // The session is going to be closed anyways.
       // Suppress the exception and log it.
       LOGGER.warn("Exception in web socket error handler: ", e);
+    } finally {
+      if (context.hasSession()) {
+        context.close(1011);
+      }
     }
   }
 
-  @OnWebSocketMessage
-  public void messageText(Session session, String message) {
+  @Override
+  public void onWebSocketBinary(byte[] payload, int off, int len) {
     try {
       if (!isCodeChanged()) {
-        handler.onTextMessage(session, message);
+        if (bindings.binaryMessage != null) {
+          try {
+            context.install();
+            context.injector().invoke(bindings.binaryMessage, handler, payload, off, len);
+          } finally {
+            context.uninstall();
+          }
+        } else {
+          context.close(1003, "Unsupported Message Type");
+        }
       } else {
-        session.close(1011, "");
+        context.close(1011);
       }
     } catch (Exception e) {
-      error(session, e);
-      session.close(1011, "");
+      onWebSocketError(e);
+      context.close(1011);
     }
   }
- 
-  @OnWebSocketMessage
-  public void messageBinary(final Session session, InputStream message) {
+
+  @Override
+  public void onWebSocketText(String message) {
     try {
       if (!isCodeChanged()) {
-        handler.onBinaryMessage(session, message);
+        if (bindings.textMessage != null) {
+          try {
+            context.install();
+            context.injector().invoke(bindings.textMessage, handler, message);
+          } finally {
+            context.uninstall();
+          }
+        } else {
+          context.close(1003, "Unsupported Message Type");
+        }
       } else {
-        session.close(1011, "");
+        context.close(1011);
       }
     } catch (Exception e) {
-      error(session, e);
-      session.close(1011, "");
+      onWebSocketError(e);
+      context.close(1011);
     }
-  }
-  
-  private boolean isCodeChanged() throws Exception {
-    return config.canReloadClass(handler.getClass()) && 
-           !Snapshot.capture(config.autoReloadPrefixes).equals(snapshot);
-  }
-  
-  public boolean shouldAccept(ServletUpgradeRequest request, ServletUpgradeResponse response) throws Exception {
-    return handler.shouldAccept(request, response);
   }
 }

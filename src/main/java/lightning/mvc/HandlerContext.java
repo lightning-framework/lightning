@@ -101,6 +101,9 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   private final Cache cache;
   private final Injector injector;
   private final InjectorModule bindings;
+  public final InjectorModule globalBindings;
+  public final InjectorModule userBindings;
+  private final MySQLDatabaseProvider dbp;
   public static final String ATTRIBUTE = HandlerContext.class.getCanonicalName();
   private AsyncContext asyncContext;
 
@@ -111,6 +114,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.response = re;
     this.config = c;
     this.mail = mailer;
+    this.dbp = dbp;
     this.templateEngine = te;
     this.cookies = SecureCookieManager.forRequest(request, response, config.server.hmacKey, config.ssl.isEnabled());
     this.url = URLGenerator.forRequest(request);
@@ -138,12 +142,18 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     this.bindings.bindClassToInstance(Cache.class, this.cache());
     this.bindings.bindClassToResolver(User.class, () -> this.user());
     this.bindings.bindClassToResolver(MySQLDatabase.class, () -> this.db());
+    this.userBindings = userModule;
+    this.globalBindings = globalModule;
     this.injector = new Injector(globalModule, userModule, this.bindings);
     this.bindings.bindClassToInstance(Injector.class, this.injector);
   }
 
   public Injector injector() {
     return this.injector;
+  }
+
+  public Injector globalInjector() {
+    return new Injector(globalBindings, userBindings);
   }
 
   public InjectorModule bindings() {
@@ -295,6 +305,10 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @return
    */
   public final Config getConfig() {
+    return config;
+  }
+
+  public final Config config() {
     return config;
   }
 
@@ -806,7 +820,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   }
 
   public final String toJson(Object object) throws Exception {
-    return toJson(JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+    return toJson(object, JsonFieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
   }
 
   public final String toJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
@@ -1004,5 +1018,25 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     } catch (Exception e) {
       // Nothing we can do.
     }
+  }
+
+  public Response response() {
+    return response;
+  }
+
+  public Request request() {
+    return request;
+  }
+
+  public TemplateEngine templates() {
+    return templateEngine;
+  }
+
+  public JsonService json() {
+    return jsonifier;
+  }
+
+  public MySQLDatabaseProvider dbPool() {
+    return dbp;
   }
 }

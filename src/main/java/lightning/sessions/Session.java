@@ -28,11 +28,11 @@ import com.google.common.hash.Hashing;
  * Implements a session system.
  * Improves upon native session functionality by adding extra security features and
  * (by allowing custom storage drivers) supporting distributed session management.
- * 
+ *
  * Session are loaded and saved lazily (no operations on storage unless necessary).
  * Any type of Serializable object can be stored in a session.
- * 
- * TODO: Session will not get saved automatically when user handler sends HTTP content before the 
+ *
+ * TODO: Session will not get saved automatically when user handler sends HTTP content before the
  * session is saved (since after content is sent the session manager is not able to write the session
  * ID cookie). Happens because HandlerContext is closed (which invokes session save) after the user
  * handler is invoked. Could be fixed by output buffering.
@@ -41,15 +41,15 @@ import com.google.common.hash.Hashing;
  */
 public final class Session {
   private static final Logger logger = LoggerFactory.getLogger(Session.class);
-  private static final int SESSION_ID_BYTES = 1024;
+  private static final int SESSION_ID_BYTES = 256;
   private static final int XSRF_BYTES = 48;
   private static final String SESSION_COOKIE_NAME = "_sessiond";
   private static final String SESSION_KEY_PREFIX = "$$session-";
   private static final String LAST_USE_KEY = SESSION_KEY_PREFIX + "lastuse";
   private static final String XSRF_KEY = SESSION_KEY_PREFIX + "xsrf";
-  
+
   private long inactivityTimeoutSeconds = 60 * 60 * 24 * 14; // TODO: An option for this.
-    
+
   /**
    * Hashes a session token.
    * @param plaintextValue Raw session token.
@@ -58,7 +58,7 @@ public final class Session {
   private static String hashToken(String plaintextValue) {
     return Hashing.sha256().hashString(plaintextValue, Charsets.UTF_8).toString();
   }
-  
+
   /**
    * @param request An incoming HTTP request.
    * @return A session object for that request.
@@ -67,40 +67,40 @@ public final class Session {
     if (driver == null) {
       throw new RuntimeException("Error: Must install a session driver before using Session.");
     }
-    
+
     return new Session(request, response, config, driver);
   }
-  
+
   /**
    * An exception thrown when the session library fails to complete an operation.
    */
   public static class SessionException extends Exception {
     private static final long serialVersionUID = 1L;
-    
+
     public SessionException(Exception e) {
       super(e);
     }
-    
+
     public SessionException(String message) {
       super(message);
     }
   }
-  
+
   /**
    * An exception thrown when the session library fails to complete an operation.
    */
   public static class SessionDriverException extends SessionException {
     private static final long serialVersionUID = 1L;
-    
+
     public SessionDriverException(Exception e) {
       super(e);
     }
-    
+
     public SessionDriverException(String message) {
       super(message);
     }
   }
-  
+
   /**
    * Defines an interface for storage session information.
    * The storage driver may choose to store extra metadata (e.g. last use times) and prune the
@@ -114,7 +114,7 @@ public final class Session {
      * @throws SessionDriverException On failure.
      */
     public Map<String, Object> get(String hashedId) throws SessionDriverException;
-    
+
     /**
      * Stores information about a session in the storage system. Only called when some differences exist.
      * @param hashedId Hashed session identifier.
@@ -123,21 +123,21 @@ public final class Session {
      * @throws SessionDriverException On failure.
      */
     public void put(String hashedId, Map<String, Object> data, Set<String> changedKeys) throws SessionDriverException;
-    
+
     /**
      * @param hashedId Hashed session identifier
      * @return Whether or not that session exists in DB.
      * @throws SessionDriverException On failure.
      */
     public boolean has(String hashedId) throws SessionDriverException;
-    
+
     /**
      * Invalidates a session.
      * @param hashedId Hashed session identifier.
      * @throws SeessionDriverException On failure.
      */
     public void invalidate(String hashedId) throws SessionDriverException;
-    
+
     /**
      * Keeps a session from timing out. The provided identifier may not correspond to an
      * identifier in storage; in this case, do nothing.
@@ -146,9 +146,9 @@ public final class Session {
      */
     public void keepAliveIfExists(String hashedId) throws SessionDriverException;
   }
-  
-  // -----------------------------------------------------------------  
-  
+
+  // -----------------------------------------------------------------
+
   private final SessionStorageDriver storage;
   private final SecureCookieManager cookies;
   private final Request request;
@@ -158,7 +158,7 @@ public final class Session {
   private String rawIdentifier;
   private Map<String, Object> data;
   private Set<String> changedKeys;
-  
+
   /**
    * @param request Spark HTTP request.
    * @param response Spark HTTP response.
@@ -172,35 +172,35 @@ public final class Session {
     isLoaded = false;
     cookies = SecureCookieManager.forRequest(request, response, config.server.hmacKey, config.ssl.isEnabled());
     changedKeys = new TreeSet<>();
-    
+
     try {
       rawIdentifier = cookies.get(SESSION_COOKIE_NAME);
     } catch (InsecureCookieException e) {
       rawIdentifier = null;
     }
   }
-  
+
   /**
    * @return Cookie manager for this session.
    */
   public SecureCookieManager getCookieManager() {
     return cookies;
   }
-  
+
   /**
    * @return Spark HTTP request for this session.
    */
   public Request getRequest() {
     return request;
   }
-  
+
   /**
    * @return Spark HTTP response for this session.
    */
   public Response getResponse() {
     return response;
   }
-  
+
   /**
    * @return A new, unused session identifier.
    */
@@ -210,22 +210,22 @@ public final class Session {
       byte bytes[] = new byte[SESSION_ID_BYTES];
       generator.nextBytes(bytes);
       String id = Base64.getEncoder().encodeToString(bytes);
-      
+
       if (storage.has(hashToken(id))) {
         continue; // Pick again.
       }
-      
+
       return id;
     }
   }
-  
+
   /**
    * @return Whether or not this session has any unsaved data.
    */
   public boolean isDirty() {
     return isDirty;
   }
-  
+
   /**
    * @return All valid keys stored on the session.
    * @throws SessionException
@@ -234,7 +234,7 @@ public final class Session {
     lazyLoad();
     return Iterables.filter(data.keySet(), (x) -> !x.startsWith(SESSION_KEY_PREFIX));
   }
-  
+
   /**
    * Sets the stored data for key to value.
    * @param key
@@ -243,38 +243,38 @@ public final class Session {
    */
   public void set(String key, Object value) throws SessionException {
     if (key.startsWith(SESSION_KEY_PREFIX))
-      throw new SessionException("Error: Key is reserved by session manager.");    
+      throw new SessionException("Error: Key is reserved by session manager.");
     if (!(value instanceof Serializable)) // Note: Also prevents storing null pointers!
       throw new SessionException("Error: Unable to store nonserializable object in Session.");
-    
+
     lazyLoad();
     isDirty = true;
     changedKeys.add(key);
     data.put(key, value);
   }
-  
+
   public String getRawID() throws SessionException {
     lazyLoad();
     return rawIdentifier;
   }
-  
+
   public Map<String, ObjectParam> asMap() throws SessionException {
     lazyLoad();
-    
+
     Map<String, ObjectParam> map = new HashMap<>();
-    
+
     for (String key : userKeys()) {
       map.put(key, get(key));
     }
-    
+
     return map;
   }
-  
+
   public Set<String> keys() throws SessionException {
     lazyLoad();
     return asMap().keySet();
   }
-  
+
   /**
    * Gets any stored information for the given key. Throws an exception if not found.
    * @param key
@@ -288,8 +288,8 @@ public final class Session {
     if (!data.containsKey(key))
       return new ObjectParam(null);
     return new ObjectParam(data.get(key));
-  }  
-  
+  }
+
   /**
    * Removes any stored information for the given key.
    * @param key
@@ -298,13 +298,13 @@ public final class Session {
   public void forget(String key) throws SessionException {
     if (key.startsWith(SESSION_KEY_PREFIX))
       return;
-    
+
     lazyLoad();
     isDirty = true;
     changedKeys.add(key);
     data.remove(key);
   }
-  
+
   /**
    * Returns whether or not the session has any data for a key.
    * @param key
@@ -314,11 +314,11 @@ public final class Session {
   public boolean has(String key) throws SessionException {
     if (key.startsWith(SESSION_KEY_PREFIX))
       return false;
-    
+
     lazyLoad();
     return data.containsKey(key);
   }
-  
+
   /**
    * @return An XSRF token for this session.
    * @throws Exception
@@ -330,14 +330,14 @@ public final class Session {
       changedKeys.add(XSRF_KEY);
       isDirty = true;
     }
-    
+
     return (String) data.get(XSRF_KEY);
   }
-  
+
   public String xsrfToken() throws Exception {
     return getXSRFToken();
   }
-  
+
   /**
    * Sets a new XSRF token and returns it.
    * @return
@@ -349,7 +349,7 @@ public final class Session {
     data.put(XSRF_KEY, lightning.crypt.Hasher.generateToken(XSRF_BYTES, (x) -> false));
     changedKeys.add(XSRF_KEY);
     isDirty = true;
-    
+
     return (String) data.get(XSRF_KEY);
   }
 
@@ -357,19 +357,19 @@ public final class Session {
    * Saves the session, throwing an Exception on failure.
    * If the session is not dirty, has no effect.
    * @throws SessionException
-   * @throws InsecureCookieException 
+   * @throws InsecureCookieException
    */
   public void save() throws SessionException {
     if (!isLoaded) {
       return;
     }
-    
+
     if (!isDirty && rawIdentifier != null) {
       // No need to do a full save, but should ensure the session doesn't expire.
       storage.keepAliveIfExists(hashToken(rawIdentifier));
       return;
     }
-    
+
     data.put(LAST_USE_KEY, Time.now());
     changedKeys.add(LAST_USE_KEY);
     storage.put(hashToken(rawIdentifier), data, changedKeys);
@@ -389,16 +389,16 @@ public final class Session {
     logger.debug("Session data was: {}", data);
     isDirty = false;
   }
-  
+
   /**
    * Loads all data attached to this session.
-   * @throws SessionException 
+   * @throws SessionException
    */
   private void lazyLoad() throws SessionException {
     if (isLoaded) {
       return;
     }
-        
+
     if (rawIdentifier == null) {
       data = new HashMap<>();
       rawIdentifier = generateSessionId();
@@ -422,12 +422,12 @@ public final class Session {
         logger.debug("Session invalidated due to timeout; regenerated as {}.", rawIdentifier);
       }
     }
-    
+
     logger.debug("Data loaded was: {}", data);
     isLoaded = true;
-    save();    
+    save();
   }
-  
+
   /**
    * Regenerates the session identifier; should be called periodically and on privilege escalation.
    * Requires a call to save() in order to take effect.

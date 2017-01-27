@@ -1,6 +1,9 @@
 package lightning.util;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ReflectionUtil {
   public static Method getMethod(Class<?> clazz, String name) throws NoSuchMethodException {
@@ -22,5 +25,23 @@ public class ReflectionUtil {
     }
 
     return r;
+  }
+
+  public static List<Method> getMethodsAnnotatedWith(Class<?> clazz, Class<? extends Annotation> annotation) {
+    List<Method> results = new ArrayList<>();
+
+    while (clazz != null) {
+      for (Method method : clazz.getDeclaredMethods()) {
+        if (!method.isAnnotationPresent(annotation)) {
+          continue;
+        }
+
+        results.add(method);
+      }
+
+      clazz = clazz.getSuperclass();
+    }
+
+    return results;
   }
 }

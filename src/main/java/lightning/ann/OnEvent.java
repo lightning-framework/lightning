@@ -6,10 +6,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import lightning.enums.EventType;
+
 @Documented
-@Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface RequireRParams {
-  @SuppressWarnings("deprecation")
-  RequireRParam[] value();
+@Retention(RetentionPolicy.RUNTIME)
+public @interface OnEvent {
+  public EventType value();
 }

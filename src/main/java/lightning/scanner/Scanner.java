@@ -8,19 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import lightning.ann.Before;
-import lightning.ann.Befores;
-import lightning.ann.Controller;
-import lightning.ann.ExceptionHandler;
-import lightning.ann.Finalizer;
-import lightning.ann.Initializer;
-import lightning.ann.Route;
-import lightning.ann.Routes;
-import lightning.ann.WebSocket;
-import lightning.classloaders.ExceptingClassLoader;
-import lightning.classloaders.ExceptingClassLoader.PrefixClassLoaderExceptor;
-import lightning.websockets.WebSocketHandler;
-
 import org.reflections.Reflections;
 import org.reflections.scanners.MethodAnnotationsScanner;
 import org.reflections.scanners.SubTypesScanner;
@@ -31,6 +18,20 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Iterables;
 
+import lightning.ann.Before;
+import lightning.ann.Befores;
+import lightning.ann.Controller;
+import lightning.ann.ExceptionHandler;
+import lightning.ann.Finalizer;
+import lightning.ann.Initializer;
+import lightning.ann.OnEvent;
+import lightning.ann.Route;
+import lightning.ann.Routes;
+import lightning.ann.WebSocket;
+import lightning.classloaders.ExceptingClassLoader;
+import lightning.classloaders.ExceptingClassLoader.PrefixClassLoaderExceptor;
+import lightning.util.ReflectionUtil;
+
 /**
  * Responsible for scanning the class path for annotations needed by the framework.
  * TODO: Can we speed this up to make debug mode faster? Not going to be scalable to MASSIVE applications.
@@ -40,40 +41,40 @@ public class Scanner {
   private final List<String> scanPrefixes;
   private final boolean enableAutoReload;
   private static final Logger logger = LoggerFactory.getLogger(Scanner.class);
-  
+
   /**
    * @param classLoader The class loader to use (default one in most cases)
    * @param scanPrefixes List of package prefixes to scan within (e.g. ["lightning.controllers"])
-   * @param enableAutoReload 
+   * @param enableAutoReload
    */
   public Scanner(List<String> reloadPrefixes, List<String> scanPrefixes, boolean enableAutoReload) {
     this.reloadPrefixes = reloadPrefixes;
     this.scanPrefixes = scanPrefixes;
     this.enableAutoReload = enableAutoReload;
   }
-  
+
   private static void putMethod(Map<Class<?>, Set<Method>> map, Method method) {
     Class<?> clazz = method.getDeclaringClass();
-    
+
     if (!map.containsKey(clazz)) {
       map.put(clazz, new HashSet<>());
     }
-    
+
     map.get(clazz).add(method);
   }
-  
+
   public ScanResult scan() {
     Set<Class<?>> controllers = new HashSet<>();
     Map<Class<?>, Set<Method>> initializers = new HashMap<>();
     Map<Class<?>, Set<Method>> finalizers = new HashMap<>();
     Map<Class<?>, Set<Method>> exceptionHandlers = new HashMap<>();
     Map<Class<?>, Set<Method>> routes = new HashMap<>();
-    Set<Class<? extends WebSocketHandler>> websockets = new HashSet<>();
+    Set<Class<?>> websockets = new HashSet<>();
     Map<Class<?>, Set<Method>> beforeFilters = new HashMap<>();
     ClassLoader classLoader = enableAutoReload
         ? new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), "target/classes")
         : this.getClass().getClassLoader();
-    
+
     for (Reflections scanner : reflections(classLoader)) {
       for (Method m : scanner.getMethodsAnnotatedWith(Initializer.class)) {
         // TODO: check returns void, can inject
@@ -89,7 +90,7 @@ public class Scanner {
               + "Initializers must be public, concrete, non-static, and declared inside of an @Controller.", m);
         }
       }
-      
+
       for (Method m : scanner.getMethodsAnnotatedWith(Finalizer.class)) {
         // TODO: check returns void, can inject
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
@@ -104,7 +105,7 @@ public class Scanner {
               + "Finalizers must be public, concrete, non-static, and declared inside of an @Controller.", m);
         }
       }
-      
+
       for (Method m : scanner.getMethodsAnnotatedWith(ExceptionHandler.class)) {
         // TODO: check returns void, can inject
         if (Modifier.isStatic(m.getModifiers()) &&
@@ -117,34 +118,40 @@ public class Scanner {
             + "ExceptionHandlers must be public, concrete, static.", m);
         }
       }
-      
-      for (Class<?> c : scanner.getTypesAnnotatedWith(WebSocket.class)) {
+
+      websocket: for (Class<?> c : scanner.getTypesAnnotatedWith(WebSocket.class)) {
         if (!Modifier.isPublic(c.getModifiers())) {
           logger.error("ERROR: @WebSocket {} must be public.", c.getCanonicalName());
           continue;
         }
-        
+
         if (Modifier.isAbstract(c.getModifiers()) || c.isInterface()) {
           logger.error("ERROR: @WebSocket {} must be instantiatable.", c.getCanonicalName());
           continue;
         }
-        
-        if (!WebSocketHandler.class.isAssignableFrom(c)) {
-          logger.error("ERROR: @WebSocket {} must implement interface WebSocketHandler.", c.getCanonicalName());
-          continue;
-        }
-        
+
         if (c.getConstructors().length > 1) {
           // TODO: Should also check the constructor is public and injectable.
           logger.error("ERROR: @WebSocket {} must have one public constructor.", c.getCanonicalName());
           continue;
         }
-        
-        @SuppressWarnings("unchecked")
-        Class<? extends WebSocketHandler> cl = (Class<? extends WebSocketHandler>)c;
-        websockets.add(cl);
+
+
+        for (Method method : ReflectionUtil.getMethodsAnnotatedWith(c, OnEvent.class)) {
+          try {
+            method.getAnnotation(OnEvent.class).value().validate(method);
+          } catch (Exception e) {
+            logger.error("ERROR: @WebSocket {} method {} is not valid: {}",
+                c.getCanonicalName(), method.getName(), e.getMessage());
+            continue websocket;
+          }
+
+          // TODO: Should also check that method is injectable.
+        }
+
+        websockets.add(c);
       }
-      
+
       for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Before.class), scanner.getMethodsAnnotatedWith(Befores.class))) {
         // TODO: verify return value, can inject
         if (Modifier.isStatic(m.getModifiers()) &&
@@ -157,7 +164,7 @@ public class Scanner {
             + "Before filters must be public, concrete, static.", m);
         }
       }
-      
+
       for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Route.class), scanner.getMethodsAnnotatedWith(Routes.class))) {
         // TODO: verify can inject, verify any @Filter(s) constructors are injectable
         if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
@@ -173,26 +180,26 @@ public class Scanner {
         }
       }
     }
-    
+
     // TODO: Should check all controller constructors are injectable.
-    
+
     return new ScanResult(controllers, initializers, exceptionHandlers, routes, websockets, finalizers, beforeFilters);
   }
-  
+
   private Reflections[] reflections(ClassLoader classLoader) {
     Reflections[] result = new Reflections[scanPrefixes.size()];
-    
+
     int i = 0;
     for (String searchPath : scanPrefixes) {
       ConfigurationBuilder config = ConfigurationBuilder.build(
-          searchPath, classLoader, 
-          new SubTypesScanner(), 
-          new TypeAnnotationsScanner(), 
+          searchPath, classLoader,
+          new SubTypesScanner(),
+          new TypeAnnotationsScanner(),
           new MethodAnnotationsScanner());
       result[i] = new Reflections(config);
       i++;
     }
-    
+
     return result;
   }
 }
