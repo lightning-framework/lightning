@@ -66,9 +66,11 @@ public class DebugScreen {
                           ArrayList<LinkedHashMap<String, Object>> exceptionChain,
                           boolean isSuppressed) {
     LinkedHashMap<String, Object> exceptionInfo = new LinkedHashMap<>();
+    String trace = traceToString(throwable);
     exceptionInfo.put("frames", parseFrames(throwable));
     exceptionInfo.put("short_message", StringUtils.abbreviate(Optional.fromNullable(throwable.getMessage()).or(""), 100));
-    exceptionInfo.put("full_trace", traceToString(throwable));
+    exceptionInfo.put("full_trace", trace);
+    exceptionInfo.put("show_full_trace", trace.length() > 100);
     exceptionInfo.put("message", Optional.fromNullable(throwable.getMessage()).or(""));
     exceptionInfo.put("plain_exception", ExceptionUtils.getStackTrace(throwable));
     exceptionInfo.put("name", throwable.getClass().getCanonicalName().split("\\."));
@@ -184,8 +186,12 @@ public class DebugScreen {
 
   private LinkedHashMap<String, Object> getHandlerInfo(HandlerContext ctx, Match<Object> match) {
     LinkedHashMap<String, Object> data = new LinkedHashMap<>();
-    
-    if (match.getData() instanceof Method) {
+
+    if (match == null) {
+      data.put("Controller", "N/A");
+      data.put("Method", "N/A");
+    }
+    else if (match.getData() instanceof Method) {
       Method method = (Method)match.getData();
       data.put("Controller", method.getDeclaringClass().getCanonicalName());
       data.put("Method", method.getName());

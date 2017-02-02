@@ -6,6 +6,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProviderImpl;
+import lightning.exceptions.LightningConfigException;
 import lightning.exceptions.LightningRuntimeException;
 import lightning.inject.InjectorModule;
 
@@ -32,8 +33,18 @@ public class LightningServer {
   private Server server;
   private MySQLDatabaseProvider dbp;
 
+  public LightningServer(Config config) throws Exception {
+    this(config, new InjectorModule());
+  }
+
   public LightningServer(Config config, InjectorModule userModule) throws Exception {
     config.validate();
+
+    if (config.autoReloadPrefixes != null &&
+        userModule.hasInjectionsIn(config.autoReloadPrefixes)) {
+      throw new LightningConfigException("You must not dependency inject classes in your auto-reload packages.");
+    }
+
     server = createServer(config);
     this.dbp = new MySQLDatabaseProviderImpl(config.db);
 

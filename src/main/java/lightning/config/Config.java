@@ -7,6 +7,7 @@ import lightning.ann.Optional;
 import lightning.ann.Required;
 import lightning.exceptions.LightningException;
 import lightning.mail.MailerConfig;
+import lightning.util.Iterables;
 
 import com.google.common.collect.ImmutableList;
 
@@ -30,11 +31,6 @@ public class Config {
    *   Debug Mode enables automatic code reloading without restarting the server, adds in-browser exception
    *   stack traces and template errors, disables caching of static files and template files, disables HTTP
    *   caching of static files, etc.
-   *
-   * LIMITATIONS:
-   *   Web sockets are not automatically reloadable (due to limitations in Jetty which underlies our built-in
-   *   web server) but may be in future releases. For now, you will need to restart the server to see changes
-   *   reflected to web socket code.
    */
   public @Optional boolean enableDebugMode = false;
 
@@ -527,6 +523,7 @@ public class Config {
     public @Optional int unreturnedConnectionTimeoutS = 50000;
     public @Optional int idleConnectionTestPeriodS = 600;
     public @Optional int maxStatementsCached = 500;
+    public @Optional int acquireTimeoutMs = -1;
 
     public boolean isEnabled() {
       return name != null && !name.isEmpty();
@@ -549,19 +546,31 @@ public class Config {
     notNull("scanPrefixes", scanPrefixes);
     notNull("server.hmacKey", server.hmacKey);
     badIf(server.enableHttp2 && !ssl.isEnabled(), "You must enable SSL to enable HTTP2.");
+    badIf(autoReloadPrefixes != null &&
+          Iterables.reduce(Iterables.map(autoReloadPrefixes,
+                                         /*
+                                          * Try to protect against some mistakes... this is
+                                          * by no means a comprehensive list.
+                                          */
+                                         i -> (i.startsWith("java.") ||
+                                               i.startsWith("lightning.") ||
+                                               i.startsWith("com.augustl.pathtravelagent."))),
+                           false,
+                           (a, i) -> a || i),
+          "You may not reload packages java.*, lightning.*, com.augustl.pathtravelagent.*.");
   }
-  
+
   public boolean canReloadClass(Class<?> type) {
     if (!enableDebugMode) {
       return false;
     }
-    
+
     for (String prefix : autoReloadPrefixes) {
       if (type.getCanonicalName().startsWith(prefix)) {
         return true;
       }
     }
-    
+
     return false;
   }
 }

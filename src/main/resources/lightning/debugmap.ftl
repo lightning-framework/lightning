@@ -122,14 +122,17 @@
                         <tbody>
                             <#list routes as handler>
                                 <tr>
-                                    <td><code>${handler.path}</code></td>
+                                    <td>
+                                    	<#if !handler.has_params>
+                                    		<a href="${handler.path}" target="_blank">
+                                    	</#if>
+                                    	<code>${handler.path}</code>
+                                    	<#if !handler.has_params>
+                                    		</a>
+                                    	</#if>
+                                	</td>
                                     <td>${handler.methods}</td>
                                     <td>
-                                        <#if handler.filters?has_content>
-                                            <#list handler.filters as filter>
-                                                <code>${filter}</code>
-                                            </#list>
-                                        </#if>
                                         <code>${handler.target}</code>
                                     </td>
                                 </tr>

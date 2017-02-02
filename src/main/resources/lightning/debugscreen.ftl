@@ -102,7 +102,7 @@
             <div class="details">
                 <div class="data-table-container" id="data-tables">
                     <!-- Print Long Stack Trace -->
-                    <#if exceptions?first.message?length != exceptions?first.short_message?length>
+                    <#if exceptions?first.show_full_trace>
                         <div class="data-table">
                             <h3>Detailed Message</h3>
                             <pre style="white-space: pre-wrap;">${exceptions?first.full_trace}</pre>

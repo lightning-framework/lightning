@@ -103,6 +103,9 @@ public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
     source.setTestConnectionOnCheckin(false);
     source.setTestConnectionOnCheckout(false); // Note: expensive if true
     source.setIdleConnectionTestPeriod(config.idleConnectionTestPeriodS); // seconds
+    if (config.acquireTimeoutMs > 0) {
+      source.setCheckoutTimeout(config.acquireTimeoutMs);
+    }
     this.source = source;
   }
 

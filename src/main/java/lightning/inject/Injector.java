@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableMap;
@@ -47,7 +48,6 @@ import lightning.http.Request;
  *
  * NOTE: Injected dependencies MUST NOT be within the autoreload packages.
  *       Otherwise, dependency injection WILL FAIL in debug mode.
- * TODO: Should show errors at start-up when attempting to inject something in an autoreload package.
  */
 public class Injector {
   private final InjectorModule[] modules;
@@ -57,6 +57,16 @@ public class Injector {
    */
   public Injector(InjectorModule... modules) {
     this.modules = modules;
+  }
+
+  public boolean hasInjectionsIn(List<String> prefixes) {
+    for (InjectorModule m : modules) {
+      if (m.hasInjectionsIn(prefixes)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -112,6 +122,15 @@ public class Injector {
     return constructor.newInstance(arguments);
   }
 
+  /**
+   * Invokes a method.
+   * @param method A method to invoke.
+   * @param target The object upon which to invoke the method (null for static methods).
+   * @param initialArgs The initial arguments to the method. Remaining arguments will be filled
+   *                    in via dependency injection.
+   * @return The return value of the method (null for void methods).
+   * @throws Exception If the invocation fails, or if argument injection fails.
+   */
   public Object invoke(Method method, Object target, Object ...initialArgs) throws Exception {
     return method.invoke(target, getInjectedArguments(method, initialArgs));
   }

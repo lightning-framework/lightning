@@ -6,12 +6,16 @@ public class CacheException extends Exception {
   public CacheException() {
     super();
   }
-  
+
   public CacheException(String message) {
     super(message);
   }
-  
+
   public CacheException(Exception parent) {
     super(parent);
+  }
+
+  public CacheException(String message, Exception parent) {
+    super(message, parent);
   }
 }

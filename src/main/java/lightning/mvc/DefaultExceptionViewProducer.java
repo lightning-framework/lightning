@@ -5,7 +5,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.collect.ImmutableMap;
 
-import lightning.fn.ExceptionViewProducer;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
 import lightning.http.InternalServerErrorException;
@@ -14,7 +13,7 @@ import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
 
-public class DefaultExceptionViewProducer implements ExceptionViewProducer {
+public class DefaultExceptionViewProducer {
   private static final String VIEW_NAME = "error.ftl";
   private static final ImmutableMap<Class<? extends Throwable>, String> status = ImmutableMap.<Class<? extends Throwable>, String>builder()
       .put(AccessViolationException.class, "403")
@@ -50,21 +49,20 @@ public class DefaultExceptionViewProducer implements ExceptionViewProducer {
       .put(BadRequestException.class, true)
       .build();
 
-  @Override
   public ModelAndView produce(Class<? extends Throwable> clazz, Throwable e, HttpServletRequest request, HttpServletResponse response) {
     if (!status.containsKey(clazz)) {
       return null;
     }
-    
+
     ImmutableMap.Builder<String, Object> data = ImmutableMap.builder();
     data.put("status", status.get(clazz));
     data.put("status_text", statusText.get(clazz));
     data.put("explanation", explanationText.get(clazz));
-    
+
     if (includeMessage.getOrDefault(clazz, false) && e.getMessage() != null) {
       data.put("message", e.getMessage());
     }
-    
+
     return new ModelAndView(VIEW_NAME, data.build());
   }
 }

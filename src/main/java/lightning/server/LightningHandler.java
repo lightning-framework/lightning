@@ -35,16 +35,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import lightning.ann.Before;
-import lightning.ann.Befores;
 import lightning.ann.ExceptionHandler;
-import lightning.ann.Filter;
-import lightning.ann.Filters;
 import lightning.ann.Json;
 import lightning.ann.Multipart;
 import lightning.ann.RequireAuth;
 import lightning.ann.RequireXsrfToken;
 import lightning.ann.Route;
-import lightning.ann.Routes;
 import lightning.ann.Template;
 import lightning.ann.WebSocket;
 import lightning.cache.Cache;
@@ -58,9 +54,8 @@ import lightning.debugscreen.LocalSourceLocator;
 import lightning.debugscreen.SourceLocator;
 import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
+import lightning.exceptions.LightningConfigException;
 import lightning.exceptions.LightningException;
-import lightning.fn.ExceptionViewProducer;
-import lightning.fn.RouteFilter;
 import lightning.healthscreen.HealthScreenController;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -72,6 +67,7 @@ import lightning.http.MethodNotAllowedException;
 import lightning.http.NotAuthorizedException;
 import lightning.http.NotFoundException;
 import lightning.http.NotImplementedException;
+import lightning.inject.Injector;
 import lightning.inject.InjectorModule;
 import lightning.io.BufferingHttpServletResponse;
 import lightning.io.FileServer;
@@ -90,8 +86,11 @@ import lightning.scanner.ScanResult;
 import lightning.scanner.Scanner;
 import lightning.templates.FreeMarkerTemplateEngine;
 import lightning.templates.TemplateEngine;
+import lightning.util.DebugUtil;
 import lightning.util.MimeMatcher;
 import lightning.websockets.WebSocketHolder;
+
+import static lightning.util.ReflectionUtil.annotations;
 
 public final class LightningHandler extends AbstractHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(LightningHandler.class);
@@ -120,7 +119,7 @@ public final class LightningHandler extends AbstractHandler {
   private final JsonService jsonService;
   private final Cache cache;
   private final DebugScreen debugScreen;
-  private final ExceptionViewProducer exceptionViews;
+  private final DefaultExceptionViewProducer exceptionViews;
   private final MimeMatcher outputBufferMatcher;
 
   private WebSocketServerFactory webSocketFactory;
@@ -132,10 +131,14 @@ public final class LightningHandler extends AbstractHandler {
     this.config = config;
     this.dbProvider = dbProvider;
     this.userInjectorModule = userInjectorModule;
+    this.globalInjectorModule = new InjectorModule();
     this.scanResult = null;
     this.filters = new FilterMapper<>();
     this.exceptionHandlers = new ExceptionMapper<>();
-    this.scanner = new Scanner(config.autoReloadPrefixes, config.scanPrefixes, config.enableDebugMode);
+    this.scanner = new Scanner(config.autoReloadPrefixes,
+                               config.scanPrefixes,
+                               config.enableDebugMode, new Injector(this.userInjectorModule,
+                                                                    this.globalInjectorModule));
     this.routes = new RouteMapper<>();
     this.internalTemplateEngine = new FreeMarkerTemplateEngine(getClass(), "/lightning");
     this.exceptionViews = new DefaultExceptionViewProducer();
@@ -207,7 +210,6 @@ public final class LightningHandler extends AbstractHandler {
 
     // Set up the global injection module.
     {
-      this.globalInjectorModule = new InjectorModule();
       this.globalInjectorModule.bindClassToInstance(LightningHandler.class, this);
       this.globalInjectorModule.bindClassToInstance(Config.class, this.config);
       this.globalInjectorModule.bindClassToInstance(MySQLDatabaseProvider.class, this.dbProvider);
@@ -217,7 +219,11 @@ public final class LightningHandler extends AbstractHandler {
       this.globalInjectorModule.bindClassToInstance(JsonService.class, this.jsonService);
     }
 
-    rescan();
+    try {
+      rescan();
+    } catch (Throwable t) {
+      throw new LightningConfigException("Lightning has failed to process your routing configuration. You must correct these errors to start the server.", t);
+    }
   }
 
   private Resource[] getStaticFileResourcePaths() {
@@ -310,6 +316,7 @@ public final class LightningHandler extends AbstractHandler {
     try {
       HandlerContext context = context(request, response);
       context.bindings().bindToClass(error);
+      // TODO: Show code snippet if injection fails.
       exceptionHandler.invoke(null, context.injector().getInjectedArguments(exceptionHandler));
     } catch (Throwable exceptionHandlerError) {
       if ((exceptionHandlerError instanceof InvocationTargetException) &&
@@ -321,7 +328,10 @@ public final class LightningHandler extends AbstractHandler {
         exceptionHandlerError.addSuppressed(error);
       }
 
-      LOGGER.warn("An exception handler returned an exception:", exceptionHandlerError);
+      if (exceptionHandlerError != error) {
+        /* Don't log on re-throw. */
+        LOGGER.warn("An exception handler returned an exception:", exceptionHandlerError);
+      }
 
       // If the user exception handler threw an exception (not unlikely), we can try to render
       // the built-in page instead.
@@ -434,87 +444,67 @@ public final class LightningHandler extends AbstractHandler {
   }
 
   private synchronized void rescan() throws Exception {
+    routes.clear();
+    exceptionHandlers.clear();
+    filters.clear();
+
+    // Built-ins.
+    DebugMapController.map(routes, config);
+    HealthScreenController.map(routes, config);
+    routes.compile();
+
     scanResult = scanner.scan();
 
     // Exception Handlers
-    {
-      exceptionHandlers.clear();
-      for (Class<?> clazz : scanResult.exceptionHandlers.keySet()) {
-        for (Method method : scanResult.exceptionHandlers.get(clazz)) {
-          ExceptionHandler annotation = method.getAnnotation(ExceptionHandler.class);
-          exceptionHandlers.map(annotation.value(), method);
+    for (Class<?> clazz : scanResult.exceptionHandlers.keySet()) {
+      for (Method method : scanResult.exceptionHandlers.get(clazz)) {
+        for (ExceptionHandler eh : annotations(method, ExceptionHandler.class)) {
+          exceptionHandlers.map(eh.value(), method);
         }
       }
     }
 
-    // Routes & Web Sockets
-    {
-      routes.clear();
-
-      // Built-ins.
-      {
-        DebugMapController.map(routes, config);
-        HealthScreenController.map(routes, config);
-      }
-
-      // @Route annotations.
-      {
-        for (Class<?> clazz : scanResult.routes.keySet()) {
-          for (Method method : scanResult.routes.get(clazz)) {
-            if (method.getAnnotation(Route.class) != null) {
-              Route route = method.getAnnotation(Route.class);
-              for (HTTPMethod httpMethod : route.methods()) {
-                routes.map(httpMethod, route.path(), method);
-              }
-            }
-            else if (method.getAnnotation(Routes.class) != null) {
-              for (Route route : method.getAnnotation(Routes.class).value()) {
-                for (HTTPMethod httpMethod : route.methods()) {
-                  routes.map(httpMethod, route.path(), method);
-                }
+    // Routes
+    for (Class<?> clazz : scanResult.routes.keySet()) {
+      for (Method method : scanResult.routes.get(clazz)) {
+        for (Route route : annotations(method, Route.class)) {
+          for (Template template : annotations(method, Template.class)) {
+            if (template.value() != null && !template.value().isEmpty()) {
+              try {
+                userTemplateEngine.requireValid(template.value());
+              } catch (Exception e) {
+                throw DebugUtil.mockStackTrace(method,
+                    new IllegalStateException(method + ": Refers to a @Template that does not exist.", e), true);
               }
             }
           }
+
+          for (HTTPMethod httpMethod : route.methods()) {
+            routes.map(httpMethod, route.path(), method);
+          }
         }
       }
+    }
 
-      // TODO: Drop active web socket connections immediately when code changes (instead of on next event).
-      // @WebSocket annotations.
-      {
-
-        for (Class<?> clazz : scanResult.websockets) {
-          @SuppressWarnings("unchecked")
-          Class<? extends WebSocketHolder> ws = (Class<? extends WebSocketHolder>)clazz;
-          WebSocket info = clazz.getAnnotation(WebSocket.class);
-          WebSocketHolder creator = new WebSocketHolder(ws);
-
-          routes.map(HTTPMethod.GET,
-                          info.path(),
-                          creator);
-        }
-      }
-
-      routes.compile();
+    // TODO: Drop active web socket connections immediately when code changes (instead of on next event).
+    // Web Sockets
+    for (Class<?> clazz : scanResult.websockets) {
+      @SuppressWarnings("unchecked")
+      Class<? extends WebSocketHolder> ws = (Class<? extends WebSocketHolder>)clazz;
+      WebSocket info = clazz.getAnnotation(WebSocket.class);
+      routes.map(HTTPMethod.GET, info.path(), new WebSocketHolder(ws));
     }
 
     // Filters
-    {
-      filters.clear();
-
-      for (Class<?> clazz : scanResult.beforeFilters.keySet()) {
-        for (Method m : scanResult.beforeFilters.get(clazz)) {
-          if (m.getAnnotation(Before.class) != null) {
-            Before info = m.getAnnotation(Before.class);
-            filters.addFilterBefore(info.path(), info.methods(), info.priority(), m);
-          }
-          else if (m.getAnnotation(Before.class) != null) {
-            for (Before info : m.getAnnotation(Befores.class).value()) {
-              filters.addFilterBefore(info.path(), info.methods(), info.priority(), m);
-            }
-          }
+    for (Class<?> clazz : scanResult.beforeFilters.keySet()) {
+      for (Method m : scanResult.beforeFilters.get(clazz)) {
+        for (Before info : annotations(m, Before.class)) {
+          filters.addFilterBefore(info.path(), info.methods(), info.priority(), m);
         }
       }
     }
+
+    routes.compile();
   }
 
   @Override
@@ -527,7 +517,11 @@ public final class LightningHandler extends AbstractHandler {
 
     try {
       if (config.enableDebugMode) {
-        rescan(); // Reloads all routes, exception handlers, filters, etc.
+        try {
+          rescan(); // Reloads all routes, exception handlers, filters, etc.
+        } catch (Throwable t) {
+          throw new LightningConfigException("Errors exist in your routing configuration - you must correct these to continue.", t);
+        }
       }
 
       if (redirectInsecureRequest(sRequest, sResponse)) {
@@ -630,38 +624,47 @@ public final class LightningHandler extends AbstractHandler {
                                        Object output) throws Throwable {
     assert (output != null);
 
-    Json json = target.getAnnotation(Json.class);
-    if (json != null) {
-     context.sendJson(output, json.prefix(), json.names());
-     return;
-    }
+    try {
+      Json json = target.getAnnotation(Json.class);
+      if (json != null) {
+       context.sendJson(output, json.prefix(), json.names());
+       return;
+      }
 
-    if (output instanceof ModelAndView) {
-      context.render((ModelAndView)output);
-      return;
-    }
-
-    Template template = target.getAnnotation(Template.class);
-    if (template != null) {
-      if (template.value() != null) {
-        context.render(template.value(), output);
+      if (output instanceof ModelAndView) {
+        context.render((ModelAndView)output);
         return;
       }
 
-      throw new LightningException("Improper use of @Template annotation - refer to documentation.");
-    }
+      Template template = target.getAnnotation(Template.class);
+      if (template != null) {
+        if (template.value() != null && !template.value().isEmpty()) {
+          context.render(template.value(), output);
+          return;
+        }
 
-    if (output instanceof File) {
-      context.sendFile((File)output);
-      return;
-    }
+        throw new LightningException("Improper use of @Template annotation - refer to documentation.");
+      }
 
-    if (output instanceof String) {
-      context.response.write((String)output);
-      return;
-    }
+      if (output instanceof File) {
+        context.sendFile((File)output);
+        return;
+      }
 
-    throw new LightningException("Unable to process return value of @Route - refer to documentation.");
+      if (output instanceof String) {
+        context.response.write((String)output);
+        return;
+      }
+
+      throw new LightningException("Unable to process return value of @Route - refer to documentation.");
+    } catch (Throwable e) {
+      if (config.enableDebugMode) {
+        /* We can mock a stack trace for the target method so that the debug screen can show the code. */
+        throw DebugUtil.mockStackTrace(target, e, false);
+      }
+
+      throw e;
+    }
   }
 
   private void processBeforeFilters(HandlerContext context) throws Throwable {
@@ -672,18 +675,6 @@ public final class LightningHandler extends AbstractHandler {
       ((InternalRequest)context.request).setWildcards(filter.wildcards(context.request.path()));
       ((InternalRequest)context.request).setParams(filter.params(context.request.path()));
       filter.handler.invoke(null, context.injector().getInjectedArguments(filter.handler));
-    }
-  }
-
-  private void processBeforeAnnotationFilters(HandlerContext context, Method target) throws Throwable {
-    if (target.getAnnotation(Filters.class) != null) {
-      for (Filter filter : target.getAnnotation(Filters.class).value()) {
-        RouteFilter instance = context.injector().newInstance(filter.value());
-        instance.execute();
-      }
-    } else if (target.getAnnotation(Filter.class) != null) {
-      RouteFilter instance = context.injector().newInstance(target.getAnnotation(Filter.class).value());
-      instance.execute();
     }
   }
 
@@ -740,10 +731,8 @@ public final class LightningHandler extends AbstractHandler {
           }
         }
 
-        // Execute @Filter filters.
-        processBeforeAnnotationFilters(context, target);
-
         // Instantiate the controller.
+        // TODO: Injector errors should show code.
         controller = context.injector().newInstance(target.getDeclaringClass());
 
         // Run @Initializers.

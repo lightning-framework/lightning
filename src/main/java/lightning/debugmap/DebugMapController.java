@@ -6,10 +6,13 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.augustl.pathtravelagent.DefaultPathToPathSegments;
 import com.augustl.pathtravelagent.PathFormatException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
@@ -20,8 +23,6 @@ import freemarker.template.Version;
 import lightning.ann.Before;
 import lightning.ann.Controller;
 import lightning.ann.ExceptionHandler;
-import lightning.ann.Filter;
-import lightning.ann.Filters;
 import lightning.ann.Json;
 import lightning.ann.Route;
 import lightning.ann.WebSocket;
@@ -71,7 +72,7 @@ public class DebugMapController {
   }
 
   public void handle(LightningHandler handler, HandlerContext ctx) throws Exception {
-    Map<String, Object> model = new HashMap<String, Object>();
+    Map<String, Object> model = new LinkedHashMap<String, Object>();
 
     ScanResult result = handler.getLastScanResult();
 
@@ -85,8 +86,10 @@ public class DebugMapController {
         ));
       }
     }
+    exceptionHandlers.sort(new ExceptionComparator());
     model.put("exception_handlers", exceptionHandlers);
 
+    // TODO: We could package in a debug web socket client.
     List<Object> websockets = new ArrayList<>();
     for (Class<?> type : result.websockets) {
         WebSocket ws = notNull(type.getAnnotation(WebSocket.class));
@@ -95,6 +98,7 @@ public class DebugMapController {
           "target", type.getCanonicalName()
         ));
     }
+    websockets.sort(new PathComparator());
     model.put("websockets", websockets);
 
     List<Object> beforeFilters = new ArrayList<>();
@@ -109,6 +113,7 @@ public class DebugMapController {
         ));
       }
     }
+    beforeFilters.sort(new PathComparator());
     model.put("before_filters", beforeFilters);
 
     List<Object> routes = new ArrayList<>();
@@ -117,12 +122,13 @@ public class DebugMapController {
         Route r = notNull(target.getAnnotation(Route.class));
         routes.add(ImmutableMap.<String, Object>of(
           "path", r.path(),
-          "filters", parseFilters(target),
           "methods", Joiner.on(", ").join(r.methods()),
-          "target", type.getCanonicalName() + "@" + target.getName()
+          "target", type.getCanonicalName() + "@" + target.getName(),
+          "has_params", r.path().contains(":") || r.path().contains("*")
         ));
       }
     }
+    routes.sort(new PathComparator());
     model.put("routes", routes);
 
     model.put("http_methods", HTTPMethod.values());
@@ -130,6 +136,84 @@ public class DebugMapController {
     templateEngine.clearTemplateCache();
     templateEngine.getTemplate("debugmap.ftl")
                   .process(model, ctx.response.getWriter());
+  }
+
+  private static final class ExceptionComparator implements Comparator<Object> {
+    @SuppressWarnings("unchecked")
+    @Override
+    public int compare(Object a, Object b) {
+      Map<String, Object> ma = (Map<String, Object>)a;
+      Map<String, Object> mb = (Map<String, Object>)b;
+      return ((String)ma.get("exception")).compareTo((String)mb.get("exception"));
+    }
+  }
+
+  private static final class PathComparator implements Comparator<Object> {
+    @SuppressWarnings("unchecked")
+    @Override
+    public int compare(Object a, Object b) {
+      Map<String, Object> ma = (Map<String, Object>)a;
+      Map<String, Object> mb = (Map<String, Object>)b;
+      return comparePath((String)ma.get("path"), (String)mb.get("path"));
+    }
+
+    public int comparePath(String a, String b) {
+      if (a.equals("*") && b.equals("*")) {
+        return 0;
+      }
+      else if (a.equals("*") && !b.equals("*")) {
+        return -1;
+      }
+      else if (b.equals("*") && !a.equals("*")) {
+        return 1;
+      }
+
+      try {
+        Iterator<String> as = DefaultPathToPathSegments.parse(a).iterator();
+        Iterator<String> bs = DefaultPathToPathSegments.parse(b).iterator();
+
+        while (as.hasNext() && bs.hasNext()) {
+          int cmp = compareSegment(as.next(), bs.next());
+
+          if (cmp != 0) {
+            return cmp;
+          }
+        }
+
+        if (as.hasNext()) {
+          return 1;
+        }
+        else if (bs.hasNext()) {
+          return -1;
+        }
+        else {
+          return 0;
+        }
+      } catch (PathFormatException e) {
+        e.printStackTrace(System.err);
+        return 0;
+      }
+    }
+
+    public int compareSegment(String a, String b) {
+      if (a.equals("*") && !b.equals("*")) {
+        return -1;
+      }
+
+      if (b.equals("*") && !a.equals("*")) {
+        return 1;
+      }
+
+      if (a.startsWith(":") && !b.startsWith(":")) {
+        return 1;
+      }
+
+      if (b.startsWith(":") && !a.startsWith(":")) {
+        return -1;
+      }
+
+      return a.compareTo(b);
+    }
   }
 
   @Json
@@ -165,16 +249,6 @@ public class DebugMapController {
           matches.add(filter.handler.getDeclaringClass().getCanonicalName() + "@" + filter.handler.getName());
         }
 
-        if (m.getAnnotation(Filters.class) != null) {
-          for (Filter filter : m.getAnnotation(Filters.class).value()) {
-            matches.add(filter.value().getCanonicalName());
-          }
-        }
-
-        if (m.getAnnotation(Filter.class) != null) {
-          matches.add(m.getAnnotation(Filter.class).value().getCanonicalName());
-        }
-
         matches.add(m.getDeclaringClass().getCanonicalName() + "@" + m.getName());
       }
     }
@@ -188,24 +262,5 @@ public class DebugMapController {
     }
 
     return item;
-  }
-
-  private static List<Object> parseFilters(Method target) {
-    List<Object> filters = new ArrayList<>();
-
-    Filters f2 = target.getAnnotation(Filters.class);
-    Filter f1 = target.getAnnotation(Filter.class);
-
-    if (f2 != null) {
-      for (Filter f : f2.value()) {
-        filters.add(f.value().getCanonicalName());
-      }
-    }
-
-    if (f1 != null) {
-      filters.add(f1.value().getCanonicalName());
-    }
-
-    return filters;
   }
 }

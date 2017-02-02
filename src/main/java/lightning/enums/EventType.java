@@ -1,14 +1,15 @@
 package lightning.enums;
 
-import java.lang.annotation.Annotation;
+import static lightning.util.ReflectionUtil.requireArgsStartWith;
+import static lightning.util.ReflectionUtil.requireIsPublicInstanceWithReturnType;
+import static lightning.util.ReflectionUtil.requireIsPublicStaticWithReturnType;
+import static lightning.util.ReflectionUtil.requireOnClassAnnotatedWith;
+
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 
-import com.google.common.base.Joiner;
-
-import javassist.Modifier;
 import lightning.ann.OnEvent;
 import lightning.ann.WebSocket;
+import lightning.exceptions.LightningValidationException;
 import lightning.util.ReflectionUtil;
 
 /**
@@ -22,7 +23,7 @@ public enum EventType {
   WEBSOCKET_CLOSE,
   WEBSOCKET_ERROR;
 
-  public void validate(Method method) {
+  public void validate(Method method) throws LightningValidationException {
     requireUniqueEventHandler(method);
 
     switch (this) {
@@ -57,23 +58,24 @@ public enum EventType {
     }
   }
 
-  private void requireArgsStartWith(Method method, Class<?> ...args) {
-    String error = method + ": Must begin with arguments " + Joiner.on(", ").join(args) + ".";
+  public int getReservedArgCount() {
+    switch (this) {
+      case WEBSOCKET_BINARY_MESSAGE:
+        return 3;
 
-    if (method.getParameterCount() < args.length) {
-      throw new IllegalArgumentException(error);
-    }
+      case WEBSOCKET_CLOSE:
+        return 2;
 
-    Parameter[] params = method.getParameters();
+      case WEBSOCKET_ERROR:
+      case WEBSOCKET_TEXT_MESSAGE:
+        return 1;
 
-    for (int i = 0; i < args.length; i++) {
-      if (!params[i].getType().equals(args[i])) {
-        throw new IllegalArgumentException(error);
-      }
+      default:
+        return 0;
     }
   }
 
-  private void requireUniqueEventHandler(Method method) {
+  private void requireUniqueEventHandler(Method method) throws LightningValidationException {
     for (Method m : ReflectionUtil.getMethodsAnnotatedWith(method.getDeclaringClass(), OnEvent.class)) {
       if (m.equals(method)) {
         continue;
@@ -82,31 +84,8 @@ public enum EventType {
       OnEvent info = m.getAnnotation(OnEvent.class);
 
       if (info != null && info.value() == this) {
-        throw new IllegalStateException("@OnEvent(" + this.toString() + ") must be unique on declaring class (and parents).\n    " + method + "\n    " + m);
+        throw new LightningValidationException(method, "@OnEvent(" + this.toString() + ") must be unique on declaring class (and parents).\n");
       }
-    }
-  }
-
-  private void requireOnClassAnnotatedWith(Method method, Class<? extends Annotation> annotation) {
-    if (method.getDeclaringClass().getAnnotation(annotation) == null) {
-      throw new IllegalStateException(method + ": Must declare " + this.toString() + " event handler on an @" +
-                                      annotation.getSimpleName() + ".");
-    }
-  }
-
-  private void requireIsPublicStaticWithReturnType(Method method, Class<?> returnType) {
-    if (!Modifier.isPublic(method.getModifiers()) ||
-        !Modifier.isStatic(method.getModifiers()) ||
-        !method.getReturnType().equals(returnType)) {
-      throw new IllegalStateException(method + ": Must be public, static, and return " + returnType + ".");
-    }
-  }
-
-  private void requireIsPublicInstanceWithReturnType(Method method, Class<?> returnType) {
-    if (!Modifier.isPublic(method.getModifiers()) ||
-        Modifier.isStatic(method.getModifiers()) ||
-        !method.getReturnType().equals(returnType)) {
-      throw new IllegalStateException(method + ": Must be public, static, and return " + returnType + ".");
     }
   }
 }

@@ -536,6 +536,12 @@ div.data-table {
     box-shadow: 0px 3px 5px rgba(0,0,0,0.3);
 }
 
+.route-map-container a,
+.route-map-container a:hover,
+.route-map-container a:visited {
+	color: inherit;
+}
+
 .route-map-container .route-map-table {
     margin-bottom: 20px;
 }

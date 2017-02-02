@@ -1,7 +1,16 @@
 package lightning.scanner;
 
+import static lightning.util.ReflectionUtil.getMethodsAnnotatedWith;
+import static lightning.util.ReflectionUtil.requireHasSinglePublicConstructor;
+import static lightning.util.ReflectionUtil.requireIsInstantiateable;
+import static lightning.util.ReflectionUtil.requireIsNotInterface;
+import static lightning.util.ReflectionUtil.requireIsPublic;
+import static lightning.util.ReflectionUtil.requireIsPublicInstance;
+import static lightning.util.ReflectionUtil.requireIsPublicInstanceWithReturnType;
+import static lightning.util.ReflectionUtil.requireIsPublicStaticWithReturnType;
+import static lightning.util.ReflectionUtil.requireOnClassAnnotatedWith;
+
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -13,9 +22,8 @@ import org.reflections.scanners.MethodAnnotationsScanner;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
 import org.reflections.util.ConfigurationBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
 import lightning.ann.Before;
@@ -30,27 +38,32 @@ import lightning.ann.Routes;
 import lightning.ann.WebSocket;
 import lightning.classloaders.ExceptingClassLoader;
 import lightning.classloaders.ExceptingClassLoader.PrefixClassLoaderExceptor;
-import lightning.util.ReflectionUtil;
+import lightning.exceptions.LightningValidationException;
+import lightning.inject.InjectionValidator;
+import lightning.inject.Injector;
 
 /**
  * Responsible for scanning the class path for annotations needed by the framework.
- * TODO: Can we speed this up to make debug mode faster? Not going to be scalable to MASSIVE applications.
  */
 public class Scanner {
   private final List<String> reloadPrefixes;
   private final List<String> scanPrefixes;
   private final boolean enableAutoReload;
-  private static final Logger logger = LoggerFactory.getLogger(Scanner.class);
+  private final InjectionValidator iv;
 
   /**
    * @param classLoader The class loader to use (default one in most cases)
    * @param scanPrefixes List of package prefixes to scan within (e.g. ["lightning.controllers"])
    * @param enableAutoReload
    */
-  public Scanner(List<String> reloadPrefixes, List<String> scanPrefixes, boolean enableAutoReload) {
-    this.reloadPrefixes = reloadPrefixes;
+  public Scanner(List<String> reloadPrefixes,
+                 List<String> scanPrefixes,
+                 boolean enableAutoReload,
+                 Injector injector) {
+    this.reloadPrefixes = reloadPrefixes != null ? reloadPrefixes : ImmutableList.of();
     this.scanPrefixes = scanPrefixes;
     this.enableAutoReload = enableAutoReload;
+    this.iv = new InjectionValidator(injector, this.reloadPrefixes);
   }
 
   private static void putMethod(Map<Class<?>, Set<Method>> map, Method method) {
@@ -63,7 +76,7 @@ public class Scanner {
     map.get(clazz).add(method);
   }
 
-  public ScanResult scan() {
+  public ScanResult scan() throws LightningValidationException {
     Set<Class<?>> controllers = new HashSet<>();
     Map<Class<?>, Set<Method>> initializers = new HashMap<>();
     Map<Class<?>, Set<Method>> finalizers = new HashMap<>();
@@ -77,113 +90,73 @@ public class Scanner {
 
     for (Reflections scanner : reflections(classLoader)) {
       for (Method m : scanner.getMethodsAnnotatedWith(Initializer.class)) {
-        // TODO: check returns void, can inject
-        if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
-            !Modifier.isStatic(m.getModifiers()) &&
-            !Modifier.isAbstract(m.getModifiers()) &&
-            Modifier.isPublic(m.getModifiers())) {
-          controllers.add(m.getDeclaringClass());
-          putMethod(initializers, m);
-        } else {
-          logger.error(
-                "ERROR: Could not install @Initializer for {}. "
-              + "Initializers must be public, concrete, non-static, and declared inside of an @Controller.", m);
-        }
+        iv.validate(m);
+        requireOnClassAnnotatedWith(m, Controller.class);
+        requireIsPublicInstanceWithReturnType(m, void.class);
+        controllers.add(m.getDeclaringClass());
+        putMethod(initializers, m);
       }
 
       for (Method m : scanner.getMethodsAnnotatedWith(Finalizer.class)) {
-        // TODO: check returns void, can inject
-        if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
-            !Modifier.isStatic(m.getModifiers()) &&
-            !Modifier.isAbstract(m.getModifiers()) &&
-            Modifier.isPublic(m.getModifiers())) {
-          controllers.add(m.getDeclaringClass());
-          putMethod(finalizers, m);
-        } else {
-          logger.error(
-                "ERROR: Could not install @Finalizer for {}. "
-              + "Finalizers must be public, concrete, non-static, and declared inside of an @Controller.", m);
-        }
+        iv.validate(m);
+        requireOnClassAnnotatedWith(m, Controller.class);
+        requireIsPublicInstanceWithReturnType(m, void.class);
+        controllers.add(m.getDeclaringClass());
+        putMethod(finalizers, m);
       }
 
       for (Method m : scanner.getMethodsAnnotatedWith(ExceptionHandler.class)) {
-        // TODO: check returns void, can inject
-        if (Modifier.isStatic(m.getModifiers()) &&
-            Modifier.isPublic(m.getModifiers()) &&
-            !Modifier.isAbstract(m.getModifiers())) {
-          putMethod(exceptionHandlers, m);
-        } else {
-          logger.error(
-              "ERROR: Could not install @ExceptionHandler for {}. "
-            + "ExceptionHandlers must be public, concrete, static.", m);
-        }
+        iv.validate(m);
+        requireIsPublicStaticWithReturnType(m, void.class);
+        putMethod(exceptionHandlers, m);
       }
 
-      websocket: for (Class<?> c : scanner.getTypesAnnotatedWith(WebSocket.class)) {
-        if (!Modifier.isPublic(c.getModifiers())) {
-          logger.error("ERROR: @WebSocket {} must be public.", c.getCanonicalName());
-          continue;
-        }
+      for (Class<?> c : scanner.getTypesAnnotatedWith(WebSocket.class)) {
+        requireIsPublic(c);
+        requireIsInstantiateable(c);
+        requireHasSinglePublicConstructor(c);
+        iv.validateConstructor(c);
 
-        if (Modifier.isAbstract(c.getModifiers()) || c.isInterface()) {
-          logger.error("ERROR: @WebSocket {} must be instantiatable.", c.getCanonicalName());
-          continue;
-        }
-
-        if (c.getConstructors().length > 1) {
-          // TODO: Should also check the constructor is public and injectable.
-          logger.error("ERROR: @WebSocket {} must have one public constructor.", c.getCanonicalName());
-          continue;
-        }
-
-
-        for (Method method : ReflectionUtil.getMethodsAnnotatedWith(c, OnEvent.class)) {
-          try {
-            method.getAnnotation(OnEvent.class).value().validate(method);
-          } catch (Exception e) {
-            logger.error("ERROR: @WebSocket {} method {} is not valid: {}",
-                c.getCanonicalName(), method.getName(), e.getMessage());
-            continue websocket;
-          }
-
-          // TODO: Should also check that method is injectable.
+        for (Method method : getMethodsAnnotatedWith(c, OnEvent.class)) {
+          method.getAnnotation(OnEvent.class).value().validate(method);
+          iv.validate(method);
         }
 
         websockets.add(c);
       }
 
-      for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Before.class), scanner.getMethodsAnnotatedWith(Befores.class))) {
-        // TODO: verify return value, can inject
-        if (Modifier.isStatic(m.getModifiers()) &&
-            Modifier.isPublic(m.getModifiers()) &&
-            !Modifier.isAbstract(m.getModifiers())) {
-          putMethod(beforeFilters, m);
-        } else {
-          logger.error(
-              "ERROR: Could not install @Before filter for {}. "
-            + "Before filters must be public, concrete, static.", m);
-        }
+      for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Before.class),
+                                       scanner.getMethodsAnnotatedWith(Befores.class))) {
+        iv.validate(m);
+        requireIsPublicStaticWithReturnType(m, void.class);
+        putMethod(beforeFilters, m);
       }
 
-      for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Route.class), scanner.getMethodsAnnotatedWith(Routes.class))) {
-        // TODO: verify can inject, verify any @Filter(s) constructors are injectable
-        if (m.getDeclaringClass().getAnnotation(Controller.class) != null &&
-            !Modifier.isStatic(m.getModifiers()) &&
-            !Modifier.isAbstract(m.getModifiers()) &&
-            Modifier.isPublic(m.getModifiers())) {
-          controllers.add(m.getDeclaringClass());
-          putMethod(routes, m);
-        } else {
-          logger.error(
-                "ERROR: Could not install @Route for {}. "
-              + "Routes must be public, concrete, non-static, and declared inside of an @Controller.", m);
-        }
+      for (Method m : Iterables.concat(scanner.getMethodsAnnotatedWith(Route.class),
+                                       scanner.getMethodsAnnotatedWith(Routes.class))) {
+        iv.validate(m);
+        iv.validateRouteReturn(m);
+        requireOnClassAnnotatedWith(m, Controller.class);
+        requireIsPublicInstance(m);
+        controllers.add(m.getDeclaringClass());
+        putMethod(routes, m);
       }
     }
 
-    // TODO: Should check all controller constructors are injectable.
+    for (Class<?> c : controllers) {
+      requireIsPublic(c);
+      requireIsNotInterface(c);
+      requireHasSinglePublicConstructor(c);
+      iv.validateConstructor(c);
+    }
 
-    return new ScanResult(controllers, initializers, exceptionHandlers, routes, websockets, finalizers, beforeFilters);
+    return new ScanResult(controllers,
+                          initializers,
+                          exceptionHandlers,
+                          routes,
+                          websockets,
+                          finalizers,
+                          beforeFilters);
   }
 
   private Reflections[] reflections(ClassLoader classLoader) {
