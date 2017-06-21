@@ -1,9 +1,5 @@
 package lightning.debugmap;
 
-import static lightning.server.Context.config;
-
-import java.io.File;
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -59,16 +55,7 @@ public class DebugMapController {
   public DebugMapController() {
     templateEngine = new Configuration(new Version(2, 3, 23));
     templateEngine.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-    File path = new File("../lightning/src/main/resources/lightning");
-    if (config().enableDebugMode && path.exists()) {
-      try {
-        templateEngine.setDirectoryForTemplateLoading(path);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    } else {
-      templateEngine.setClassForTemplateLoading(getClass(), "/lightning");
-    }
+    templateEngine.setClassForTemplateLoading(getClass(), "/lightning");
   }
 
   public void handle(LightningHandler handler, HandlerContext ctx) throws Exception {
@@ -133,7 +120,6 @@ public class DebugMapController {
 
     model.put("http_methods", HTTPMethod.values());
 
-    templateEngine.clearTemplateCache();
     templateEngine.getTemplate("debugmap.ftl")
                   .process(model, ctx.response.getWriter());
   }

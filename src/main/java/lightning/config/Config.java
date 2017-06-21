@@ -1,5 +1,7 @@
 package lightning.config;
 
+import java.io.File;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -8,6 +10,7 @@ import lightning.ann.Required;
 import lightning.exceptions.LightningException;
 import lightning.mail.MailerConfig;
 import lightning.util.Iterables;
+import lightning.util.SimpleHTTPServer;
 
 import com.google.common.collect.ImmutableList;
 
@@ -16,6 +19,12 @@ import com.google.common.collect.ImmutableList;
  * See the official web documentation for more information.
  */
 public class Config {
+  public Config() {
+    isRunningFromJar = Config.class.getResource("Config.class").toString().startsWith("jar:") ||
+        Config.class.getResource("Config.class").toString().startsWith("rsrc:") ||
+        Config.class.getProtectionDomain().getCodeSource().getLocation().getPath().contains(".jar");
+  }
+
   /**
    * Specifies whether or not debug (development) mode should be enabled.
    * Recommended during development.
@@ -39,6 +48,11 @@ public class Config {
    * If set to null, the route map handler will not be installed.
    */
   public @Optional String debugRouteMapPath = "/~lightning/routes";
+
+  /**
+   * The root path of your project (the directory containing pom.xml).
+   */
+  public @Optional String projectRootPath = "./";
 
   /**
    * Specifies a path on which a simple health status page will be installed for use by load balancers and
@@ -67,7 +81,7 @@ public class Config {
 
   /**
    * Specifies a list of paths in which to search for source code files to display in the debug screen when
-   * operating in debug mode.
+   * operating in debug mode. Absolute OR relative to project root.
    */
   public @Optional List<String> codeSearchPaths = ImmutableList.of("./src/main/java", "./src/test/java");
 
@@ -542,9 +556,30 @@ public class Config {
     }
   }
 
+  private final boolean isRunningFromJar;
+
+  public boolean isRunningFromJAR() {
+    return isRunningFromJar;
+  }
+
+  public String resolveProjectPath(String path) {
+    if (Paths.get(path).isAbsolute()) {
+      return path;
+    }
+
+    return Paths.get(projectRootPath, path).toAbsolutePath().toString();
+  }
+
+  public String resolveProjectPath(String part1, String part2) {
+    return Paths.get(projectRootPath, part1, part2).toAbsolutePath().toString();
+  }
+
   public void validate() throws LightningException {
+    notNull("projectRootPath", projectRootPath);
     notNull("scanPrefixes", scanPrefixes);
     notNull("server.hmacKey", server.hmacKey);
+    badIf(server.templateFilesPath != null && Paths.get(server.templateFilesPath).isAbsolute(), "templateFilesPath must not be absolute.");
+    badIf(server.staticFilesPath != null && Paths.get(server.staticFilesPath).isAbsolute() && !SimpleHTTPServer.isMainClass(), "staticFilesPath must not be absolute.");
     badIf(server.enableHttp2 && !ssl.isEnabled(), "You must enable SSL to enable HTTP2.");
     badIf(autoReloadPrefixes != null &&
           Iterables.reduce(Iterables.map(autoReloadPrefixes,
@@ -558,10 +593,21 @@ public class Config {
                            false,
                            (a, i) -> a || i),
           "You may not reload packages java.*, lightning.*, com.augustl.pathtravelagent.*.");
+
+    if (enableDebugMode && !isRunningFromJAR()) {
+      File root = new File(projectRootPath);
+      if (!root.exists() || !root.isDirectory() || !root.canRead()) {
+        throw new LightningException("Your configuration is invalid: projectRootPath must exist, be directory, be readable when debug mode is enabled.");
+      }
+      File pom = new File(root, "pom.xml");
+      if (!pom.exists() || !pom.canRead()) {
+        throw new LightningException("Your configuration is invalid: projectRootPath must be a Maven project directory.");
+      }
+    }
   }
 
   public boolean canReloadClass(Class<?> type) {
-    if (!enableDebugMode) {
+    if (!enableDebugMode || isRunningFromJAR()) {
       return false;
     }
 

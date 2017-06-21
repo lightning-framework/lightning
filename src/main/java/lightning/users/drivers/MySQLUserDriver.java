@@ -34,36 +34,36 @@ import com.google.common.collect.ImmutableList;
 public class MySQLUserDriver implements UsersDriver {
   private final MySQLDatabaseProvider provider;
   private final Groups groups;
-  
+
   public MySQLUserDriver(MySQLDatabaseProvider provider, Groups groups) {
     this.provider = provider;
     this.groups = groups;
   }
-  
+
   public User nextUser(ResultSet result) throws ClassNotFoundException, SQLException, IOException {
     if (!result.next()) {
       return null;
     }
-    
+
     @SuppressWarnings("unchecked")
     Map<String, Object> properties = (Map<String, Object>) getBlob(result, "properties");
-    
+
     if (properties == null) {
       properties = new TreeMap<>();
     }
-    
-    return new User(this, 
+
+    return new User(this,
         groups,
-        result.getLong("id"), 
-        result.getString("username"), 
-        result.getString("email"), 
-        result.getString("encrypted_password"), 
+        result.getLong("id"),
+        result.getString("username"),
+        result.getString("email"),
+        result.getString("encrypted_password"),
         result.getString("secret_key"),
-        result.getLong("banned_until"), 
+        result.getLong("banned_until"),
         ResultSets.getBoolean(result, "email_verified"),
         properties);
   }
-  
+
   private static void setBlob(PreparedStatement statement, int index, Object object) throws SQLException, IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     ObjectOutputStream oos = new ObjectOutputStream(baos);
@@ -73,7 +73,7 @@ public class MySQLUserDriver implements UsersDriver {
     ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
     statement.setBinaryStream(index, bais, bytes.length);
   }
-  
+
   private static Object getBlob(ResultSet result, String column) throws SQLException, IOException, ClassNotFoundException {
     Blob blob = result.getBlob(column);
     if (result.wasNull())
@@ -137,7 +137,7 @@ public class MySQLUserDriver implements UsersDriver {
       return user;
     }
   }
-  
+
   @Override
   public void save(User user, Set<Long> addPrivileges, Set<Long> removePrivileges) throws Exception {
     try (MySQLDatabase db = provider.getDatabase()) {
@@ -196,6 +196,7 @@ public class MySQLUserDriver implements UsersDriver {
       String encryptedPassword = Users.hashPassword(plaintextPassword);
       query.setString("encrypted_password", encryptedPassword);
       String token = Auth.generateToken(); // TODO: Use something else.
+      token = token.substring(0, Math.min(token.length(), 128));
       query.setString("secret_key", token);
       final Map<String, Object> properties = new TreeMap<>();
       query.set("properties", (stmt, i) -> {
@@ -209,7 +210,7 @@ public class MySQLUserDriver implements UsersDriver {
       query.executeUpdate();
       long id = query.getInsertionId();
       query.close();
-      
+
       return new User(this, groups, id, userName, email, encryptedPassword, token, 0, false, properties);
     }
   }
@@ -221,7 +222,7 @@ public class MySQLUserDriver implements UsersDriver {
       query = db.prepare("DELETE FROM user_privileges WHERE user_id = ?;", ImmutableList.of(userId));
       query.executeUpdate();
       query.close();
-      
+
       query = db.prepare("DELETE FROM users WHERE id = ?;", ImmutableList.of(userId));
       query.executeUpdate();
       query.close();

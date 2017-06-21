@@ -9,10 +9,11 @@ import com.google.common.base.Optional;
  * A utility library for parsing command-line flags.
  * Accepts flags in the format "--name value --name2 value2".
  */
+@Deprecated // use lightning.flags
 public class Flags {
   private static HashMap<String, String> flags = new HashMap<>();
   private static final String FLAG_PREFIX = "--";
-  
+
   /**
    * Parses the provided arguments.
    * @param args Provided command-line arguments.
@@ -28,14 +29,14 @@ public class Flags {
         } else {
           flags.put(args[i].substring(FLAG_PREFIX.length(), args[i].length()), args[i+1]);
         }
-        
+
         i++;
       } else {
         i++;
       }
     }
   }
-  
+
   /**
    * Returns whether or not a flag was present.
    * @param flagName A flag name.
@@ -44,7 +45,7 @@ public class Flags {
   public static boolean has(String flagName) {
     return flags.containsKey(flagName);
   }
-  
+
   /**
    * Returns whether or not a value was present for a flag.
    * @param flagName A flag name.
@@ -53,7 +54,7 @@ public class Flags {
   public static boolean hasValue(String flagName) {
     return flags.containsKey(flagName) && flags.get(flagName) != null;
   }
-  
+
   /**
    * @param flagName A flag name.
    * @return A file representing the path given in the flag flagName.
@@ -62,17 +63,17 @@ public class Flags {
   public static File getFile(String flagName) throws FlagsException {
     if (flags.containsKey(flagName)) {
       File file = new File(flags.get(flagName));
-      
+
       if (file.exists() && !file.isDirectory() && file.canRead()) {
         return file;
       }
-      
+
       throw new FlagsException("Error: File " + flags.get(flagName) + " does not exist or is not readable.");
     }
-    
+
     throw new FlagsException("Error: No flag exists named " + flagName);
   }
-  
+
   /**
    * @param flagName A flag name.
    * @return The string value of the given flag.
@@ -82,10 +83,10 @@ public class Flags {
     if (hasValue(flagName)) {
       return flags.get(flagName);
     }
-    
-    throw new FlagsException("Error: No flag exists named " + flagName);    
+
+    throw new FlagsException("Error: No flag exists named " + flagName);
   }
-  
+
   /**
    * @param flagName A flag name.
    * @param defaultValue A default value.
@@ -94,7 +95,7 @@ public class Flags {
   public static String getStringOrDefault(String flagName, String defaultValue) {
     return hasValue(flagName) ? flags.get(flagName) : defaultValue;
   }
-  
+
   /**
    * @param flagName A flag name.
    * @return An option that is filled iff the given flag has a value.
@@ -102,7 +103,7 @@ public class Flags {
   public static Optional<String> getStringOption(String flagName) {
     return hasValue(flagName) ? Optional.of(flags.get(flagName)) : Optional.absent();
   }
-  
+
   /**
    * @param flagName A flag name.
    * @return Returns the long value of a given flag.
@@ -116,10 +117,10 @@ public class Flags {
        throw new FlagsException("Error: Flag " + flagName + " must be a number.");
      }
     }
-    
+
     throw new FlagsException("Error: No flag exists named " + flagName);
   }
-  
+
   /**
    * @param flagName A flag name.
    * @return Returns the long value of a given optional flag.
@@ -133,10 +134,10 @@ public class Flags {
        return Optional.absent();
      }
     }
-    
+
     return Optional.absent();
   }
-  
+
   /**
    * @param flagName A flag name.
    * @param defaultValue A value.
@@ -150,10 +151,10 @@ public class Flags {
        return defaultValue;
      }
     }
-    
+
     return defaultValue;
   }
-  
+
   /**
    * @param flagName A flag name.
    * @return Returns the long value of a given flag.
@@ -167,10 +168,10 @@ public class Flags {
        throw new FlagsException("Error: Flag " + flagName + " must be a number.");
      }
     }
-    
+
     throw new FlagsException("Error: No flag exists named " + flagName);
   }
-  
+
   /**
    * @param flagName A flag name.
    * @return Returns the long value of a given optional flag.
@@ -184,10 +185,10 @@ public class Flags {
        return Optional.absent();
      }
     }
-    
+
     return Optional.absent();
   }
-  
+
   /**
    * @param flagName A flag name.
    * @param defaultValue A value.
@@ -201,10 +202,10 @@ public class Flags {
        return defaultValue;
      }
     }
-    
+
     return defaultValue;
   }
-  
+
   /**
    * @param flagName The name of the flag.
    * @param type The type of the enum.
@@ -215,13 +216,13 @@ public class Flags {
     if (!hasValue(flagName)) {
       return Optional.absent();
     }
-    
+
     T[] constants = type.getEnumConstants();
-    
+
     Optional<Integer> intValue = getIntOption(flagName);
     if (intValue.isPresent()) {
       int offset = intValue.get();
-      
+
       if (offset >= 0 && offset < constants.length) {
         return Optional.of(constants[offset]);
       } else {
@@ -229,17 +230,17 @@ public class Flags {
       }
     } else {
       String value = getString(flagName);
-      
+
       for (T constant : constants) {
         if (value.equalsIgnoreCase(constant.toString())) {
           return Optional.of(constant);
         }
       }
-      
+
       return Optional.absent();
     }
   }
-  
+
   /**
    * An exception throwing when flag errors occur.
    */
@@ -249,11 +250,11 @@ public class Flags {
     public FlagsException() {
       super();
     }
-    
+
     public FlagsException(String message) {
       super(message);
     }
-    
+
     public FlagsException(Exception e) {
       super(e);
     }

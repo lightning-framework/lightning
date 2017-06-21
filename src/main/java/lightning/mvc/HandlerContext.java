@@ -78,6 +78,7 @@ import com.google.common.collect.ImmutableList;
  * A controller is a class that is used to process a single HTTP request and should be sub-classed.
  * Each controller lives only on a single thread to service a single request. Instances are
  * allocated to service a single request and destroyed after a response to that request is sent.
+ * TODO: Built-in support for HTTP head (incl static files).
  */
 public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   private static final Logger logger = LoggerFactory.getLogger(HandlerContext.class);
@@ -1008,7 +1009,9 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   }
 
   public void handleException(Throwable error) {
-    logger.warn("Route handler returned exception: ", error);
+    if (!(error instanceof IOException)) {
+      logger.warn("Route handler returned exception: ", error);
+    }
     try {
       LightningHandler handler = injector().getInjectedArgumentForClass(LightningHandler.class);
       handler.sendErrorPage(request.raw(),

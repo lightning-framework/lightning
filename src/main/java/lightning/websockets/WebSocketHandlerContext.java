@@ -155,15 +155,21 @@ public class WebSocketHandlerContext {
   }
 
   public void close() {
-    session.close();
+    if (session != null) {
+      session.close();
+    }
   }
 
   public void close(int status) {
-    session.close(status, null);
+    if (session != null) {
+      session.close(status, null);
+    }
   }
 
   public void close(int status, String reason) {
-    session.close(status, reason);
+    if (session != null) {
+      session.close(status, reason);
+    }
   }
 
   public boolean isOpen() {

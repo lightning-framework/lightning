@@ -1,6 +1,5 @@
 package lightning.debugscreen;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -48,18 +47,8 @@ public class DebugScreen {
   public DebugScreen(Config config, SourceLocator... sourceLocators) {
     templateConfig = new Configuration(new Version(2, 3, 23));
     templateConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
+    templateConfig.setClassForTemplateLoading(getClass(), "/lightning");
     this.sourceLocators = sourceLocators;
-
-    File path = new File("../lightning/src/main/resources/lightning");
-    if (path.exists()) {
-      try {
-        templateConfig.setDirectoryForTemplateLoading(path);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    } else {
-      templateConfig.setClassForTemplateLoading(getClass(), "/lightning");
-    }
   }
 
   private void addToChain(Throwable throwable,

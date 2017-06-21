@@ -38,6 +38,7 @@ import com.google.common.hash.Hashing;
  * handler is invoked. Could be fixed by output buffering.
  * TODO: People that don't have cookies enabled will create tons of rows, need way to purge these first.
  *       Maybe by having a committed flag and dropping sessions not committed within X seconds?
+ * TODO: we should optimize db access (e.g. if no session cookie exists -> no db hit)
  */
 public final class Session {
   private static final Logger logger = LoggerFactory.getLogger(Session.class);

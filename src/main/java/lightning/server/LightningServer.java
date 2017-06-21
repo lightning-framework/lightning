@@ -51,9 +51,12 @@ public class LightningServer {
     if (config.enableDebugMode) {
       logger.warn("Lightning Framework :: NOTICE: You are running this server in DEBUG MODE.");
       logger.warn("Lightning Framework :: NOTICE: Please do not enable debug mode on production systems as it may leak internals.");
-      if (config.autoReloadPrefixes != null && !config.autoReloadPrefixes.isEmpty()) {
+      if (config.autoReloadPrefixes != null && !config.autoReloadPrefixes.isEmpty() && !config.isRunningFromJAR()) {
         logger.warn("Lightning Framework :: NOTICE: You have enabled code hot swaps in packages: " + Joiner.on(", ").join(config.autoReloadPrefixes));
       }
+    }
+    if (config.isRunningFromJAR()) {
+      logger.info("Lightning Framework :: NOTICE: You are running this server from a JAR deployment.");
     }
 
     LightningHandler lightningHandler = new LightningHandler(config, dbp, userModule);

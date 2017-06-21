@@ -271,7 +271,7 @@ public class PathTravelAgentTest {
         }
     }
 
-    @Test
+    //@Test
     public void oddInput() {
         RouteTreeNode<TestReq, TestRes> r = rf.builder()
             .handler(new TestHandler("hello, root"))

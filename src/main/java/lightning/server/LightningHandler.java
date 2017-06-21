@@ -1,5 +1,7 @@
 package lightning.server;
 
+import static lightning.util.ReflectionUtil.annotations;
+
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -7,6 +9,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -18,6 +21,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.io.MappedByteBufferPool;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.util.MultiException;
 import org.eclipse.jetty.util.MultiPartInputStreamParser;
@@ -31,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.augustl.pathtravelagent.PathFormatException;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import lightning.ann.Before;
@@ -90,11 +93,8 @@ import lightning.util.DebugUtil;
 import lightning.util.MimeMatcher;
 import lightning.websockets.WebSocketHolder;
 
-import static lightning.util.ReflectionUtil.annotations;
-
 public final class LightningHandler extends AbstractHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(LightningHandler.class);
-  @SuppressWarnings("unchecked")
   private static final ImmutableSet<Class<? extends Throwable>> INTERNAL_EXCEPTIONS = ImmutableSet.of(
       NotFoundException.class,
       BadRequestException.class,
@@ -137,8 +137,10 @@ public final class LightningHandler extends AbstractHandler {
     this.exceptionHandlers = new ExceptionMapper<>();
     this.scanner = new Scanner(config.autoReloadPrefixes,
                                config.scanPrefixes,
-                               config.enableDebugMode, new Injector(this.userInjectorModule,
-                                                                    this.globalInjectorModule));
+                               config.enableDebugMode && !config.isRunningFromJAR(),
+                               new Injector(this.userInjectorModule,
+                                            this.globalInjectorModule),
+                               config.resolveProjectPath("target/classes"));
     this.routes = new RouteMapper<>();
     this.internalTemplateEngine = new FreeMarkerTemplateEngine(getClass(), "/lightning");
     this.exceptionViews = new DefaultExceptionViewProducer();
@@ -175,7 +177,7 @@ public final class LightningHandler extends AbstractHandler {
       SourceLocator[] locators = new SourceLocator[config.codeSearchPaths.size()];
       int i = 0;
       for (String path : config.codeSearchPaths) {
-        locators[i++] = new LocalSourceLocator(path);
+        locators[i++] = new LocalSourceLocator(config.resolveProjectPath(path));
       }
       this.debugScreen = new DebugScreen(config, locators);
     }
@@ -190,11 +192,14 @@ public final class LightningHandler extends AbstractHandler {
     // Set up static files.
     {
       if (config.server.staticFilesPath != null) {
-        ResourceFactory factory = (config.enableDebugMode)
+        ResourceFactory factory = (config.enableDebugMode && !config.isRunningFromJAR())
             ? new ResourceCollection(getStaticFileResourcePaths())
-            : Resource.newClassPathResource(config.server.staticFilesPath);
+            : Resource.newClassPathResource("/" + config.server.staticFilesPath);
         // NOTE: We disable MMAP in debug mode because MMAP will lock files preventing people from
         // making changes to them.
+        if (factory == null) {
+          throw new LightningException("Your configured staticFilesPath does not exist within the classpath.");
+        }
         this.fileServer = new FileServer(factory, !config.enableDebugMode);
         this.fileServer.setMaxCachedFiles(config.server.maxCachedStaticFiles);
         this.fileServer.setMaxCachedFileSize(config.server.maxCachedStaticFileSizeBytes);
@@ -222,18 +227,37 @@ public final class LightningHandler extends AbstractHandler {
     try {
       rescan();
     } catch (Throwable t) {
-      throw new LightningConfigException("Lightning has failed to process your routing configuration. You must correct these errors to start the server.", t);
+      if (config.enableDebugMode && !config.isRunningFromJAR()) {
+        LOGGER.error("Lightning has failed to process your routing configuration. The server will start (in debug mode), but you must correct these errors.", t);
+      } else {
+        throw new LightningConfigException("Lightning has failed to process your routing configuration. You must correct these errors to start the server.", t);
+      }
     }
+
+    if (config.debugRouteMapPath != null && config.enableDebugMode) {
+      LOGGER.info("A route overview is available at {}://localhost:{}{}",
+                  config.ssl.isEnabled() ? "https" : "http",
+                  config.server.port,
+                  config.debugRouteMapPath);
+    }
+  }
+
+  private boolean isIgnorableException(Throwable e) {
+    return (e instanceof IOException) || (e instanceof RuntimeIOException);
   }
 
   private Resource[] getStaticFileResourcePaths() {
     assert (config.server.staticFilesPath != null && config.enableDebugMode);
     ArrayList<Resource> resources = new ArrayList<>();
-    List<File> possible = ImmutableList.of(
-      new File("./src/main/resources", config.server.staticFilesPath),
-      new File("./src/main/java", config.server.staticFilesPath),
-      new File(config.server.staticFilesPath)
-    );
+    List<File> possible = new ArrayList<>();
+
+    if (Paths.get(config.server.staticFilesPath).isAbsolute()) {
+      possible.add(new File(config.server.staticFilesPath));
+    }
+    else {
+      possible.add(new File(config.resolveProjectPath("src/main/resources", config.server.staticFilesPath)));
+      possible.add(new File(config.resolveProjectPath("src/main/java", config.server.staticFilesPath)));
+    }
 
     for (File f : possible) {
       if (f.exists() && f.isDirectory() && f.canRead()) {
@@ -298,7 +322,7 @@ public final class LightningHandler extends AbstractHandler {
                              HttpServletResponse response,
                              Throwable error,
                              Match<Object> route) throws ServletException, IOException {
-    if (response.isCommitted()) {
+    if (response.isCommitted() && !isIgnorableException(error)) {
       LOGGER.warn("Failed to render an error page (response already committed).");
       return; // We can't render an error page if the response is committed.
     }
@@ -310,13 +334,14 @@ public final class LightningHandler extends AbstractHandler {
       return;
     }
 
+    logRequest(request, "@ExceptionHandler " + exceptionHandler);
+
     response.reset();
     response.addHeader("Content-Type", "text/html; charset=UTF-8");
 
     try {
       HandlerContext context = context(request, response);
       context.bindings().bindToClass(error);
-      // TODO: Show code snippet if injection fails.
       exceptionHandler.invoke(null, context.injector().getInjectedArguments(exceptionHandler));
     } catch (Throwable exceptionHandlerError) {
       if ((exceptionHandlerError instanceof InvocationTargetException) &&
@@ -340,11 +365,11 @@ public final class LightningHandler extends AbstractHandler {
   }
 
   public void sendBuiltInErrorPage(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    Throwable error,
-                                    Match<Object> route) throws ServletException, IOException {
+                                   HttpServletResponse response,
+                                   Throwable error,
+                                   Match<Object> route) throws ServletException, IOException {
     try {
-      if (response.isCommitted()) {
+      if (response.isCommitted() && !isIgnorableException(error)) {
         LOGGER.warn("Failed to render an error page (response already committed).");
         return; // We can't render an error page if the response is committed.
       }
@@ -359,6 +384,8 @@ public final class LightningHandler extends AbstractHandler {
         internalTemplateEngine.render(view.viewName, view.viewModel, response.getWriter());
         return;
       }
+
+      logRequest(request, "@ExceptionHandler lightning.server.DefaultExceptionHandler");
 
       // For all other exception types:
       if (config.enableDebugMode) {
@@ -413,7 +440,7 @@ public final class LightningHandler extends AbstractHandler {
     if (config.server.staticFilesPath != null &&
         request.getMethod().equalsIgnoreCase("GET") &&
         fileServer.couldConsume(request, response)) {
-      logRequest(request, "STATIC FILE");
+      logRequest(request, "lightning.server.StaticFileHandler");
       fileServer.handle(request, response);
       return true;
     }
@@ -429,7 +456,7 @@ public final class LightningHandler extends AbstractHandler {
       return false;
     }
 
-    logRequest(request, "HTTPS REDIRECT");
+    logRequest(request, "lightning.server.HttpToHttpsRedirect");
     URI httpUri = new URI(request.getRequestURL().toString());
     URI httpsUri = new URI("https",
                            httpUri.getUserInfo(),
@@ -516,7 +543,7 @@ public final class LightningHandler extends AbstractHandler {
     baseRequest.setHandled(true);
 
     try {
-      if (config.enableDebugMode) {
+      if (config.enableDebugMode && !config.isRunningFromJAR()) {
         try {
           rescan(); // Reloads all routes, exception handlers, filters, etc.
         } catch (Throwable t) {
@@ -548,10 +575,9 @@ public final class LightningHandler extends AbstractHandler {
         }
       }
 
-      logRequest(sRequest, "NOT FOUND");
       throw new NotFoundException();
     } catch (Throwable error) {
-      if (!INTERNAL_EXCEPTIONS.contains(error.getClass())) {
+      if (!INTERNAL_EXCEPTIONS.contains(error.getClass()) && !isIgnorableException(error)) {
         LOGGER.warn("A request handler returned an exception: ", error);
       }
 
@@ -732,7 +758,6 @@ public final class LightningHandler extends AbstractHandler {
         }
 
         // Instantiate the controller.
-        // TODO: Injector errors should show code.
         controller = context.injector().newInstance(target.getDeclaringClass());
 
         // Run @Initializers.

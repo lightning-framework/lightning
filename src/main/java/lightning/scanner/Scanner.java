@@ -50,6 +50,7 @@ public class Scanner {
   private final List<String> scanPrefixes;
   private final boolean enableAutoReload;
   private final InjectionValidator iv;
+  private final String path;
 
   /**
    * @param classLoader The class loader to use (default one in most cases)
@@ -59,11 +60,13 @@ public class Scanner {
   public Scanner(List<String> reloadPrefixes,
                  List<String> scanPrefixes,
                  boolean enableAutoReload,
-                 Injector injector) {
+                 Injector injector,
+                 String path) {
     this.reloadPrefixes = reloadPrefixes != null ? reloadPrefixes : ImmutableList.of();
     this.scanPrefixes = scanPrefixes;
     this.enableAutoReload = enableAutoReload;
     this.iv = new InjectionValidator(injector, this.reloadPrefixes);
+    this.path = path;
   }
 
   private static void putMethod(Map<Class<?>, Set<Method>> map, Method method) {
@@ -85,7 +88,7 @@ public class Scanner {
     Set<Class<?>> websockets = new HashSet<>();
     Map<Class<?>, Set<Method>> beforeFilters = new HashMap<>();
     ClassLoader classLoader = enableAutoReload
-        ? new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), "target/classes")
+        ? new ExceptingClassLoader(new PrefixClassLoaderExceptor(reloadPrefixes), path)
         : this.getClass().getClassLoader();
 
     for (Reflections scanner : reflections(classLoader)) {
@@ -165,12 +168,12 @@ public class Scanner {
     int i = 0;
     for (String searchPath : scanPrefixes) {
       ConfigurationBuilder config = ConfigurationBuilder.build(
-          searchPath, classLoader,
-          new SubTypesScanner(),
-          new TypeAnnotationsScanner(),
-          new MethodAnnotationsScanner());
-      result[i] = new Reflections(config);
-      i++;
+        searchPath,
+        classLoader,
+        new SubTypesScanner(),
+        new TypeAnnotationsScanner(),
+        new MethodAnnotationsScanner());
+      result[i++] = new Reflections(config);
     }
 
     return result;

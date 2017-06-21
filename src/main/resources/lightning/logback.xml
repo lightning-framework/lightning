@@ -11,7 +11,7 @@
   </appender>
 
   <!-- Logger for our packages. -->
-  <logger name="lightning" level="DEBUG" />
+  <logger name="lightning" level="INFO" />
 
   <!-- By default, the level of the root level is set to DEBUG -->
   <root level="WARN">

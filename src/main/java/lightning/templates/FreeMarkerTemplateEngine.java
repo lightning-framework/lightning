@@ -26,11 +26,11 @@ public final class FreeMarkerTemplateEngine implements TemplateEngine {
 
     if (config.server.templateFilesPath != null) {
       File templatePath = Iterables.firstOr(Iterables.filter(ImmutableList.of(
-          new File("./src/main/java/" + config.server.templateFilesPath),
-          new File("./src/main/resources/" + config.server.templateFilesPath)
-      ), f -> f.exists()), new File(config.server.templateFilesPath));
+          new File(config.resolveProjectPath("src/main/java", config.server.templateFilesPath)),
+          new File(config.resolveProjectPath("src/main/resources", config.server.templateFilesPath))
+      ), f -> f.exists()), null);
 
-      if (templatePath.exists() && config.enableDebugMode) {
+      if (templatePath != null && templatePath.exists() && config.enableDebugMode && !config.isRunningFromJAR()) {
         this.configuration.setDirectoryForTemplateLoading(templatePath);
       } else {
         this.configuration.setClassForTemplateLoading(getClass(), "/" + config.server.templateFilesPath);

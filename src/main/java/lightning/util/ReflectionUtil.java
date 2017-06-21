@@ -107,7 +107,7 @@ public class ReflectionUtil {
     if (!Modifier.isPublic(method.getModifiers()) ||
         Modifier.isStatic(method.getModifiers()) ||
         Modifier.isAbstract(method.getModifiers())) {
-      throw new LightningValidationException(method, "Must be public, static, non-abstract.");
+      throw new LightningValidationException(method, "Must be public, non-static, non-abstract.");
     }
   }
 

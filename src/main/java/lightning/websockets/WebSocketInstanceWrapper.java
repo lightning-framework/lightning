@@ -1,5 +1,7 @@
 package lightning.websockets;
 
+import java.net.SocketTimeoutException;
+
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketListener;
 import org.eclipse.jetty.websocket.api.annotations.WebSocket;
@@ -23,7 +25,7 @@ public final class WebSocketInstanceWrapper implements WebSocketListener {
     this.handler = handler;
     this.bindings = bindings;
     this.context = context;
-    this.snapshot = context.config().enableDebugMode
+    this.snapshot = context.config().enableDebugMode && !context.config().isRunningFromJAR()
         ? Snapshot.capture(context.config().autoReloadPrefixes)
         : null;
   }
@@ -69,11 +71,10 @@ public final class WebSocketInstanceWrapper implements WebSocketListener {
           }
         }
       } else {
-        session.close(1011, "");
+        session.close(1011, "Code Reloaded");
       }
     } catch (Exception e) {
       onWebSocketError(e);
-      session.close(1011, "");
     }
   }
 
@@ -83,7 +84,9 @@ public final class WebSocketInstanceWrapper implements WebSocketListener {
       if (bindings.error != null) {
         context.injector().invoke(bindings.error, handler, error);
       } else {
-        LOGGER.warn("A web socket error occured: ", error);
+        if (!(error instanceof SocketTimeoutException)) {
+          LOGGER.warn("A web socket error occured: ", error);
+        }
       }
     } catch (Exception e) {
       // The session is going to be closed anyways.
@@ -91,7 +94,18 @@ public final class WebSocketInstanceWrapper implements WebSocketListener {
       LOGGER.warn("Exception in web socket error handler: ", e);
     } finally {
       if (context.hasSession()) {
-        context.close(1011);
+        if (error instanceof SocketTimeoutException) {
+          // Has no effect (Jetty just drops the TCP connection).
+          context.close(1000, "Timed Out");
+          // Jetty apparently doesn't fire the close event on all errors (e.g. timeouts).
+          onWebSocketClose(1000, "Timed Out");
+        } else if (context.config().enableDebugMode) {
+          context.close(1011, error.getClass().getCanonicalName());
+          onWebSocketClose(1011, error.getClass().getCanonicalName());
+        } else {
+          context.close(1011, "Internal Error");
+          onWebSocketClose(1011, "Internal Error");
+        }
       }
     }
   }
@@ -111,11 +125,10 @@ public final class WebSocketInstanceWrapper implements WebSocketListener {
           context.close(1003, "Unsupported Message Type");
         }
       } else {
-        context.close(1011);
+        context.close(1011, "Code Reloaded");
       }
     } catch (Exception e) {
       onWebSocketError(e);
-      context.close(1011);
     }
   }
 
@@ -134,11 +147,10 @@ public final class WebSocketInstanceWrapper implements WebSocketListener {
           context.close(1003, "Unsupported Message Type");
         }
       } else {
-        context.close(1011);
+        context.close(1011, "Code Reloaded");
       }
     } catch (Exception e) {
       onWebSocketError(e);
-      context.close(1011);
     }
   }
 }
