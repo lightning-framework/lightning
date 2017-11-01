@@ -13,9 +13,6 @@ import com.augustl.pathtravelagent.PathFormatException;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 
-import freemarker.template.Configuration;
-import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.Version;
 import lightning.ann.Before;
 import lightning.ann.Controller;
 import lightning.ann.ExceptionHandler;
@@ -30,6 +27,8 @@ import lightning.routing.RouteMapper;
 import lightning.routing.RouteMapper.Match;
 import lightning.scanner.ScanResult;
 import lightning.server.LightningHandler;
+import lightning.templates.FreeMarkerTemplateEngine;
+import lightning.templates.TemplateEngine;
 import lightning.util.ReflectionUtil;
 import lightning.websockets.WebSocketHolder;
 
@@ -50,12 +49,10 @@ public class DebugMapController {
     }
   }
 
-  protected final Configuration templateEngine;
+  protected final TemplateEngine templates;
 
-  public DebugMapController() {
-    templateEngine = new Configuration(new Version(2, 3, 23));
-    templateEngine.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-    templateEngine.setClassForTemplateLoading(getClass(), "/lightning");
+  public DebugMapController() throws Exception {
+    templates = new FreeMarkerTemplateEngine(getClass(), "/lightning");
   }
 
   public void handle(LightningHandler handler, HandlerContext ctx) throws Exception {
@@ -120,8 +117,7 @@ public class DebugMapController {
 
     model.put("http_methods", HTTPMethod.values());
 
-    templateEngine.getTemplate("debugmap.ftl")
-                  .process(model, ctx.response.getWriter());
+    templates.render("debugmap.ftl", model, ctx.response.writer());
   }
 
   private static final class ExceptionComparator implements Comparator<Object> {

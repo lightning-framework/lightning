@@ -35,8 +35,11 @@ public class InjectorModule {
    * @param instance An object of given type.
    */
   public <T> void bindClassToInstance(Class<T> clazz, T instance) {
-    Class<?> currentClass = clazz;
+    bindClassToInstanceUnsafe(clazz, instance);
+  }
 
+  public void bindClassToInstanceUnsafe(Class<?> clazz, Object instance) {
+    Class<?> currentClass = clazz;
     while (currentClass != null && !classBindings.containsKey(currentClass)) {
       classBindings.put(currentClass, instance);
       currentClass = currentClass.getSuperclass();

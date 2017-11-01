@@ -40,6 +40,7 @@ import com.google.common.collect.ImmutableSet;
 import lightning.ann.Before;
 import lightning.ann.ExceptionHandler;
 import lightning.ann.Json;
+import lightning.ann.JsonInput;
 import lightning.ann.Multipart;
 import lightning.ann.RequireAuth;
 import lightning.ann.RequireXsrfToken;
@@ -59,6 +60,7 @@ import lightning.enums.HTTPMethod;
 import lightning.enums.HTTPStatus;
 import lightning.exceptions.LightningConfigException;
 import lightning.exceptions.LightningException;
+import lightning.exceptions.LightningValidationException;
 import lightning.healthscreen.HealthScreenController;
 import lightning.http.AccessViolationException;
 import lightning.http.BadRequestException;
@@ -268,17 +270,17 @@ public final class LightningHandler extends AbstractHandler {
     return resources.toArray(new Resource[resources.size()]);
   }
 
-  public synchronized ScanResult getLastScanResult() {
+  public ScanResult getLastScanResult() {
     // For use in debug map page.
     return scanResult;
   }
 
-  public synchronized Match<Object> getRouteMatch(String path, HTTPMethod method) throws PathFormatException {
+  public Match<Object> getRouteMatch(String path, HTTPMethod method) throws PathFormatException {
     // For use in debug map page.
     return routes.lookup(path, method);
   }
 
-  public synchronized FilterMatch<Method> getFilterMatch(String path, HTTPMethod method) throws PathFormatException {
+  public FilterMatch<Method> getFilterMatch(String path, HTTPMethod method) throws PathFormatException {
     // For use in debug map page.
     return filters.lookup(path, method);
   }
@@ -327,7 +329,7 @@ public final class LightningHandler extends AbstractHandler {
       return; // We can't render an error page if the response is committed.
     }
 
-    Method exceptionHandler = exceptionHandlers.getHandler(error);
+    Method exceptionHandler = exceptionHandlers.get(error);
 
     if (exceptionHandler == null) {
       sendBuiltInErrorPage(request, response, error, route);
@@ -470,7 +472,7 @@ public final class LightningHandler extends AbstractHandler {
     return true;
   }
 
-  private synchronized void rescan() throws Exception {
+  private void rescan() throws Exception {
     routes.clear();
     exceptionHandlers.clear();
     filters.clear();
@@ -486,7 +488,13 @@ public final class LightningHandler extends AbstractHandler {
     for (Class<?> clazz : scanResult.exceptionHandlers.keySet()) {
       for (Method method : scanResult.exceptionHandlers.get(clazz)) {
         for (ExceptionHandler eh : annotations(method, ExceptionHandler.class)) {
-          exceptionHandlers.map(eh.value(), method);
+          try {
+            exceptionHandlers.map(eh.value(), method);
+          } catch (IllegalStateException e) {
+            throw new LightningValidationException(method,
+                "Duplicate @ExceptionHandler for type " + eh.value().getCanonicalName() +
+                " (first discovered on " + exceptionHandlers.get(eh.value()) + ").");
+          }
         }
       }
     }
@@ -531,7 +539,14 @@ public final class LightningHandler extends AbstractHandler {
       }
     }
 
-    routes.compile();
+    try {
+      routes.compile();
+    } catch (RouteMapper.RouteFormatException e) {
+      if (e.handler instanceof Method) {
+        throw DebugUtil.mockStackTrace((Method)e.handler, e, true);
+      }
+      throw e;
+    }
   }
 
   @Override
@@ -539,24 +554,40 @@ public final class LightningHandler extends AbstractHandler {
                      org.eclipse.jetty.server.Request baseRequest,
                      HttpServletRequest sRequest,
                      HttpServletResponse sResponse) throws IOException, ServletException {
-    Match<Object> route = null;
     baseRequest.setHandled(true);
 
+    if (sendStaticFile(sRequest, sResponse)) {
+      return;
+    }
+
+    if (config.enableDebugMode) {
+      // Serialize requests in debug mode to prevent concurrency issues due to rescans.
+      // TODO: Find a more performant solution for larger projects.
+      synchronized (this) {
+        handleRequest(target, baseRequest, sRequest, sResponse);
+      }
+    } else {
+      handleRequest(target, baseRequest, sRequest, sResponse);
+    }
+  }
+
+  private void handleRequest(String target,
+                             org.eclipse.jetty.server.Request baseRequest,
+                             HttpServletRequest sRequest,
+                             HttpServletResponse sResponse) throws IOException, ServletException {
+    Match<Object> route = null;
+
     try {
+      if (redirectInsecureRequest(sRequest, sResponse)) {
+        return;
+      }
+
       if (config.enableDebugMode && !config.isRunningFromJAR()) {
         try {
           rescan(); // Reloads all routes, exception handlers, filters, etc.
         } catch (Throwable t) {
           throw new LightningConfigException("Errors exist in your routing configuration - you must correct these to continue.", t);
         }
-      }
-
-      if (redirectInsecureRequest(sRequest, sResponse)) {
-        return;
-      }
-
-      if (sendStaticFile(sRequest, sResponse)) {
-        return;
       }
 
       route = routes.lookup(sRequest);
@@ -602,7 +633,7 @@ public final class LightningHandler extends AbstractHandler {
         } else if (context == null || !context.isAsync()) {
           // If you get this error, it's because you invoked request().raw().startAsync() instead of goAsync on
           // lightning.server.Context.
-          LOGGER.warn("Using servlet async with multipart request may not clean pieces - use Lightning's goAsync instead.");
+          LOGGER.warn("Using servlet async with multipart request may not clean up properly - use Lightning's goAsync instead.");
         }
       }
 
@@ -754,6 +785,18 @@ public final class LightningHandler extends AbstractHandler {
           RequireXsrfToken info = target.getAnnotation(RequireXsrfToken.class);
           if (info != null) {
             context.requireXsrf(info.inputName());
+          }
+        }
+
+        {
+          JsonInput info = target.getAnnotation(JsonInput.class);
+          if (info != null) {
+            Object value = context.parseJson(info.type(), info.names());
+            context.badRequestIf(value == null,
+                context.isDebug()
+                  ? "Failed to parse JSON '" + info.type().getCanonicalName() + "' from request body."
+                  : "Failed to parse JSON from request body.");
+            context.bindings().bindClassToInstanceUnsafe(info.type(), value);
           }
         }
 

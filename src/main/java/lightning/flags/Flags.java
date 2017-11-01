@@ -150,7 +150,7 @@ public class Flags {
 
       FlagSpecInfo flag = flags.get(entry.getKey());
 
-      if (entry.getValue() == null && !flag.parser.equals(BooleanParser.class)) {
+      if (entry.getValue() == null && !(flag.parser instanceof BooleanParser)) {
         throw new FlagParseException(String.format("Value is required for flag '%s' (declared on %s.%s) of type '%s'.",
             flag.spec.names()[0], flag.field.getDeclaringClass().getSimpleName(), flag.field.getName(), formatTypeName(flag.field.getGenericType())));
       }

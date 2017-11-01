@@ -51,7 +51,7 @@ public class RouteMapper<T> {
     public RouteRequest(HttpServletRequest request) throws PathFormatException {
       this.segments = DefaultPathToPathSegments.parse(request.getPathInfo());
     }
-    
+
     public RouteRequest(String path) throws PathFormatException {
       this.segments = DefaultPathToPathSegments.parse(path);
     }
@@ -151,13 +151,27 @@ public class RouteMapper<T> {
   }
 
   @SuppressWarnings("serial")
-  static final class RouteFormatException extends Exception {
+  public static final class RouteFormatException extends Exception {
+    public final Object handler;
+
+    public RouteFormatException(String message, Exception cause, Object handler) {
+      super(message, cause);
+      this.handler = handler;
+    }
+
     public RouteFormatException(String message, Exception cause) {
       super(message, cause);
+      this.handler = null;
     }
 
     public RouteFormatException(String message) {
       super(message);
+      this.handler = null;
+    }
+
+    public RouteFormatException(String message, Throwable cause) {
+      super(message, cause);
+      this.handler = null;
     }
   }
 
@@ -214,7 +228,14 @@ public class RouteMapper<T> {
 
     public void handler(IRouteHandler<T_REQ, T_RES> handler) {
       if (this.handler != null) {
-        throw new IllegalStateException("Duplicate handler for path.");
+        if (this.handler instanceof RouteMatchHandler &&
+            handler instanceof RouteMatchHandler) {
+          RouteMatchHandler<?> handler1 = (RouteMatchHandler<?>)this.handler;
+          RouteMatchHandler<?> handler2 = (RouteMatchHandler<?>)handler;
+          throw new IllegalStateException("Handler already exists at path (" + handler1.route.action + ") - could not install handler (" + handler2.route.action + ").");
+        }
+
+        throw new IllegalStateException("Handler already exists at path.");
       }
 
       this.handler = handler;
@@ -300,14 +321,14 @@ public class RouteMapper<T> {
       return null;
     }
   }
-  
+
   public Match<T> lookup(HttpServletRequest request) {
     HTTPMethod method = HTTPMethod.valueOf(request.getMethod().toUpperCase());
-    
+
     if (!routes.containsKey(method)) {
       return null;
     }
-    
+
     try {
       return matcher.match(routes.get(method), new RouteRequest(request));
     } catch (PathFormatException e) {
@@ -378,7 +399,10 @@ public class RouteMapper<T> {
           throw new RouteFormatException("Routing path " + method + " " + route.path + " contains illegal characters.");
         } catch (IllegalStateException e) {
           routes.clear();
-          throw new RouteFormatException("Duplicate/incompatible routing path " + method + " " + route.path + ".");
+          RouteFormatException error = new RouteFormatException(
+              "Found multiple routes mapping to " + method + " '" + route.path + "' (or equivalent path).",
+              e, route.action);
+          throw error;
         }
       }
 

@@ -52,83 +52,87 @@ import lightning.users.Users.UsersException;
  */
 public class Context {
   private static final ThreadLocal<HandlerContext> controller = new ThreadLocal<>();
-  
+
   static final void setContext(HandlerContext c) {
     controller.set(c);
   }
-  
+
   public static final HandlerContext context() {
     return controller.get();
   }
-  
+
   static final void clearContext() {
     controller.remove();
   }
-  
+
   public static final HandlerContext goAsync() throws Exception {
     return context().goAsync();
   }
-  
+
+  public static boolean isDebug() {
+    return context().isDebug();
+  }
+
   public static final Cache cache() {
     return context().cache();
   }
-  
+
   public static final Groups groups() {
     return context().groups();
   }
-  
+
   public static final Users users() {
     return context().users();
   }
-  
+
   public static final boolean contextExists() {
     return controller.get() != null;
   }
-  
+
   public static final Request request() {
     return context().request;
   }
-  
+
   public static final Response response() {
     return context().response;
   }
-  
+
   public static final Config config() {
     return context().config;
   }
-  
+
   public static final TemplateEngine templateEngine() {
     return context().templateEngine;
   }
-  
+
   public static final SecureCookieManager cookies() {
     return context().cookies;
   }
-  
+
   public static final URLGenerator url() {
     return context().url;
   }
-  
+
   public static final Validator validator() {
     return context().validator;
   }
-  
+
   public static final Session session() {
     return context().session;
   }
-  
+
   public static final Auth auth() {
     return context().auth;
   }
-  
+
   public static final Mailer mail() throws LightningException {
     return context().mail();
   }
-  
+
   public static final User user() throws SessionException, AuthException {
     return context().getUser();
   }
-  
+
   public static final MySQLDatabase db() throws SQLException {
     return context().db();
   }
@@ -140,7 +144,7 @@ public class Context {
   public static final void notImplemented(String reason) throws NotImplementedException {
     context().notImplemented(reason);
   }
-  
+
   public static final void accessViolation() throws AccessViolationException {
     context().accessViolation();
   }
@@ -240,7 +244,7 @@ public class Context {
   public static final void redirectIfNotLoggedIn(String path) throws SessionException, AuthException {
     context().redirectIfNotLoggedIn(path);
   }
-  
+
   public static final ParamTester requireQueryParam(String name) throws BadRequestException {
     return context().requireQueryParam(name);
   }
@@ -260,7 +264,7 @@ public class Context {
   public static final Param routeParam(String name) {
     return context().routeParam(name);
   }
-  
+
   public static final boolean passesValidation() {
     return context().passesValidation();
   }
@@ -268,19 +272,19 @@ public class Context {
   public static final FieldValidator validate(String queryParamName) {
     return context().validate(queryParamName);
   }
-  
+
   public static final void requireXsrf(String queryParamName) throws Exception {
     context().requireXsrf(queryParamName);
   }
-  
+
   public static final void requireXsrf() throws Exception {
     context().requireXsrf();
   }
-  
+
   public static final void validateXsrf(String queryParamName) throws Exception {
     context().validateXsrf(queryParamName);
   }
-  
+
   public static final void validateXsrf() throws Exception {
     context().validateXsrf();
   }
@@ -292,19 +296,19 @@ public class Context {
   public static final Map<String, Param> queryParams() {
     return context().queryParams();
   }
-  
+
   public static final ModelAndView modelAndView(String viewName, Object viewModel) {
     return context().modelAndView(viewName, viewModel);
   }
-  
+
   public static final String renderToString(String viewName, Object viewModel) throws Exception {
     return context().renderToString(viewName, viewModel);
   }
-  
+
   public static final String renderToString(ModelAndView modelAndView) throws Exception {
     return context().renderToString(modelAndView);
   }
-  
+
   public static final void render(String viewName, Object viewModel) throws Exception {
     context().render(viewName, viewModel);
   }
@@ -312,67 +316,67 @@ public class Context {
   public static final void render(ModelAndView modelAndView) throws Exception {
     context().render(modelAndView);
   }
-  
+
   public static final void sendFile(File file) throws Exception {
     context().sendFile(file);
   }
-  
+
   public static final void sendJson(Object object) throws Exception {
     context().sendJson(object);
   }
-  
+
   public static final void sendJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
     context().sendJson(object, policy);
   }
-  
+
   public static final void sendJson(Object object, String prefix) throws Exception {
     context().sendJson(object, prefix);
   }
-  
+
   public static final void sendJson(Object object, String prefix, JsonFieldNamingPolicy policy) throws Exception {
     context().sendJson(object, prefix, policy);
   }
-  
+
   public static final String toJson(Object object) throws Exception {
     return context().toJson(object);
   }
-  
+
   public static final String toJson(Object object, JsonFieldNamingPolicy policy) throws Exception {
     return context().toJson(object, policy);
   }
-  
+
   public static final <T> T parseJson(String json, Class<T> clazz) throws Exception {
     return context().parseJson(json, clazz);
   }
-  
+
   public static final <T> T parseJson(String json, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return context().parseJson(json, clazz, policy);
   }
-  
+
   public static final <T> T parseJson(Class<T> clazz) throws Exception {
     return context().parseJson(clazz);
   }
-   
+
   public static final <T> T parseJson(Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return context().parseJson(clazz, policy);
   }
-   
+
   public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz, JsonFieldNamingPolicy policy) throws Exception {
     return context().parseJsonFromParam(queryParamName, clazz, policy);
   }
-   
+
   public static final <T> T parseJsonFromParam(String queryParamName, Class<T> clazz) throws Exception {
     return context().parseJsonFromParam(queryParamName, clazz);
   }
-  
+
   public static final void halt() {
     context().halt();
   }
-  
+
   public static final Hasher hasher() {
     return context().hasher();
   }
-  
+
   public static final TokenSets tokens() {
     return context().tokens();
   }

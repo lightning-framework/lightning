@@ -1042,4 +1042,8 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
   public MySQLDatabaseProvider dbPool() {
     return dbp;
   }
+
+  public boolean isDebug() {
+    return config.enableDebugMode;
+  }
 }

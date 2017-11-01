@@ -20,34 +20,32 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
-import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.Version;
 import lightning.config.Config;
 import lightning.enums.HTTPHeader;
+import lightning.enums.HTTPStatus;
 import lightning.http.Request;
 import lightning.mvc.HandlerContext;
 import lightning.routing.RouteMapper.Match;
+import lightning.templates.FreeMarkerTemplateEngine;
+import lightning.templates.TemplateEngine;
 import lightning.util.Iterables;
 
 /**
- * Renders an in-browser stack trace.
+ * Renders an interactive in-browser stack trace when a controller throws an uncaught exception.
  */
 public class DebugScreen {
-  protected final Configuration templateConfig;
+  protected final TemplateEngine templates;
   protected final SourceLocator[] sourceLocators;
 
-  public DebugScreen(Config config) {
+  public DebugScreen(Config config) throws Exception {
     this(config,
          new LocalSourceLocator("./src/main/java"),
          new LocalSourceLocator("./src/test/java"));
   }
 
-  public DebugScreen(Config config, SourceLocator... sourceLocators) {
-    templateConfig = new Configuration(new Version(2, 3, 23));
-    templateConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-    templateConfig.setClassForTemplateLoading(getClass(), "/lightning");
+  public DebugScreen(Config config, SourceLocator... sourceLocators) throws Exception {
+    this.templates = new FreeMarkerTemplateEngine(getClass(), "/lightning");
     this.sourceLocators = sourceLocators;
   }
 
@@ -69,9 +67,9 @@ public class DebugScreen {
     exceptionChain.add(exceptionInfo);
   }
 
-  public final void crawlChain(Throwable throwable,
-                               ArrayList<LinkedHashMap<String, Object>> exceptionChain,
-                               boolean isSuppressed) {
+  private void crawlChain(Throwable throwable,
+                          ArrayList<LinkedHashMap<String, Object>> exceptionChain,
+                          boolean isSuppressed) {
     addToChain(throwable, exceptionChain, isSuppressed);
 
     for (Throwable suppressedThrowable : throwable.getSuppressed()) {
@@ -83,10 +81,11 @@ public class DebugScreen {
     }
   }
 
-  public final void handle(Throwable throwable, HandlerContext ctx, Match<Object> match)
-      throws IOException {
-    // Set the status to 500 Internal Server Error (important so that AJAX requests fail).
-    ctx.response.raw().setStatus(500);
+  public final void handle(Throwable throwable,
+                           HandlerContext ctx,
+                           Match<Object> match) throws IOException {
+    // Set the response status (important so that AJAX requests will fail).
+    ctx.response.raw().setStatus(HTTPStatus.INTERNAL_SERVER_ERROR.getCode());
 
     try {
       LinkedHashMap<String, Object> model = new LinkedHashMap<>();
@@ -101,11 +100,9 @@ public class DebugScreen {
       model.put("tables", tables);
 
       ctx.response.raw().setHeader(HTTPHeader.CONTENT_TYPE.httpName(), "text/html; charset=UTF-8");
-      templateConfig.clearTemplateCache();
-      templateConfig.getTemplate("debugscreen.ftl").process(model, ctx.response.raw().getWriter());
+      templates.render("debugscreen.ftl", model, ctx.response.raw().getWriter());
     } catch (Exception e) {
-      // In case we encounter any exceptions trying to render the error page itself,
-      // have this simple fallback.
+      // A simple fallback in case an error occurs trying to generate the error page.
       ctx.response.raw().getWriter().println(
                 "<html>"
               + "  <head>"
@@ -116,7 +113,7 @@ public class DebugScreen {
               + "    <pre>"
               +        ExceptionUtils.getStackTrace(throwable)
               + "    </pre>"
-              + "    <h1>Caught Exception Rendering DebugScreen:</h1>"
+              + "    <h1>Caught Exception (while rendering debug screen):</h1>"
               + "    <pre>"
               +        ExceptionUtils.getStackTrace(e)
               + "    </pre>"
@@ -170,7 +167,8 @@ public class DebugScreen {
       tables.put("Auth", ImmutableMap.of());
     }
 
-    tables.put("Environment", getEnvironmentInfo(ctx));
+    tables.put("Lightning Environment", getEnvironmentInfo(ctx));
+    tables.put("System Environment", System.getenv());
   }
 
   private LinkedHashMap<String, Object> getHandlerInfo(HandlerContext ctx, Match<Object> match) {

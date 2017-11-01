@@ -21,14 +21,17 @@ import com.google.common.collect.ImmutableSet;
 import lightning.ann.ExceptionHandler;
 import lightning.ann.ExceptionHandlers;
 import lightning.ann.Json;
+import lightning.ann.JsonInput;
 import lightning.ann.OnEvent;
 import lightning.ann.QParam;
 import lightning.ann.RParam;
+import lightning.ann.Route;
 import lightning.ann.Template;
 import lightning.ann.WebSocket;
 import lightning.cache.Cache;
 import lightning.db.MySQLDatabase;
 import lightning.enums.EventType;
+import lightning.enums.HTTPMethod;
 import lightning.exceptions.LightningValidationException;
 import lightning.groups.Groups;
 import lightning.http.Request;
@@ -138,6 +141,17 @@ public class InjectionValidator {
 
     Set<Class<?>> whitelist = new HashSet<>();
 
+    if (m.getAnnotation(JsonInput.class) != null) {
+      Route route;
+      if ((route = m.getAnnotation(Route.class)) != null) {
+        for (HTTPMethod httpMethod : route.methods()) {
+          if (httpMethod == HTTPMethod.GET) {
+            throw new LightningValidationException(m, "@JsonInput is not applicable to @Route containing methods {GET}.");
+          }
+        }
+      }
+    }
+
     if (m.getAnnotation(ExceptionHandler.class) != null ||
         m.getAnnotation(ExceptionHandlers.class) != null) {
       whitelist.addAll(REQUEST_CLASSES);
@@ -157,6 +171,11 @@ public class InjectionValidator {
     }
     else {
       whitelist.addAll(REQUEST_CLASSES);
+    }
+
+    JsonInput jsonInput;
+    if ((jsonInput = m.getAnnotation(JsonInput.class)) != null) {
+      whitelist.add(jsonInput.type());
     }
 
     try {

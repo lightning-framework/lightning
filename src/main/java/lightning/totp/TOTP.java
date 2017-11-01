@@ -52,17 +52,22 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
  * We recommend picking keys (>=64 bytes, generated using a strong random number generator).
  *
  * You may elect to provide "scratch codes" to clients that can be accepted for one-time use in lieu
- * of a TOTP token for account recovery. Alternatively, you may recommend clients record the secret
- * key for recovery purposes.
+ * of a TOTP token for account recovery. This implementation does not provide support for scratch
+ * codes. Alternatively, you may recommend clients record the secret key for recovery purposes.
  *
- * The server may store secret keys un-encrypted. If compromised, two-factor authentication will
- * simply provide no additional security until new keys are generated and installed by clients.
+ * The server may elect to store secret keys un-encrypted. If compromised, two-factor authentication
+ * will simply provide no additional security until new keys are generated and installed by clients.
  *
  * You may send TOTP codes (fetched by getCurrentToken()) to clients via email, SMS, or other
- * third party system in lieu of having them use an authenticator app.
+ * third party system in lieu of having them use an authenticator app. Keep in mind, though, that
+ * the codes are only valid for a short period of time and these mediums may have delivery delays
+ * such that the codes will be invalid by the time they arrive.
+ *
+ * Note that TOTP tokens are 6-digit unsigned integers.
  *
  * An example usage (pseudo-code):
  *   let totp = new TOTP(user.secretKey);
+ *   // NOTE: You should impose your own restrictions to prevent brute force attacks.
  *   let response = totp.checkToken(httpRequest.authToken);
  *   let isValid = response.isValid;
  *   if (isValid) {
@@ -75,6 +80,9 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
  *          user.lastUsedCounter <- response.counter;
  *       }
  *     }
+ *   }
+ *   if (!isValid) {
+ *     // NOTE: You could check for a scratch code here (using w/e mechanism you wish).
  *   }
  *   if (isValid) {
  *      // The user entered a valid, not-before-seen code.

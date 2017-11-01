@@ -1,3 +1,4 @@
+<#setting boolean_format="True,False">
 <#escape x as x?html>
 <!DOCTYPE html>
 <html>

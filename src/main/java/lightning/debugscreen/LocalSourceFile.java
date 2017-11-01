@@ -8,9 +8,12 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 
+/**
+ * A source file located on a local file system.
+ */
 public class LocalSourceFile implements SourceFile {
   private final File file;
-  
+
   public LocalSourceFile(File file) {
     this.file = file;
   }
@@ -22,9 +25,9 @@ public class LocalSourceFile implements SourceFile {
 
   @Override
   public Optional<Map<Integer, String>> getLines(StackTraceElement frame) {
-    // If no line number is given, we can't fetch lines.
-    if (frame.getLineNumber() == -1) {
-        return Optional.absent();
+    // If the frame has no line number attached, we can't fetch anything.
+    if (frame.getLineNumber() < 0) {
+      return Optional.absent();
     }
 
     // Otherwise, fetch 20 lines centered on the number provided in the trace.
@@ -34,25 +37,25 @@ public class LocalSourceFile implements SourceFile {
     int current = 0;
 
     try (BufferedReader br = new BufferedReader(new FileReader(file))) {
-        String line;
-        while ((line = br.readLine()) != null) {
-            if (current < start) {
-                current += 1;
-                continue;
-            }
-
-            if (current > end) {
-                break;
-            }
-
-            lines.put(current, line);
-            current += 1;
+      String line;
+      while ((line = br.readLine()) != null) {
+        if (current < start) {
+          current++;
+          continue;
         }
-    } catch (Exception e) {
-        // If we get an IOException, not much we can do... just ignore it and move on.
-        return Optional.absent();
-    }
 
-    return Optional.of(lines.build());
+        if (current > end) {
+          break;
+        }
+
+        lines.put(current, line);
+        current++;
+      }
+
+      return Optional.of(lines.build());
+    } catch (Exception e) {
+      // Ignore and move on (the frame just won't have a code snippet).
+      return Optional.absent();
+    }
   }
 }

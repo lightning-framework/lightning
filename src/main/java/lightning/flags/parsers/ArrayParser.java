@@ -21,6 +21,7 @@ public class ArrayParser<T> extends CollectionParser<T> implements Parser<Object
     Object result = Array.newInstance((Class<?>)type, items.size());
 
     // The type system really falls apart here... :(
+    // Arrays of primitives cannot conform to T[].
     if (type == int.class) {
       int[] dst = (int[])result;
       int i = 0;

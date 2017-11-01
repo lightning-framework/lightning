@@ -1,99 +1,59 @@
-/*
- * Copyright 2011- Per Wendel
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package lightning.routing;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import javax.annotation.Nullable;
 
 public class ExceptionMapper<T> {
-    /**
-     * Holds a map of Exception classes and associated handlers
-     */
-    private Map<Class<? extends Throwable>, T> exceptionMap;
+    private Map<Class<?>, T> map;
+    private Map<Class<?>, T> cache;
 
-    /**
-     * Class constructor
-     */
     public ExceptionMapper() {
-        this.exceptionMap = new HashMap<>();
+      this.map = new HashMap<>();
+      this.cache = new ConcurrentHashMap<>();
     }
 
-    /**
-     * Maps the given handler to the provided exception type. If a handler was already registered to the same type, the
-     * handler is overwritten.
-     *
-     * @param exceptionClass Type of exception
-     * @param handler        Handler to map to exception
-     */
-    public void map(Class<? extends Throwable> exceptionClass, T handler) {
-        this.exceptionMap.put(exceptionClass, handler);
-    }
-    
-    public boolean has(Class<? extends Throwable> exceptionClass) {
-      return getHandler(exceptionClass) != null;
-    }
-    
     public void clear() {
-      exceptionMap.clear();
+      this.map = new HashMap<>();
+      this.cache = new ConcurrentHashMap<>();
     }
 
-    /**
-     * Returns the handler associated with the provided exception class
-     *
-     * @param exceptionClass Type of exception
-     * @return Associated handler
-     */
-    public T getHandler(Class<? extends Throwable> exceptionClass) {
-        // If the exception map does not contain the provided exception class, it might
-        // still be that a superclass of the exception class is.
-        if (!this.exceptionMap.containsKey(exceptionClass)) {
+    public void map(Class<? extends Throwable> type, T handler) {
+      if (map.containsKey(type)) {
+        throw new IllegalStateException();
+      }
+      map.put(type, handler);
+    }
 
-            Class<?> superclass = exceptionClass.getSuperclass();
-            do {
-                // Is the superclass mapped?
-                if (this.exceptionMap.containsKey(superclass)) {
-                    // Use the handler for the mapped superclass, and cache handler
-                    // for this exception class
-                    T handler = this.exceptionMap.get(superclass);
-                    this.exceptionMap.put(exceptionClass, handler);
-                    return handler;
-                }
+    public boolean has(Class<? extends Throwable> type) {
+      return get(type) != null;
+    }
 
-                // Iteratively walk through the exception class's superclasses
-                superclass = superclass.getSuperclass();
-            } while (superclass != null);
+    public @Nullable T get(Throwable exception) {
+      return get(exception.getClass());
+    }
 
-            // No handler found either for the superclasses of the exception class
-            // We cache the null value to prevent future look expense
-            this.exceptionMap.put(exceptionClass, null);
-            return null;
+    public @Nullable T get(Class<? extends Throwable> throwableType) {
+      Class<?> type = throwableType;
+
+      T handler = cache.get(type);
+      if (handler != null) {
+        return handler;
+      }
+
+      while (type != null) {
+        handler = map.get(type);
+
+        if (handler != null) {
+          cache.put(type, handler);
+          return handler;
         }
 
-        // Direct map
-        return this.exceptionMap.get(exceptionClass);
-    }
+        type = type.getSuperclass();
+      }
 
-    /**
-     * Returns the handler associated with the provided exception class
-     *
-     * @param exception Exception that occurred
-     * @return Associated handler
-     */
-    public T getHandler(Throwable exception) {
-        return getHandler(exception.getClass());
+      return null;
     }
 }

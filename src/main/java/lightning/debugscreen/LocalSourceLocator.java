@@ -15,98 +15,97 @@ import com.google.common.base.Optional;
 /**
  * Locates source files by searching exhaustively within a base directory.
  * The base directory should contain all of the code for your app (e.g. src/main/java).
+ * Assumes conventions are followed (e.g. path.to.Class -> src/main/java/path/to/Class.java).
  */
 public class LocalSourceLocator implements SourceLocator {
-    private final File basePathFile;
-    
-    /**
-     * @param basePath The path of the directory to search for source files within (e.g. src/main/java).
-     */
-    public LocalSourceLocator(String basePath) {
-        this.basePathFile = new File(basePath);
+  private final File basePathFile;
+
+  /**
+   * @param basePath The path of the directory to search for source files within.
+   */
+  public LocalSourceLocator(String basePath) {
+    this.basePathFile = new File(basePath);
+  }
+
+  /**
+   * @param basePath The directory to search for source files within.
+   */
+  public LocalSourceLocator(File basePath) {
+    this.basePathFile = basePath;
+  }
+
+  @Override
+  public String toString() {
+    try {
+      return this.basePathFile.getCanonicalPath();
+    } catch (Exception e) {
+      return this.basePathFile.getPath();
     }
-    
-    /**
-     * @param basePath The directory to search for source files within.
-     */
-    public LocalSourceLocator(File basePath) {
-      this.basePathFile = basePath;
+  }
+
+  @Override
+  public Optional<SourceFile> findFileForFrame(StackTraceElement frame) {
+    // Cannot find a file if the frame does not have one.
+    if (frame.getFileName() == null) {
+      return Optional.absent();
     }
 
-    @Override
-    public String toString() {
+    // Ignore cases where the directory doesn't exist/cannot be read.
+    // No point in returning an error here since this is for a debug screen.
+    if (!basePathFile.exists() || !basePathFile.isDirectory() || !basePathFile.canRead()) {
+      return Optional.absent();
+    }
+
+    // This is where things get a little bit tricky.
+    // The stack frame only contains the file name (e.g. "File.java"), but not the full path.
+    // The compiled byte code also does not contain the full path.
+    // Our strategy here is to find all files with a matching file name and pare them down.
+    // We may not always find a file (e.g. sometimes they won't be available like in a JAR).
+
+    Collection<File> possibilities = FileUtils.listFiles(basePathFile, new IOFileFilter() {
+      @Override
+      public boolean accept(File file) {
+        return file.getName().equals(frame.getFileName());
+      }
+
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.equals(frame.getFileName());
+      }
+    }, TrueFileFilter.INSTANCE);
+
+    if (possibilities.size() == 1) {
+      // Assume the matched file is the source file (we may be wrong, but we can't know).
+      return Optional.of(new LocalSourceFile(Iterables.first(possibilities)));
+    }
+
+    if (possibilities.size() > 1) {
+      // Use the canonical class name to identify the correct file.
+      // Assumes the directory structure matches the package and name of the class.
+      // e.g. edu.rice.mschurr.Hello -> src/main/java/edu/rice/mschurr/Hello.java
+      String className = frame.getClassName();
+
+      // Remove anything after the $ in the class name to get the declaring class name.
+      // Effectively, this finds the top-level class name for lambdas and nested classes.
+      if (className.indexOf('$') != -1) {
+        className = className.substring(0, className.lastIndexOf('$'));
+      }
+
+      // Build the expected path of the file.
+      String path = File.separatorChar + className.replace('.', File.separatorChar) + ".java";
+
+      // Check each possibility against the expected path.
       try {
-        return this.basePathFile.getCanonicalPath();
-      } catch (Exception e) {
-        return this.basePathFile.getPath();
+        for (File file : possibilities) {
+          if (file.getCanonicalPath().endsWith(path)) {
+            return Optional.of(new LocalSourceFile(file));
+          }
+        }
+      } catch (IOException e) {
+        // Ignore (the provided frame just won't have a code snippet).
       }
     }
 
-    @Override
-    public Optional<SourceFile> findFileForFrame(StackTraceElement frame) {
-        // If the frame has no file attached, we can't find a source file (obviously).
-        if (frame.getFileName() == null) {
-            return Optional.absent();
-        }
-
-        if (!basePathFile.exists() || !basePathFile.isDirectory() || !basePathFile.canRead()) {
-            return Optional.absent();
-        }
-
-        // Find a list of all matching files (any files with the same name as the name provided
-        // in the trace) within the base path.
-
-        // We may not find a file in all cases because sometimes source files are just not
-        // available (e.g. we only have .class files in compiled applications).
-
-        // Since the stack trace only gives the file base name (and not the actual path),
-        // we need to enumerate all possibilities.
-        Collection<File> possibilities = FileUtils.listFiles(basePathFile, new IOFileFilter() {
-            @Override
-            public boolean accept(File file) {
-                return file.getName().equals(frame.getFileName());
-            }
-
-            @Override
-            public boolean accept(File dir, String name) {
-                return name.equals(frame.getFileName());
-            }
-        }, TrueFileFilter.INSTANCE);
-
-        if (possibilities.size() == 1) {
-            // If there's only one possibility, assume it is the correct source file.
-            File file = Iterables.first(possibilities);
-            return Optional.of(new LocalSourceFile(file));
-        } else if (possibilities.size() > 1) {
-            // If there are multiple possibilities, use the class name to further filter down.
-            // Assumes the directory structures matches the package name of the class.
-            // e.g. edu.rice.mschurr.Hello -> src/main/java/edu/rice/mschurr/Hello.java
-            String className = frame.getClassName();
-
-            // Remove anything after the $ in the class name to get the base class.
-            // Effectively, this finds the top-level class name for lambdas and nested classes.
-            if (className.indexOf('$') != -1) {
-                className = className.substring(0, className.lastIndexOf('$'));
-            }
-
-            // Build the effective path of the file (according to package and class name).
-            // e.g. /path/to/package/Class.java
-            String path = File.separatorChar + className.replace('.', File.separatorChar) + ".java";
-
-            // Go through each possibility and see if it is in the desired package.
-            try {
-                for (File file : possibilities) {
-                    if (file.getCanonicalPath().endsWith(path)) {
-                        return Optional.of(new LocalSourceFile(file));
-                    }
-                }
-            } catch (IOException e) {
-                return Optional.absent();
-            }
-
-            return Optional.absent();
-        } else {
-            return Optional.absent();
-        }
-    }
+    return Optional.absent();
+  }
 }
