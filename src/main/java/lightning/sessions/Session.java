@@ -42,7 +42,7 @@ import com.google.common.hash.Hashing;
  */
 public final class Session {
   private static final Logger logger = LoggerFactory.getLogger(Session.class);
-  private static final int SESSION_ID_BYTES = 256;
+  private static final int SESSION_ID_BYTES = 128;
   private static final int XSRF_BYTES = 48;
   private static final String SESSION_COOKIE_NAME = "_sessiond";
   private static final String SESSION_KEY_PREFIX = "$$session-";

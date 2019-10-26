@@ -58,7 +58,7 @@ public final class User {
     this.email = email;
     this.encryptedPassword = encryptedPassword;
     this.banExpiry = banExpiry;
-    this.properties = properties;
+    this.properties = new HashMap<>(properties);
     this.privileges = null;
     this.token = token;
     this.emailIsVerified = emailIsVerified;

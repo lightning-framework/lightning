@@ -84,7 +84,7 @@ public final class MySQLDatabaseProviderImpl implements MySQLDatabaseProvider {
     }
 
     source.setJdbcUrl(url);
-    source.setDriverClass("com.mysql.jdbc.Driver");
+    source.setDriverClass("com.mysql.cj.jdbc.Driver");
     source.setUser(config.username);
     source.setPassword(config.password);
     source.setMinPoolSize(config.minPoolSize);
