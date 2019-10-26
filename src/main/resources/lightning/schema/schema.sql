@@ -10,18 +10,18 @@ SET collation_connection = utf8_general_ci;
  * Delete any copies of the tables already in the database.
  */
 SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS user_privileges;
-DROP TABLE IF EXISTS files;
-DROP TABLE IF EXISTS sessions;
-DROP TABLE IF EXISTS recovery_tokens;
-DROP TABLE IF EXISTS email_verification_tokens;
-DROP TABLE IF EXISTS auth_tokens;
-DROP TABLE IF EXISTS auth_attempts;
-DROP TABLE IF EXISTS auth_sessions;
-DROP TABLE IF EXISTS groups;
-DROP TABLE IF EXISTS group_membership;
-DROP TABLE IF EXISTS group_privileges;
+DROP TABLE IF EXISTS `users`;
+DROP TABLE IF EXISTS `user_privileges`;
+DROP TABLE IF EXISTS `files`;
+DROP TABLE IF EXISTS `sessions`;
+DROP TABLE IF EXISTS `recovery_tokens`;
+DROP TABLE IF EXISTS `email_verification_tokens`;
+DROP TABLE IF EXISTS `auth_tokens`;
+DROP TABLE IF EXISTS `auth_attempts`;
+DROP TABLE IF EXISTS `auth_sessions`;
+DROP TABLE IF EXISTS `groups`;
+DROP TABLE IF EXISTS `group_membership`;
+DROP TABLE IF EXISTS `group_privileges`;
 SET FOREIGN_KEY_CHECKS = 1;
 
 /**
@@ -114,7 +114,7 @@ CREATE TABLE auth_attempts (
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 ) CHARACTER SET utf8 COLLATE utf8_general_ci;
 
-CREATE TABLE groups (
+CREATE TABLE `groups` (
   id int(64) UNSIGNED NOT NULL auto_increment,
   name varchar(64) NOT NULL,
   PRIMARY KEY (id),
@@ -125,7 +125,7 @@ CREATE TABLE group_membership (
   group_id int(64) UNSIGNED NOT NULL,
   user_id int(64) UNSIGNED NOT NULL,
   PRIMARY KEY (group_id, user_id),
-  FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  FOREIGN KEY(group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 ) CHARACTER SET utf8 COLLATE utf8_general_ci;
 
@@ -133,5 +133,5 @@ CREATE TABLE group_privileges (
   group_id int(64) UNSIGNED NOT NULL,
   privilege_id int(64) UNSIGNED NOT NULL,
   PRIMARY KEY (group_id, privilege_id),
-  FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+  FOREIGN KEY(group_id) REFERENCES `groups`(id) ON DELETE CASCADE
 ) CHARACTER SET utf8 COLLATE utf8_general_ci;
