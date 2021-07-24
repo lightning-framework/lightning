@@ -85,7 +85,7 @@ public class LightningServer {
 
   private Server createServer(Config config) throws Exception {
     BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>(config.server.maxQueuedRequests);
-    QueuedThreadPool pool = new QueuedThreadPool(config.server.minThreads, config.server.maxThreads, config.server.threadTimeoutMs, queue);
+    QueuedThreadPool pool = new QueuedThreadPool(config.server.maxThreads, config.server.minThreads, config.server.threadTimeoutMs, queue);
     Server server = new Server(pool);
 
     if (config.ssl.isEnabled()) {
