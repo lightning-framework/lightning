@@ -113,7 +113,7 @@ public class Injector {
     }
 
     if (numConstructors == 0) {
-      return type.newInstance();
+      return type.getDeclaredConstructor().newInstance();
     }
 
     @SuppressWarnings("unchecked")

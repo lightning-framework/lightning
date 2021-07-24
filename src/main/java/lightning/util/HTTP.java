@@ -3,6 +3,7 @@ package lightning.util;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
@@ -20,7 +21,7 @@ public class HTTP {
   private static byte[] buildUrlParametersBytes(Map<String, Object> data) throws Exception {
     return buildUrlParametersString(data).getBytes("UTF-8");
   }
-  
+
   /**
    * @param data A map of POST parameters.
    * @return The String-encoded x-www-form-urlencoded parameter map.
@@ -28,20 +29,20 @@ public class HTTP {
    */
   private static String buildUrlParametersString(Map<String, Object> data) throws Exception {
     StringBuilder postData = new StringBuilder();
-    
+
     for (Map.Entry<String, Object> param : data.entrySet()) {
         if (postData.length() != 0) {
           postData.append('&');
         }
-        
+
         postData.append(URLEncoder.encode(param.getKey(), "UTF-8"));
         postData.append('=');
         postData.append(URLEncoder.encode(String.valueOf(param.getValue()), "UTF-8"));
     }
-    
+
     return postData.toString();
   }
-  
+
   /**
    * @param URL A url.
    * @return The response body as a string.
@@ -54,14 +55,14 @@ public class HTTP {
     con.setRequestProperty("User-Agent", "java");
 
     int responseCode = con.getResponseCode();
-    
+
     if (responseCode != 200) {
       throw new Exception("The server experienced an internal error.");
     }
-    
-    return IOUtils.toString(con.getInputStream());
+
+    return IOUtils.toString(con.getInputStream(), Charset.defaultCharset());
   }
-  
+
   /**
    * Executes a POST request on the given URL.
    * See http://stackoverflow.com/questions/2793150/using-java-net-urlconnection-to-fire-and-handle-http-requests.
@@ -76,17 +77,17 @@ public class HTTP {
     HttpURLConnection con = (HttpURLConnection) url.openConnection();
     con.setRequestMethod("POST");
     con.setRequestProperty("User-Agent", "java");
-    con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8"); 
+    con.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
     con.setRequestProperty("Content-Length", Integer.toString(postData.length));
     con.setDoOutput(true);
     con.getOutputStream().write(postData);
 
     int responseCode = con.getResponseCode();
-    
+
     if (responseCode != 200) {
       throw new Exception("The server experienced an internal error.");
     }
 
-    return IOUtils.toString(con.getInputStream());
+    return IOUtils.toString(con.getInputStream(), Charset.defaultCharset());
   }
 }

@@ -16,7 +16,7 @@ public class DynamicClassLoader extends AggressiveClassLoader {
   public static interface F1<A, T> {
     T e(A obj);
   }
-  
+
   LinkedList<F1<String, byte[]>> loaders = new LinkedList<>();
 
   public DynamicClassLoader(String... paths) {
@@ -71,15 +71,15 @@ public class DynamicClassLoader extends AggressiveClassLoader {
         return readFileToBytes(file);
     };
   }
-  
+
   public static byte[] readFileToBytes(File fileToRead) {
     try {
         return readData(new FileInputStream(fileToRead));
     } catch (IOException e) {
         throw new RuntimeException(e);
     }
-  }  
-  
+  }
+
   public static byte[] readData(InputStream stream) throws IOException {
     try {
       return IOUtils.toByteArray(stream);
@@ -90,6 +90,7 @@ public class DynamicClassLoader extends AggressiveClassLoader {
 
   private static F1<String, byte[]> jarLoader(final JarFile jarFile) {
     return new F1<String, byte[]>() {
+      @Override
       public byte[] e(String filePath) {
           ZipEntry entry = jarFile.getJarEntry(filePath);
           if (entry == null) {
@@ -105,11 +106,10 @@ public class DynamicClassLoader extends AggressiveClassLoader {
       @Override
       protected void finalize() throws Throwable {
         jarFile.close();
-        super.finalize();
       }
     };
   }
-  
+
   @Override
   protected byte[] loadNewClass(String name) {
     for (F1<String, byte[]> loader : loaders) {

@@ -7,7 +7,6 @@ import lightning.config.Config;
 import lightning.db.MySQLDatabaseProvider;
 import lightning.db.MySQLDatabaseProviderImpl;
 import lightning.exceptions.LightningConfigException;
-import lightning.exceptions.LightningRuntimeException;
 import lightning.inject.InjectorModule;
 
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory;
@@ -17,7 +16,6 @@ import org.eclipse.jetty.http2.server.HTTP2ServerConnectionFactory;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
-import org.eclipse.jetty.server.NegotiatingServerConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -129,14 +127,6 @@ public class LightningServer {
     String protocol = null;
 
     if (config.server.enableHttp2 && isSSL) {
-      try {
-        NegotiatingServerConnectionFactory.checkProtocolNegotiationAvailable();
-      } catch (Exception e) {
-        throw new LightningRuntimeException(
-              "Your JVM does not support the SSL ALPN extension. "
-            + "This is expected for JREs <= Java 8. "
-            + "To learn how to add ALPN support, read the docs for lightning.config.Config::server::enableHttp2.");
-      }
       http2 = new HTTP2ServerConnectionFactory(httpConfig);
       http2.setInitialStreamRecvWindow(config.server.http2InitialStreamSendWindowBytes);
       http2.setInputBufferSize(config.server.inputBufferSizeBytes);
@@ -164,7 +154,6 @@ public class LightningServer {
         :  new ServerConnector(server, cfs);
 
     connector.setIdleTimeout(config.server.connectionIdleTimeoutMs);
-    connector.setSoLingerTime(-1);
     connector.setHost(config.server.host);
     connector.setPort(port);
     connector.setAcceptQueueSize(config.server.maxAcceptQueueSize);
@@ -178,7 +167,8 @@ public class LightningServer {
       return null;
     }
 
-    SslContextFactory ssl = new SslContextFactory(config.ssl.keyStoreFile);
+    SslContextFactory ssl = new SslContextFactory.Server();
+    ssl.setKeyStorePath(config.ssl.keyStoreFile);
 
     if (config.ssl.keyStorePassword != null) {
       ssl.setKeyStorePassword(config.ssl.keyStorePassword);

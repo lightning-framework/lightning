@@ -32,6 +32,7 @@ import lightning.db.MySQLDatabaseProxy;
 import lightning.enums.CacheControl;
 import lightning.enums.HTTPHeader;
 import lightning.enums.HTTPMethod;
+import lightning.enums.HTTPScheme;
 import lightning.enums.HTTPStatus;
 import lightning.enums.JsonFieldNamingPolicy;
 import lightning.exceptions.LightningException;
@@ -66,8 +67,7 @@ import lightning.util.Time;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.ByteArrayOutputStream;
-import org.eclipse.jetty.util.MultiException;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
+import org.eclipse.jetty.server.MultiParts;
 import org.eclipse.jetty.util.resource.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -229,12 +229,12 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
     logger.debug("context closed");
 
     if (asyncContext != null) {
-      MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser)request.raw().getAttribute(
-          org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
-      if (multipartInputStream != null) {
+      MultiParts parts = (MultiParts)request.raw().getAttribute(
+          org.eclipse.jetty.server.Request.MULTIPARTS);
+      if (parts != null) {
         try {
-          multipartInputStream.deleteParts();
-        } catch (MultiException e) {
+          parts.close();
+        } catch (IOException e) {
           logger.warn("Error closing handler context:", e);
         }
       }
@@ -572,7 +572,7 @@ public class HandlerContext implements AutoCloseable, MySQLDatabaseProvider {
    * @throws BadRequestException If not over HTTPS.
    */
   public final void requireSecure() throws BadRequestException {
-    if (!request.scheme().equals("https")) {
+    if (!request.scheme().equals(HTTPScheme.HTTPS)) {
       throw new BadRequestException("This website requires requests be made over HTTPS.");
     }
   }

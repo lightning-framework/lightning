@@ -22,9 +22,8 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.io.MappedByteBufferPool;
 import org.eclipse.jetty.io.RuntimeIOException;
+import org.eclipse.jetty.server.MultiParts;
 import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.util.MultiException;
-import org.eclipse.jetty.util.MultiPartInputStreamParser;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.resource.ResourceCollection;
 import org.eclipse.jetty.util.resource.ResourceFactory;
@@ -296,6 +295,7 @@ public final class LightningHandler extends AbstractHandler {
    super.destroy();
   }
 
+  @SuppressWarnings("deprecation")
   @Override
   protected void doStart() throws Exception {
     // Set up web socket factory.
@@ -625,13 +625,13 @@ public final class LightningHandler extends AbstractHandler {
         sRequest.removeAttribute(HandlerContext.ATTRIBUTE);
       }
 
-      MultiPartInputStreamParser multipartInputStream = (MultiPartInputStreamParser)sRequest.getAttribute(
-          org.eclipse.jetty.server.Request.__MULTIPART_INPUT_STREAM);
-      if (multipartInputStream != null) {
+      MultiParts parts = (MultiParts)sRequest.getAttribute(
+          org.eclipse.jetty.server.Request.MULTIPARTS);
+      if (parts != null) {
         if (!sRequest.isAsyncStarted()) {
           try {
-            multipartInputStream.deleteParts();
-          } catch (MultiException e){
+            parts.close();
+          } catch (IOException e){
             LOGGER.warn("Error cleaning multiparts:", e);
           }
         } else if (context == null || !context.isAsync()) {
@@ -757,7 +757,7 @@ public final class LightningHandler extends AbstractHandler {
       }
 
       request.setAttribute(
-          org.eclipse.jetty.server.Request.__MULTIPART_CONFIG_ELEMENT,
+          org.eclipse.jetty.server.Request.MULTIPART_CONFIG_ELEMENT,
           new MultipartConfigElement(
               config.server.multipartSaveLocation,
               config.server.multipartPieceLimitBytes,

@@ -31,7 +31,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
   public static NamedPreparedStatement forQuery(Connection connection, String query) throws SQLException {
     return new NamedPreparedStatement(connection, query);
   }
-  
+
   /**
    * @param connection A database connection.
    * @param table The table that will be inserted to.
@@ -46,12 +46,12 @@ public final class NamedPreparedStatement implements AutoCloseable {
   public static NamedPreparedStatement forInsert(Connection connection, String table, Map<String, ?> data) throws SQLException {
     if (data.isEmpty())
       throw new SQLException("No columns specified.");
-    
+
     NamedPreparedStatement statement = new NamedPreparedStatement(connection, insertQueryFromMap("INSERT", table, data));
     statement.setFromMap(data);
     return statement;
   }
-  
+
   /**
    * @param connection A database connection.
    * @param table The table that will be inserted to.
@@ -66,12 +66,12 @@ public final class NamedPreparedStatement implements AutoCloseable {
   public static NamedPreparedStatement forReplace(Connection connection, String table, Map<String, ?> data) throws SQLException {
     if (data.isEmpty())
       throw new SQLException("No columns specified.");
-    
+
     NamedPreparedStatement statement = new NamedPreparedStatement(connection, insertQueryFromMap("REPLACE", table, data));
     statement.setFromMap(data);
     return statement;
   }
-  
+
   /**
    * Builds a named parameterized insertion query using column names from keys in the map.
    * @param table
@@ -80,32 +80,32 @@ public final class NamedPreparedStatement implements AutoCloseable {
    */
   private static String insertQueryFromMap(String verb, String table, Map<String, ?> data) {
     StringBuilder text = new StringBuilder();
-    
+
     text.append(verb);
     text.append(" INTO ");
     text.append(table);
     text.append("(");
-    
+
     for (String column : data.keySet()) {
       text.append(column);
       text.append(", ");
     }
     text.setLength(text.length() - 2);
-    
+
     text.append(") VALUES (");
-    
+
     for (String column : data.keySet()) {
       text.append(":");
       text.append(column);
       text.append(", ");
     }
     text.setLength(text.length() - 2);
-    
+
     text.append(");");
-    
+
     return text.toString();
   }
-  
+
   /** The statement this object is wrapping. */
   private final PreparedStatement statement;
 
@@ -124,23 +124,23 @@ public final class NamedPreparedStatement implements AutoCloseable {
       String parsedQuery = parse(query, indexMap);
       statement = connection.prepareStatement(parsedQuery, Statement.RETURN_GENERATED_KEYS);
   }
-  
+
   /**
    * Sets parameters from a map whose keys are column names and values are data values.
    * @param data A map of column names to associated values.
    *             Accepted types: Long, Integer, String, Timestamp, Boolean, SQLNull, InputStream,
    *             Double, Float, Date, Time, anything settable via PreparedStatement.setObject.
-   * @throws SQLException 
+   * @throws SQLException
    */
   public void setFromMap(Map<String, ?> data) throws SQLException {
     if (data == null) {
       return;
     }
-    
+
     for (Map.Entry<String, ?> entry : data.entrySet()) {
       Object value = entry.getValue();
       String column = entry.getKey();
-      
+
       if (value instanceof Long) {
         this.setLong(column, ((Long) value).longValue());
       } else if (value instanceof Integer) {
@@ -179,7 +179,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
    */
   private static final String parse(String query, Map<String, int[]> paramMap) {
     Map<String, LinkedList<Integer>> intermediateParams = new HashMap<>();
-  
+
     // I was originally using regular expressions, but they didn't work well for ignoring
     // parameter-like strings inside quotes.
     int length = query.length();
@@ -190,7 +190,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
 
     for(int i = 0; i < length; i++) {
       char c = query.charAt(i);
-      
+
       if(inSingleQuote) {
         if(c == '\'') {
           inSingleQuote = false;
@@ -206,28 +206,28 @@ public final class NamedPreparedStatement implements AutoCloseable {
           inDoubleQuote = true;
         } else if(c == ':' && i + 1 < length && Character.isJavaIdentifierStart(query.charAt(i + 1))) {
           int j = i+2;
-          
+
           while(j < length && Character.isJavaIdentifierPart(query.charAt(j))) {
             j++;
           }
-          
+
           String name = query.substring(i + 1,j);
           c = '?'; // replace the parameter with a question mark
           i += name.length(); // skip past the end if the parameter
 
           LinkedList<Integer> indexList = intermediateParams.get(name);
-          
+
           if(indexList == null) {
             indexList = new LinkedList<Integer>();
             intermediateParams.put(name, indexList);
           }
-          
-          indexList.add(new Integer(index));
+
+          indexList.add(Integer.valueOf(index));
 
           index++;
         }
       }
-      
+
       parsedQuery.append(c);
     }
 
@@ -237,12 +237,12 @@ public final class NamedPreparedStatement implements AutoCloseable {
       LinkedList<Integer> list = entry.getValue();
       int[] indexes = new int[list.size()];
       int i = 0;
-      
+
       for(Iterator<Integer> itr2 = list.iterator(); itr2.hasNext();) {
           Integer x = itr2.next();
           indexes[i++] = x.intValue();
       }
-      
+
       paramMap.put(entry.getKey(), indexes);
     }
 
@@ -257,11 +257,11 @@ public final class NamedPreparedStatement implements AutoCloseable {
    */
   private int[] getIndexes(String name) {
     int[] indexes = indexMap.get(name);
-    
+
     if(indexes == null) {
       throw new IllegalArgumentException("Parameter not found: " + name);
     }
-    
+
     return indexes;
   }
 
@@ -294,7 +294,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
       statement.setString(indexes[i], value);
     }
   }
-  
+
   /**
    * Sets a parameter to a null value by invoking PreparedStatement.setNull under the hood.
    * @param name Parameter name
@@ -308,7 +308,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
       statement.setNull(indexes[i], sqlType);
     }
   }
-  
+
   /**
    * Sets a parameter to a null value by invoking PreparedStatement.setNull under the hood.
    * @param name Parameter name
@@ -334,35 +334,35 @@ public final class NamedPreparedStatement implements AutoCloseable {
       statement.setInt(indexes[i], value);
     }
   }
-  
+
   public void setDouble(String name, double value) throws SQLException {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
       statement.setDouble(indexes[i], value);
     }
   }
-  
+
   public void setFloat(String name, float value) throws SQLException {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
       statement.setFloat(indexes[i], value);
     }
   }
-  
+
   public void setBigDecimal(String name, BigDecimal value) throws SQLException {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
       statement.setBigDecimal(indexes[i], value);
     }
   }
-  
+
   public void setTime(String name, Time value) throws SQLException {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
       statement.setTime(indexes[i], value);
     }
   }
-  
+
   public void setDate(String name, Date value) throws SQLException {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
@@ -384,12 +384,12 @@ public final class NamedPreparedStatement implements AutoCloseable {
       statement.setLong(indexes[i], value);
     }
   }
-  
+
   @FunctionalInterface
   public interface SetterFunction {
     public void apply(PreparedStatement stmt, int index) throws SQLException;
   }
-  
+
   /**
    * Allows to use raw statement for setting for a name using a setter function.
    * @param name
@@ -401,14 +401,14 @@ public final class NamedPreparedStatement implements AutoCloseable {
       fn.apply(statement, indexes[i]);
     }
   }
-  
+
   public void setBinaryStream(String name, InputStream stream, long length) throws SQLException {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
       statement.setBinaryStream(indexes[i], stream, length);
     }
   }
-  
+
   public void setBinaryStream(String name, InputStream stream) throws SQLException {
     int[] indexes = getIndexes(name);
     for(int i = 0; i < indexes.length; i++) {
@@ -448,7 +448,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
   public boolean execute() throws SQLException {
     return statement.execute();
   }
-  
+
   /**
    * Executes a query which returns a single row with the schema (Long), returning the value of that long.
    * Should be used to execute queries which SELECT COUNT(*).
@@ -458,17 +458,17 @@ public final class NamedPreparedStatement implements AutoCloseable {
    */
   public long executeCount() throws SQLException {
     try (ResultSet rs = statement.executeQuery()) {
-      
+
       if (!rs.next())
         throw new SQLException("Incorrect schema returned from count query.");
-      
+
       long count = rs.getLong(1);
       return count;
     } finally {
       statement.close();
     }
   }
-  
+
   /**
    * Executes the statement, which must be an SQL INSERT, UPDATE or DELETE statement;
    * or an SQL statement that returns nothing, such as a DDL statement.
@@ -485,12 +485,12 @@ public final class NamedPreparedStatement implements AutoCloseable {
       statement.close();
     }
   }
-  
+
   /**
    * Executes the statement, which must be an SQL INSERT statement;
    * Closes the statement and returns the inserted id.
    * @return Inserted primary key (if any). Note that if your query does not
-   *         create any inserted primary keys, this function will throw an 
+   *         create any inserted primary keys, this function will throw an
    *         exception. If are not generating primary keys, use executeUpdate
    *         instead.
    * @throws SQLException if an error occurred
@@ -532,6 +532,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
    * @throws SQLException if an error occurred
    * @see Statement#close()
    */
+  @Override
   public void close() throws SQLException {
     statement.close();
   }
@@ -546,7 +547,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
 
   /**
    * Executes all of the batched statements.
-   * 
+   *
    * See {@link Statement#executeBatch()} for details.
    * @return update counts for each statement
    * @throws SQLException if something went wrong
@@ -554,7 +555,7 @@ public final class NamedPreparedStatement implements AutoCloseable {
   public int[] executeBatch() throws SQLException {
     return statement.executeBatch();
   }
-  
+
   /**
    * @return
    * @throws SQLException
@@ -562,17 +563,17 @@ public final class NamedPreparedStatement implements AutoCloseable {
   public ResultSet getGeneratedKeys() throws SQLException {
     return statement.getGeneratedKeys();
   }
-  
+
   /**
    * @return Auto-generated ID of first row.
    * @throws SQLException On error or if no keys generated.
    */
   public long getInsertionId() throws SQLException {
     try (ResultSet result = getGeneratedKeys()) {
-    
+
       if (!result.next())
         throw new SQLException("Failed to get autogenerated keys.");
-      
+
       long value = result.getLong(1);
       return value;
     }
