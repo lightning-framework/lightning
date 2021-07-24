@@ -10,7 +10,7 @@ import lightning.ann.Required;
 import lightning.exceptions.LightningException;
 import lightning.mail.MailerConfig;
 import lightning.util.Iterables;
-import lightning.util.SimpleHTTPServer;
+import lightning.util.serve.SimpleHTTPServer;
 
 import com.google.common.collect.ImmutableList;
 
@@ -277,6 +277,8 @@ public class Config {
      * exists (e.g. styles.css.gz).
      */
     public @Optional String staticFilesPath;
+
+    public @Optional boolean staticFilesOutsideClasspath = false;
 
     /**
      * Specifies the path in which template files are located.

@@ -1,18 +1,7 @@
-package lightning.util;
-
-import static lightning.server.Context.badRequestIf;
-import static lightning.server.Context.config;
-import static lightning.server.Context.notFoundIf;
-import static lightning.server.Context.request;
-import static lightning.server.Context.response;
+package lightning.util.serve;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -20,19 +9,13 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.impl.StaticLoggerBinder;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
-import lightning.ann.Controller;
-import lightning.ann.Route;
 import lightning.config.Config;
-import lightning.enums.HTTPMethod;
 import lightning.flags.Flag;
 import lightning.flags.FlagSpec;
 import lightning.server.LightningServer;
-import lightning.templates.FreeMarkerTemplateEngine;
-import lightning.templates.TemplateEngine;
 
 /**
  * A simple class that starts an HTTP server for serving static files from a directory.
@@ -133,7 +116,7 @@ public class SimpleHTTPServer {
     config.enableDebugMode = !Options.optimal;
     config.debugRouteMapPath = null;
     if (Options.directoryIndexes) {
-      config.scanPrefixes = ImmutableList.of("lightning.util.SimpleHTTPServer");
+      config.scanPrefixes = ImmutableList.of("lightning.util.serve");
     } else {
       config.scanPrefixes = ImmutableList.of();
     }
@@ -142,6 +125,7 @@ public class SimpleHTTPServer {
     config.server.hmacKey = UUID.randomUUID().toString();
     config.server.port = Options.port;
     config.server.staticFilesPath = root.getAbsolutePath();
+    config.server.staticFilesOutsideClasspath = true;
     config.ssl.port = Options.port;
     config.ssl.redirectInsecureRequests = false;
     config.ssl.keyManagerPassword = Options.keyManagerPassword;
@@ -164,34 +148,5 @@ public class SimpleHTTPServer {
     JoranConfigurator configurator = new JoranConfigurator();
     configurator.setContext(loggerContext);
     configurator.doConfigure(SimpleHTTPServer.class.getResourceAsStream("/lightning/logback.xml"));
-  }
-
-  @Controller
-  public static final class IndexController {
-    @Route(path="*", methods={HTTPMethod.GET})
-    public void showDirectoryIndex() throws Exception {
-      Path path = Paths.get(config().server.staticFilesPath, request().path()).toAbsolutePath();
-      File file = new File(path.toString());
-
-      badRequestIf(!file.getAbsolutePath().startsWith(config().server.staticFilesPath));
-      notFoundIf(!file.exists() || !file.isDirectory() || !file.canRead());
-
-      List<Map<String, String>> files = new ArrayList<>();
-      String basePath = request().path().endsWith("/")
-          ? request().path().substring(0, request().path().length() - 1)
-          : request().path();
-
-      for (File f : file.listFiles()) {
-        files.add(ImmutableMap.of(
-            "name", f.getName() + (f.isDirectory() ? "/" : ""),
-            "link", basePath + "/" + f.getName(),
-            "type", f.isDirectory() ? "dir" : "file"
-        ));
-      }
-
-      Map<String, Object> model = ImmutableMap.of("files", files);
-      TemplateEngine te = new FreeMarkerTemplateEngine(getClass(), "/lightning");
-      te.render("directory-index.ftl", model, response().writer());
-    }
   }
 }

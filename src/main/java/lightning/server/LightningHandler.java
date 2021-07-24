@@ -194,9 +194,13 @@ public final class LightningHandler extends AbstractHandler {
     // Set up static files.
     {
       if (config.server.staticFilesPath != null) {
-        ResourceFactory factory = (config.enableDebugMode && !config.isRunningFromJAR())
-            ? new ResourceCollection(getStaticFileResourcePaths())
-            : Resource.newClassPathResource("/" + config.server.staticFilesPath);
+        ResourceFactory factory;
+        if ((config.enableDebugMode && !config.isRunningFromJAR()) || config.server.staticFilesOutsideClasspath) {
+          factory = new ResourceCollection(getStaticFileResourcePaths());
+        } else {
+          factory = Resource.newClassPathResource("/" + config.server.staticFilesPath);
+        }
+
         // NOTE: We disable MMAP in debug mode because MMAP will lock files preventing people from
         // making changes to them.
         if (factory == null) {
